@@ -86,7 +86,9 @@ const galleryFailure = (status, code) =>
     response: { status, data: { detail: { code, message: "" } } },
   });
 
-// Answers after a short wait so the pending label shows, like a real hub.
+// Answers after a short wait so the pending label shows, like a real hub. The
+// answered item carries its new action, whose params target the opposite state
+// (docs: PLUGIN_FRONTEND_COMPONENTS.md), so a second tap sends the other way.
 function galleryRunAction(action) {
   const { device, on } = action.params;
   return new Promise((resolve, reject) => {
@@ -95,7 +97,13 @@ function galleryRunAction(action) {
       else if (device === "plug-e") reject(galleryFailure(403, "plugin_action_refused"));
       else {
         const item = switchGrid.data.items.find(i => i.id === device);
-        resolve({ item: { ...item, state: on ? "on" : "off" } });
+        resolve({
+          item: {
+            ...item,
+            state: on ? "on" : "off",
+            action: { name: action.name, params: { ...action.params, on: !on } },
+          },
+        });
       }
     }, 400);
   });
