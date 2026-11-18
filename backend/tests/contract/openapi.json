@@ -2516,6 +2516,32 @@
         "title": "Preflight",
         "type": "object"
       },
+      "ScanWithConfigRequest": {
+        "additionalProperties": true,
+        "description": "Body of ``POST /api/plugins/{plugin_id}/scan``: the field and the form's config.\n\nEvery field is checked in the route, not by the model: FastAPI's default\n422 echoes the input, and this body can hold a key. The route's errors name\nkeys only, never values.",
+        "properties": {
+          "config": {
+            "additionalProperties": true,
+            "description": "The settings form's config",
+            "title": "Config",
+            "type": "object"
+          },
+          "field": {
+            "description": "Config field key to scan options for",
+            "maxLength": 64,
+            "title": "Field",
+            "type": "string"
+          },
+          "instance_id": {
+            "description": "Instance being edited, if any",
+            "maxLength": 128,
+            "title": "Instance Id",
+            "type": "string"
+          }
+        },
+        "title": "ScanWithConfigRequest",
+        "type": "object"
+      },
       "SealedModeBody": {
         "properties": {
           "sealed_mode": {
@@ -7173,6 +7199,59 @@
           }
         },
         "summary": "Scan Plugin Options",
+        "tags": [
+          "plugins"
+        ]
+      },
+      "post": {
+        "description": "List options for a config field using the settings form's config.\n\nAdmin-only (an unsafe method outside ``PUBLIC_WRITES``). The config may\nhold a key: it is used for this one call and never stored, logged or\nechoed. Secrets left blank are filled from the stored instance of this\ntype (``instance_id``) or the type config, and never reused when the\naddress changed (400). The answer carries only option strings.",
+        "operationId": "scan_plugin_options_with_config_api_plugins__plugin_id__scan_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScanWithConfigRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Scan Plugin Options With Config Api Plugins  Plugin Id  Scan Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Scan Plugin Options With Config",
         "tags": [
           "plugins"
         ]

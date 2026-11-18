@@ -2045,7 +2045,17 @@ export interface paths {
      */
     get: operations["scan_plugin_options_api_plugins__plugin_id__scan_get"];
     put?: never;
-    post?: never;
+    /**
+     * Scan Plugin Options With Config
+     * @description List options for a config field using the settings form's config.
+     *
+     *     Admin-only (an unsafe method outside ``PUBLIC_WRITES``). The config may
+     *     hold a key: it is used for this one call and never stored, logged or
+     *     echoed. Secrets left blank are filled from the stored instance of this
+     *     type (``instance_id``) or the type config, and never reused when the
+     *     address changed (400). The answer carries only option strings.
+     */
+    post: operations["scan_plugin_options_with_config_api_plugins__plugin_id__scan_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -3311,6 +3321,35 @@ export interface components {
        * @enum {string}
        */
       status: "clean" | "fault" | "settling" | "watching";
+    };
+    /**
+     * ScanWithConfigRequest
+     * @description Body of ``POST /api/plugins/{plugin_id}/scan``: the field and the form's config.
+     *
+     *     Every field is checked in the route, not by the model: FastAPI's default
+     *     422 echoes the input, and this body can hold a key. The route's errors name
+     *     keys only, never values.
+     */
+    ScanWithConfigRequest: {
+      /**
+       * Config
+       * @description The settings form's config
+       */
+      config?: {
+        [key: string]: unknown;
+      };
+      /**
+       * Field
+       * @description Config field key to scan options for
+       */
+      field?: string;
+      /**
+       * Instance Id
+       * @description Instance being edited, if any
+       */
+      instance_id?: string;
+    } & {
+      [key: string]: unknown;
     };
     /** SealedModeBody */
     SealedModeBody: {
@@ -6533,6 +6572,43 @@ export interface operations {
         };
         content: {
           "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  scan_plugin_options_with_config_api_plugins__plugin_id__scan_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        plugin_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ScanWithConfigRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
         };
       };
       /** @description Validation Error */

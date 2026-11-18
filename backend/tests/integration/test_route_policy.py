@@ -172,3 +172,22 @@ def test_only_fetch_and_actions_are_public_plugin_writes():
 
 def test_plugin_action_template_matches_a_real_route():
     assert ("POST", "/api/plugins/{plugin_id}/actions/{action}") in _policy_route_index()
+
+
+def test_post_scan_is_not_public():
+    # The scan's body can hold a key typed into the form (homey switch tiles
+    # Task 2.5): admin-only by the default-deny policy, never a viewer write.
+    assert ("POST", "/api/plugins/{plugin_id}/scan") not in PUBLIC_WRITES
+    assert ("POST", "/api/plugins/{plugin_id}/scan") in _policy_route_index()
+
+
+def test_get_scan_still_admin_read():
+    assert "/api/plugins/{plugin_id}/scan" in ADMIN_READS
+
+
+def test_post_scan_logged_out_is_admin_required(test_client):
+    response = test_client.post(
+        "/api/plugins/x/scan", json={"field": "devices", "config": {"api_key": "typed"}}
+    )
+    assert response.status_code == 401
+    assert _error_code(response) == "admin_required"

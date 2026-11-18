@@ -190,6 +190,21 @@ The `iframe` plugin uses these as the reference example.
   config field (e.g. enumerate devices); return
   `{"options": [{"value", "label"}]}` or `None`. Served at
   `GET /api/plugins/{type_id}/scan?field=...`.
+- `scan_options_with_config(field_key, config)` (async classmethod) — the
+  same, for a scan that needs the settings form's values (an address and a
+  key, e.g. to list a hub's devices). Served admin-only at
+  `POST /api/plugins/{type_id}/scan` with body
+  `{"field", "config", "instance_id"?}`. `config` is what the form holds;
+  secrets left blank are filled from the stored instance of this type (or the
+  type config), and never when the request changes the address they belong
+  to (that is a `400` asking to re-enter the key). Use `config` for this one
+  call only: never store or log it. Return
+  `{"options": [{"value", "label"}], "error"?: str}` or `None`; the host keeps
+  only those strings (at most 1000 options, 200 characters each), so nothing
+  else you return reaches the browser. An exception becomes a generic
+  `error` with no exception text. `error` is shown in Settings, so it must
+  hold no secrets. Used by the `multi-select-scan` field
+  ([frontend components](PLUGIN_FRONTEND_COMPONENTS.md)).
 - `prepare_instance_config(config, context)` (classmethod) — adjust the
   config persisted for an instance; `context` carries
   `instance_name` / `instance_enabled` / `type_enabled`. Default: unchanged.
@@ -328,6 +343,7 @@ does all of this from the class:
 | `POST /api/plugins/{instance_id}/actions/{name}` | `instance.perform_action(name, params)` after the checks in [Declared actions](#declared-actions); public (no login), body `{"params": {...}}` |
 | `POST /api/plugins/{type_id}/test` | `cls.test_connection(config)` |
 | `GET /api/plugins/{type_id}/scan?field=` | `cls.scan_options(field)` |
+| `POST /api/plugins/{type_id}/scan` | `cls.scan_options_with_config(field, config)`; admin-only, body `{"field", "config", "instance_id"?}` |
 | `PUT /api/plugins/{type_id}/config` | `apply_plugin_config_update` (see above) |
 
 ## Core code rules (host-side)
