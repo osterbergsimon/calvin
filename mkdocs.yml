@@ -101,6 +101,7 @@ nav:
     - configuration/ADMIN_AUTH.md
   - Integrations:
     - integrations/MCP.md
+    - integrations/HOME_AUTOMATION.md
   - Architecture:
     - EVENT_SYSTEM.md
     - IMAP_LOCAL_IMAGES_RELATIONSHIP.md
