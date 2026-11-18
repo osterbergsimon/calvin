@@ -74,7 +74,7 @@ def held_power(cfg: dict) -> bool | None:
     hold = _get(cfg, *_HOLD_KEYS)
     if not isinstance(hold, dict) or hold.get("power") not in ("on", "off"):
         return None
-    return hold["power"] == "on"
+    return bool(hold["power"] == "on")
 
 
 def _screen_now_power(cfg: dict, now: datetime) -> bool | None:
@@ -124,6 +124,30 @@ def now_in(cfg: dict) -> datetime:
         except (ZoneInfoNotFoundError, ValueError):
             pass
     return datetime.now().astimezone()
+
+
+def strip_holds(merged: dict) -> None:
+    """Drop any hold that did not come from the hold column.
+
+    Only ``kiosks.power_hold`` holds a screen: a ``screenHold`` in a layer, the
+    household config or a restored backup must not, or it would hold a screen
+    invisibly and ride along in backups.
+    """
+    for key in _HOLD_KEYS:
+        merged.pop(key, None)
+
+
+def agent_view(merged: dict, agent_holds: bool | None) -> dict:
+    """The config as this screen's agent obeys it.
+
+    An agent that reported it cannot hold ignores ``screenHold`` and follows the
+    projected ``screenNow`` to the next boundary. Unknown (``None``) is taken as
+    a new agent: it is what any screen will do once it updates. Returns a copy.
+    """
+    view = dict(merged)
+    if agent_holds is False:
+        strip_holds(view)
+    return view
 
 
 def project_hold(merged: dict, hold: dict | None) -> None:

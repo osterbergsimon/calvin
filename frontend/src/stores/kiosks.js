@@ -7,6 +7,12 @@ import { logError } from "@/utils/logger";
 const CACHE_KEY = "kiosks_list";
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+function withoutScreenNow(overrides) {
+  if (!overrides || !("screenNow" in overrides || "screen_now" in overrides)) return overrides;
+  const { screenNow: _screenNow, screen_now: _snake, ...rest } = overrides;
+  return rest;
+}
+
 export const useKiosksStore = defineStore("kiosks", () => {
   const kiosks = ref([]);
   let refreshSequence = 0;
@@ -34,7 +40,13 @@ export const useKiosksStore = defineStore("kiosks", () => {
       const fresh = response.data?.kiosks ?? [];
       kiosks.value = fresh.map(k => {
         const current = currentById.get(k.id);
-        return current ? { ...k, overrides: current.overrides ?? k.overrides } : k;
+        if (!current) return k;
+        let overrides = current.overrides ?? k.overrides;
+        // A hold changed elsewhere: the server removed screenNow from the layer.
+        const holdChanged =
+          JSON.stringify(k.powerHold ?? null) !== JSON.stringify(current.powerHold ?? null);
+        if (holdChanged || k.powerHold) overrides = withoutScreenNow(overrides);
+        return { ...k, overrides };
       });
       setCachedData(CACHE_KEY, kiosks.value);
     } catch {
@@ -106,16 +118,32 @@ export const useKiosksStore = defineStore("kiosks", () => {
     setCachedData(CACHE_KEY, kiosks.value);
   }
 
-  // Hold a screen on/off or send it back to its schedule (calvin-2ifv). The
-  // hold lives outside the override layer; keep the list's copy in step.
+  // Screen power held from home automation or Settings (calvin-2ifv). The hold
+  // lives outside the override layer, and setting or ending it removes
+  // screenNow from the layer on the server. Keep the list's copy in step, or
+  // a later save of this page would send an old manual choice back.
+  function applyScreenPower(id, view, { wrote = false } = {}) {
+    const kiosk = kiosks.value.find(k => k.id === id);
+    if (!kiosk || !view) return;
+    const hold = view.held ? { power: view.power, setAt: view.setAt, by: view.by } : null;
+    // A write always leaves the layer without screenNow ("schedule" clears it too).
+    if (wrote || hold || JSON.stringify(hold) !== JSON.stringify(kiosk.powerHold ?? null)) {
+      kiosk.overrides = withoutScreenNow(kiosk.overrides);
+    }
+    kiosk.powerHold = hold;
+    kiosk.agentHolds = view.agentHolds ?? kiosk.agentHolds ?? null;
+    setCachedData(CACHE_KEY, kiosks.value);
+  }
+
   async function setScreenPower(id, power) {
     const { data } = await api.put(`/kiosks/${encodeURIComponent(id)}/screen-power`, { power });
-    const kiosk = kiosks.value.find(k => k.id === id);
-    if (kiosk && data) {
-      kiosk.powerHold = data.held ? { power: data.power, setAt: data.setAt, by: data.by } : null;
-      kiosk.agentHolds = data.agentHolds ?? kiosk.agentHolds ?? null;
-      setCachedData(CACHE_KEY, kiosks.value);
-    }
+    applyScreenPower(id, data, { wrote: true });
+    return data;
+  }
+
+  async function fetchScreenPower(id) {
+    const { data } = await api.get(`/kiosks/${encodeURIComponent(id)}/screen-power`);
+    applyScreenPower(id, data);
     return data;
   }
 
@@ -145,6 +173,7 @@ export const useKiosksStore = defineStore("kiosks", () => {
     removeKiosk,
     triggerUpdate,
     setScreenPower,
+    fetchScreenPower,
     fetchAvailableAgentVersion,
   };
 });

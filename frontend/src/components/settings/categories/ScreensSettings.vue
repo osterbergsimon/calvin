@@ -1387,13 +1387,24 @@ const untilCopy = computed(() => {
 
 async function setScreenNow(power) {
   // A person's own choice ends a hold first, then works as always: until the
-  // next scheduled change.
-  if (powerHold.value && !(await endHold())) return;
+  // next scheduled change. Ask the server first: home automation may have held
+  // the screen since this page last looked.
+  if ((await isHeldNow()) && !(await endHold())) return;
   const next = {
     ...overrides.value,
     screenNow: buildPowerOverride({ power, now: new Date() }),
   };
   persist(next, powerMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
+}
+
+async function isHeldNow() {
+  const kioskId = selectedId.value;
+  if (!kioskId) return false;
+  try {
+    return Boolean((await store.fetchScreenPower(kioskId))?.held);
+  } catch {
+    return Boolean(powerHold.value); // offline: go by what the page last saw
+  }
 }
 
 // Ends a hold through the screen-power call; the layer is not touched.

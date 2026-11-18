@@ -55,6 +55,11 @@ function mountScreens({ kiosks = [kiosk()], overrides = {} } = {}) {
   store.setKioskOverrides = vi.fn();
   store.fetchDeviceConfigVersion = vi.fn(async () => null);
   store.fetchAvailableAgentVersion = vi.fn(async () => null);
+  store.fetchScreenPower = vi.fn(async id => {
+    const target = store.kiosks.find(k => k.id === id);
+    const hold = target?.powerHold ?? null;
+    return { id, held: Boolean(hold), ...(hold ?? { power: "schedule" }) };
+  });
   store.setScreenPower = vi.fn(async (id, power) => {
     const target = store.kiosks.find(k => k.id === id);
     if (target) target.powerHold = null;
@@ -142,6 +147,32 @@ describe("ScreensSettings — a held screen", () => {
     expect(order[0]).toBeLessThan(order[1]);
   });
 
+  it("Turn off now on a page that hasn't seen a new hold still ends it", async () => {
+    const { wrapper, store } = mountScreens();
+    await open(wrapper);
+    // Home automation held it after the page loaded; the page still says not held.
+    store.fetchScreenPower = vi.fn(async id => ({ id, held: true, ...HOLD, power: "on" }));
+    await wrapper.find("[data-test='screen-now-off']").trigger("click");
+    await flushPromises();
+    expect(store.fetchScreenPower).toHaveBeenCalledWith("kitchen");
+    expect(store.setScreenPower).toHaveBeenCalledWith("kitchen", "schedule");
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      screenNow: { power: "off", setAt: expect.any(String) },
+    });
+  });
+
+  it("a failed hold check still saves the person's choice", async () => {
+    const { wrapper, store } = mountScreens();
+    await open(wrapper);
+    store.fetchScreenPower = vi.fn(async () => {
+      throw new Error("offline");
+    });
+    await wrapper.find("[data-test='screen-now-off']").trigger("click");
+    await flushPromises();
+    expect(store.setScreenPower).not.toHaveBeenCalled();
+    expect(store.saveOverrides).toHaveBeenCalled();
+  });
+
   it("explains a screen whose software is too old to hold", async () => {
     const { wrapper } = mountScreens({
       kiosks: [kiosk({ powerHold: HOLD, agentHolds: false })],
@@ -152,7 +183,7 @@ describe("ScreensSettings — a held screen", () => {
     );
   });
 
-  it("without a hold, the row is as before and never calls the screen-power route", async () => {
+  it("without a hold, the row is as before and nothing is ended", async () => {
     const { wrapper, store } = mountScreens();
     await open(wrapper);
     expect(text(wrapper, "screen-now-state")).toBe("On now");

@@ -51,7 +51,10 @@ The answer, and `GET` on the same path, is the screen's state:
 ```
 
 - `desiredOn` is what the screen will do. The screen does not report whether its panel is
-  actually lit, so this is the intent, not a measurement.
+  actually lit, so this is the intent, not a measurement. For a screen that follows its
+  schedule it uses the time zone set in Settings; with none set it uses the server's own.
+- `by` is `automation` for any API key (an admin key used by a script too) and `settings` for
+  a signed-in admin.
 - `agentHolds: false` means the screen's software is too old to hold: it obeys the command
   until its next scheduled change. Press **Update** for that screen in Settings.
   `null` means no screen has checked in since Calvin was updated.

@@ -91,3 +91,26 @@ def test_limiter_allows_thirty_a_minute():
     assert wait > 0
     assert limiter.check("key:b", now=1030) == 0  # per caller
     assert limiter.check("key:a", now=1061) == 0  # the window slides
+
+
+def test_agent_view_for_an_agent_that_cannot_hold():
+    """An old agent obeys the projected screenNow, so it follows the next boundary."""
+    from app.services.screen_power import agent_view
+
+    merged = {**SCHEDULE}
+    project_hold(merged, {"power": "off", "setAt": "2026-11-18T12:00:00Z", "by": "automation"})
+    old = agent_view(merged, agent_holds=False)
+    assert "screenHold" not in old and "screen_hold" not in old
+    assert desired_on(old, _at(15)) is False
+    assert desired_on(old, _at(8, day=19)) is True  # past 22:00: the schedule again
+    for holds in (True, None):
+        assert desired_on(agent_view(merged, agent_holds=holds), _at(8, day=19)) is False
+    assert "screenHold" in merged  # the input is not changed
+
+
+def test_strip_holds_drops_a_hold_that_did_not_come_from_the_column():
+    from app.services.screen_power import strip_holds
+
+    merged = {"screenHold": {"power": "off"}, "screen_hold": {"power": "off"}, "x": 1}
+    strip_holds(merged)
+    assert merged == {"x": 1}

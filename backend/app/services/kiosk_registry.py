@@ -236,7 +236,6 @@ _HEARTBEAT_COLUMNS = [
     "wifi_power_save",
     "peer_ips",
     "agent_features",
-    "overrides",
 ]
 
 
@@ -306,6 +305,7 @@ async def record_kiosk(
                 return
 
     changed = False
+    clear_flag = False
     if hostname and existing.hostname != hostname:
         existing.hostname = hostname
         changed = True
@@ -348,6 +348,7 @@ async def record_kiosk(
         if ov.pop(_UPDATE_FLAG_KEY, None) is not None:
             existing.overrides = ov
             changed = True
+            clear_flag = True
     if (
         not changed
         and existing.last_seen is not None
@@ -357,7 +358,10 @@ async def record_kiosk(
     existing.last_seen = now
     # Never the display-check columns: the kiosk's own poll rewrites its row about
     # every 1.5 s during a check and must not put back a stale copy of the run.
-    await existing.update(_columns=_HEARTBEAT_COLUMNS)
+    # The layer only when the update flag was cleared: otherwise a poll could
+    # put back a screenNow that a hold change just removed (calvin-2ifv).
+    columns = [*_HEARTBEAT_COLUMNS, "overrides"] if clear_flag else _HEARTBEAT_COLUMNS
+    await existing.update(_columns=columns)
 
 
 def _to_utc_iso(dt: datetime | None) -> str | None:

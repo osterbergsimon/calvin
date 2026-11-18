@@ -215,7 +215,9 @@ async def _power_status_or_404(kiosk_id: str) -> dict:
 async def _screen_power_view(kiosk_id: str, status: dict) -> ScreenPowerView:
     hold = status["hold"]
     merged = merge_overrides(await build_global_config(), status["overrides"])
+    screen_power.strip_holds(merged)
     screen_power.project_hold(merged, hold)
+    agent_cfg = screen_power.agent_view(merged, status["agentHolds"])
     last_seen = status["lastSeen"]
     return ScreenPowerView(
         id=kiosk_id,
@@ -223,7 +225,7 @@ async def _screen_power_view(kiosk_id: str, status: dict) -> ScreenPowerView:
         held=hold is not None,
         setAt=hold["setAt"] if hold else None,
         by=hold["by"] if hold else None,
-        desiredOn=screen_power.desired_on(merged, screen_power.now_in(merged)),
+        desiredOn=screen_power.desired_on(agent_cfg, screen_power.now_in(agent_cfg)),
         online=last_seen is not None and (utcnow() - last_seen).total_seconds() < _ONLINE_S,
         agentHolds=status["agentHolds"],
     )
@@ -656,6 +658,7 @@ async def get_kiosk_config(
     overrides = await get_overrides(kiosk_id)
     merged = merge_overrides(base, overrides)
     merged.pop("_agentUpdateRequested", None)  # never expose the host-internal flag verbatim
+    screen_power.strip_holds(merged)  # only the hold column holds a screen
     screen_power.project_hold(merged, await kiosk_registry.get_power_hold(kiosk_id))
     version = device_config_version(merged)
     update_requested = agent_update_requested(overrides)

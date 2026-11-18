@@ -127,3 +127,19 @@ async def test_malformed_stored_hold_reads_as_none(test_db):
     await row.update(_columns=["power_hold"])
     assert await get_power_hold(KIOSK) is None
     assert (await _listed())["powerHold"] is None
+
+
+async def test_heartbeat_never_writes_back_the_layer(test_db, monkeypatch):
+    """A poll must not put back a screenNow that a hold change just removed."""
+    await _register()
+    await set_overrides(KIOSK, {"screenNow": {"power": "on", "setAt": "2026-11-18T10:00:00Z"}})
+    written: list[list[str]] = []
+    original = KioskDB.update
+
+    async def spy(self, _columns=None, **kwargs):
+        written.append(list(_columns or []))
+        return await original(self, _columns=_columns, **kwargs)
+
+    monkeypatch.setattr(KioskDB, "update", spy)
+    await kiosk_registry.record_kiosk(KIOSK, hostname="pi-new", agent_version="v3")
+    assert written and all("overrides" not in columns for columns in written)

@@ -271,3 +271,67 @@ describe("kiosks store — removeKiosk", () => {
     expect(store.kiosks).toHaveLength(1);
   });
 });
+
+// A hold lives outside the layer; when it changes the server drops screenNow
+// from the layer, so the page's copy must drop it too or a later save brings
+// an old manual choice back (calvin-2ifv).
+describe("kiosks store — screen power hold", () => {
+  const OLD_NOW = { power: "off", setAt: "2026-11-18T08:00:00Z" };
+  const HOLD = { power: "on", setAt: "2026-11-18T12:00:00Z", by: "automation" };
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it("setScreenPower PUTs the power and drops screenNow from the local layer", async () => {
+    const store = useKiosksStore();
+    store.kiosks = [{ id: "k 1", overrides: { displayName: "Hall", screenNow: OLD_NOW } }];
+    api.put.mockResolvedValueOnce({
+      data: { id: "k 1", power: "schedule", held: false, setAt: null, by: null, agentHolds: true },
+    });
+    const view = await store.setScreenPower("k 1", "schedule");
+    expect(api.put).toHaveBeenCalledWith("/kiosks/k%201/screen-power", { power: "schedule" });
+    expect(view.power).toBe("schedule");
+    expect(store.kiosks[0].powerHold).toBeNull();
+    expect(store.kiosks[0].agentHolds).toBe(true);
+    expect(store.kiosks[0].overrides).toEqual({ displayName: "Hall" });
+  });
+
+  it("fetchScreenPower reads the hold and keeps the list in step", async () => {
+    const store = useKiosksStore();
+    store.kiosks = [{ id: "k1", overrides: { screenNow: OLD_NOW }, powerHold: null }];
+    api.get.mockResolvedValueOnce({
+      data: { id: "k1", held: true, ...HOLD, agentHolds: false },
+    });
+    const view = await store.fetchScreenPower("k1");
+    expect(api.get).toHaveBeenCalledWith("/kiosks/k1/screen-power");
+    expect(view.held).toBe(true);
+    expect(store.kiosks[0].powerHold).toEqual(HOLD);
+    expect(store.kiosks[0].overrides).toEqual({});
+  });
+
+  it("refreshKiosks drops a stale screenNow when the hold changed elsewhere", async () => {
+    const store = useKiosksStore();
+    store.kiosks = [
+      { id: "held", overrides: { screenNow: OLD_NOW }, powerHold: null },
+      { id: "ended", overrides: { screenNow: OLD_NOW }, powerHold: HOLD },
+      { id: "same", overrides: { screenNow: OLD_NOW }, powerHold: null },
+    ];
+    api.get.mockResolvedValueOnce({
+      data: {
+        kiosks: [
+          { id: "held", overrides: {}, powerHold: HOLD },
+          { id: "ended", overrides: {}, powerHold: null },
+          { id: "same", overrides: {}, powerHold: null },
+        ],
+      },
+    });
+    await store.refreshKiosks();
+    const byId = Object.fromEntries(store.kiosks.map(k => [k.id, k]));
+    expect(byId.held.overrides).toEqual({});
+    expect(byId.ended.overrides).toEqual({});
+    expect(byId.same.overrides).toEqual({ screenNow: OLD_NOW }); // nothing changed: kept
+  });
+});

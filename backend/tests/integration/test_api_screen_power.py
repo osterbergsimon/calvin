@@ -217,3 +217,46 @@ def test_anonymous_cannot_switch_but_can_read(test_client: TestClient):
     response = test_client.put(URL, json={"power": "off"})
     assert response.status_code == 401
     assert test_client.get(URL).status_code == 200
+
+
+@pytest.mark.integration
+def test_a_hold_written_into_the_layer_is_ignored(test_client: TestClient):
+    """Only the hold column holds a screen: a layer (or a restored backup) cannot."""
+    _register(test_client)
+    injected = {"screenHold": {"power": "off", "setAt": "2026-11-18T12:00:00Z"}}
+    test_client.put(f"/api/kiosks/{KIOSK}/overrides", json={"overrides": injected})
+    config = test_client.get(f"/api/kiosks/{KIOSK}/config").json()
+    assert "screenHold" not in config and "screen_hold" not in config
+    body = test_client.get(URL).json()
+    assert body["held"] is False and body["desiredOn"] is True
+
+
+@pytest.mark.integration
+def test_old_agent_desired_on_follows_the_projected_screen_now(test_client: TestClient):
+    """For an agent that can't hold, desiredOn is what that agent will do."""
+    _register(test_client)  # kagent without kfeat: cannot hold
+    test_client.post(
+        "/api/config",
+        json={
+            "displayScheduleEnabled": True,
+            "displaySchedule": [
+                {"day": d, "enabled": True, "onTime": "00:00", "offTime": "23:59"} for d in range(7)
+            ],
+        },
+    )
+    from app.services import kiosk_registry
+
+    async def _old_hold():
+        from datetime import UTC, datetime
+
+        await kiosk_registry.set_power_hold(
+            KIOSK, "off", "automation", now=datetime(2026, 1, 1, tzinfo=UTC)
+        )
+
+    import asyncio
+
+    asyncio.run(_old_hold())
+    body = test_client.get(URL).json()
+    assert body["held"] is True and body["agentHolds"] is False
+    # Set long ago: the old agent's projected screenNow has expired, the schedule says on.
+    assert body["desiredOn"] is True

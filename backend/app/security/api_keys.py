@@ -180,7 +180,7 @@ class ApiKeyStore:
             keys = self._load()
             if any(entry["name"].casefold() == name.casefold() for entry in keys):
                 raise DuplicateKeyName(name)
-            entry = {
+            entry: dict[str, Any] = {
                 "id": secrets.token_hex(8),
                 "name": name,
                 "scope": scope,
