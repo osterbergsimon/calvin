@@ -15,6 +15,7 @@ import re
 import secrets
 import threading
 import time
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -29,6 +30,15 @@ SCOPE_RANK = {"read": 0, "admin": 1, "host": 2}
 MAX_NAME_LEN = 40
 LAST_USED_INTERVAL = 60  # seconds between last_used_at writes, per key
 _FILE_VERSION = 1
+
+# Named permissions a key can carry (calvin-2ifv). A key with a ``permissions``
+# field is *limited*: it is stored with the ``read`` scope, so an older backend
+# loads it as an ordinary read key (and fails closed), while this one gives it
+# only what an anonymous caller gets plus the routes its permissions open
+# (``PERMISSION_ROUTES`` in route_policy). Only things that are not already
+# public need a permission. The label is plain words for Settings and errors.
+PERMISSIONS: dict[str, str] = {"screens.power": "Turn screens on and off"}
+_warned_permissions: set[str] = set()
 
 # Anything shaped like a key; used to keep secrets out of log lines.
 SECRET_PATTERN = re.compile(r"clv_[A-Za-z0-9_-]{16,}")
@@ -46,6 +56,32 @@ def _iso(epoch: int | float) -> str:
     return datetime.fromtimestamp(epoch, UTC).isoformat().replace("+00:00", "Z")
 
 
+def _known_permissions(entry: dict[str, Any]) -> list[str]:
+    """The permissions this backend knows, in file order.
+
+    An unknown name (from a newer backend) is ignored for this key, never fatal
+    to the file, and never removed from it. A malformed field gives no
+    permissions, so the key fails closed.
+    """
+    raw = entry.get("permissions")
+    if not isinstance(raw, list):
+        return []
+    known: list[str] = []
+    for name in raw:
+        if isinstance(name, str) and name in PERMISSIONS:
+            if name not in known:
+                known.append(name)
+        elif isinstance(name, str) and name not in _warned_permissions:
+            _warned_permissions.add(name)
+            logger.warning("Ignoring unknown API key permission {!r}", name)
+    return known
+
+
+def is_limited(key: dict[str, Any]) -> bool:
+    """True for a key (public record) that carries a permissions list."""
+    return bool(key.get("limited"))
+
+
 def _public(entry: dict[str, Any]) -> dict[str, Any]:
     """The shape the API returns: never the hash."""
     last_used = entry.get("last_used_at")
@@ -56,6 +92,10 @@ def _public(entry: dict[str, Any]) -> dict[str, Any]:
         "prefix": entry["prefix"],
         "createdAt": _iso(entry["created_at"]),
         "lastUsedAt": _iso(last_used) if last_used is not None else None,
+        "permissions": _known_permissions(entry),
+        # Any entry with the field is limited, even when none of its names is
+        # known here: that is what fails closed.
+        "limited": "permissions" in entry,
     }
 
 
@@ -115,11 +155,25 @@ class ApiKeyStore:
         return [_public(entry) for entry in entries]
 
     def create(
-        self, name: str, scope: str, now: int | float | None = None
+        self,
+        name: str,
+        scope: str,
+        now: int | float | None = None,
+        permissions: Sequence[str] | None = None,
     ) -> tuple[dict[str, Any], str]:
-        """Mint a key. Returns ``(public record, secret)``; the secret exists nowhere else."""
+        """Mint a key. Returns ``(public record, secret)``; the secret exists nowhere else.
+
+        With ``permissions`` the key is limited: the list must be non-empty and
+        known, and the scope must be ``read`` (see :data:`PERMISSIONS`).
+        """
         if scope not in SCOPES:
             raise ValueError(f"Unknown scope {scope!r}")
+        if permissions is not None:
+            if scope != "read":
+                raise ValueError("A limited key is always a read key")
+            if not permissions or any(p not in PERMISSIONS for p in permissions):
+                raise ValueError("Unknown or missing permissions")
+            permissions = list(dict.fromkeys(permissions))
         secret = SECRET_PREFIX + secrets.token_urlsafe(SECRET_BYTES)
         created = time.time() if now is None else now
         with self._lock:
@@ -135,6 +189,8 @@ class ApiKeyStore:
                 "created_at": created,
                 "last_used_at": None,
             }
+            if permissions is not None:
+                entry["permissions"] = permissions
             keys.append(entry)
             self._write(keys)
         return _public(entry), secret
