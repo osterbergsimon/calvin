@@ -146,7 +146,7 @@ describe("ApiKeysSection", () => {
       const card = get("scope-card-screens");
       expect(card.text()).toContain("Turn screens on and off");
       expect(card.text()).toContain(
-        "Lets home automation switch screens on and off. Can't see or change anything else."
+        "Lets home automation switch screens on and off. Beyond that it can only do what anyone on your network can do without a key."
       );
       await get("scope-screens").setValue(true);
       await fillName("Homey");

@@ -203,7 +203,7 @@ const scopeOptions = [
     value: "screens",
     label: "Turn screens on and off",
     description:
-      "Lets home automation switch screens on and off. Can't see or change anything else.",
+      "Lets home automation switch screens on and off. Beyond that it can only do what anyone on your network can do without a key.",
     request: { scope: "read", permissions: ["screens.power"] },
   },
   {
