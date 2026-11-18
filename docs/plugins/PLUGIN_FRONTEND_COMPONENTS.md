@@ -168,6 +168,88 @@ display_schema={
 - A payload with `{"error": "...", "message": "..."}` renders as an error
   state instead of the forecast.
 
+### `switch-grid` — on/off tiles a tap switches
+
+[SwitchGrid.vue](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/renderers/SwitchGrid.vue)
+
+The one renderer that acts. Each item is a tile; a tap runs the item's
+`action` through the plugin's declared actions (`metadata.actions` and
+`perform_action`, see [Declared actions](PLUGIN_INTERFACE.md#declared-actions)),
+on the public route `POST /api/plugins/{instance_id}/actions/{name}`. The
+renderer knows nothing about the plugin: what a tap sends is in the payload.
+
+```json
+{
+  "display_schema": {
+    "kind": "switch-grid",
+    "poll_interval_ms": 15000,
+    "unreachable_text": "Couldn't reach the hub",
+    "empty_text": "No switches chosen yet."
+  }
+}
+```
+
+- `data_path` (default `$.items`) → a list of items:
+  `{"id", "label", "group"?, "state": "on" | "off" | "unavailable", "action": {"name", "params"} | null}`.
+  Tiles are grouped under `group` in first-seen order; items without one have
+  no heading. Set `params` to the target state (`on: true` when the device is
+  off), so a tap is explicit, never a blind toggle. `action: null` (or
+  `state: "unavailable"`) makes the tile inert; it reads "Not responding".
+- `perform_action` answers `{"item": {...}}` in the same item shape. The tile
+  settles on that state (the real state wins over the tap; an answer without
+  an `item` shows the data until it is fetched again), the cached data
+  is patched with it (at `data_path`), and the plugin's data is fetched again so other tiles
+  and screens stay true. Set `poll_interval_ms` so changes made elsewhere
+  show up.
+- **The answered `item` must carry its new `action`.** It takes the place of the
+  tile's entry (fields it omits, such as `label`, are kept), but the old
+  `action` is dropped: its `params` targeted the old state. An answer without an
+  `action` leaves the tile inert until the next fetch brings one, never a tap
+  that repeats the old target.
+- While the action runs the tile reads "Turning on…" / "Turning off…" and
+  ignores taps. A poll that lands meanwhile does not change it.
+- A failure returns the tile to what it showed and puts one line in the
+  grid's polite live region, cleared after 6 s or by the next good tap:
+
+  | Answer | Tile | Note |
+  |---|---|---|
+  | `403 plugin_action_refused` | unavailable until the next data | "Can't be switched from here" |
+  | `429 rate_limited` | reverts | "Too many taps. Try again in a moment." |
+  | `429 action_busy` | reverts | "Still busy with the last tap. Try again in a moment." |
+  | `504 plugin_action_timeout` | reverts | "No answer in time. Try again." |
+  | `404 unknown_action`, `422 invalid_action_params` / `invalid_action_body` | reverts | "This switch can't be used right now." |
+  | anything else (`404`/`409` for a removed or disabled instance, `502`, `500`, no answer) | reverts | `unreachable_text`, default "Couldn't reach it." |
+
+  A failed tap is retried by tapping again; nothing retries on its own.
+- `empty_text` is shown when there are no items.
+
+### `multi-select-scan` — a settings field that lists choices from a scan
+
+A settings field (not a renderer): the form shows a Scan button, the host calls
+the plugin's `scan_options_with_config`
+([PLUGIN_INTERFACE](PLUGIN_INTERFACE.md#baseplugin-surface)) with the form's
+current values, and the answer is drawn as chips to pick from. Declare it in
+`instance_config_schema`:
+
+```python
+"devices": {
+    "type": "string",
+    "label": "Devices",
+    "ui": {"component": "multi-select-scan"},
+},
+```
+
+- The saved value is **one string of ids joined by commas** (`"id1,id2"`). Ids
+  must not contain commas: the host drops a scanned option whose `value` has one
+  (or is over 200 characters), as it could not be saved back.
+- Saved ids a scan does not find stay listed under their id, so a hub that is
+  briefly unreachable never drops the selection.
+- The scan sees the address and key as typed. A blank key is filled from the
+  stored instance, **never when the address changed**, so mark the field the key
+  is sent to `"ui": {"endpoint": True}` unless its name already contains `url`,
+  `host`, `server`, `endpoint`, `domain` or `port` (or it has a `url` type). A
+  plugin with a stored key and no recognisable address field gets a `400`.
+
 ### `web-component` — the escape hatch
 
 [WebComponentHost.vue](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/WebComponentHost.vue)

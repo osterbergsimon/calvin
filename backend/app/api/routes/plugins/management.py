@@ -6,14 +6,15 @@ import sys
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import httpx
 from fastapi import APIRouter, Body, File, HTTPException, Query, UploadFile
 from loguru import logger
-from pydantic import BaseModel, TypeAdapter, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError, WithJsonSchema
 
 from app.models.db_models import PluginDB, PluginTypeDB
+from app.plugins.actions import describe_unknown
 from app.plugins.base import PluginType
 from app.plugins.isolated_check import run_isolated_plugin_check
 from app.plugins.loader import plugin_loader
@@ -25,6 +26,7 @@ from app.plugins.utils.secrets import (
     SecretEndpointChangedError,
     check_secret_endpoint,
     endpoint_keys_for_type,
+    is_unchanged_secret,
     keep_stored_secrets,
     secret_keys_for_type,
 )
@@ -706,7 +708,11 @@ async def get_plugin(plugin_id: str):
 
 
 async def _keep_stored_type_secrets(
-    plugin_id: str, config: dict[str, Any], instance_id: str | None = None
+    plugin_id: str,
+    config: dict[str, Any],
+    instance_id: str | None = None,
+    *,
+    require_endpoint: bool = False,
 ) -> dict[str, Any]:
     """
     Fill secrets the settings form sent back blank or masked from what is stored.
@@ -715,7 +721,12 @@ async def _keep_stored_type_secrets(
     (audit S4). Stored values come from the type config and, when the update
     targets an instance, from that instance. A stored secret is never reused
     when the request changes the URL/host it authenticates against; that is a
-    400 asking the caller to re-enter it.
+    400 asking the caller to re-enter it. With ``require_endpoint`` (the scan
+    route) a stored secret is also never reused when the type names no
+    endpoint field at all (no url-like name, ``url`` type or ``ui.endpoint``):
+    the host cannot tell whether the address changed, so it fails closed. That
+    decision is made from the type's schema (or, for legacy rows, the stored
+    config) only; keys the request invents never count.
     """
     stored: dict[str, Any] = {}
     stored_json = await config_service.get_value(f"plugin_{plugin_id}_config")
@@ -733,8 +744,27 @@ async def _keep_stored_type_secrets(
     keys = secret_keys_for_type(plugin_id, known)
     if not keys:
         return config
+    # What the host can tell the address from: the type's schema first, then
+    # the stored config for rows written before the schema said so. The request
+    # never counts here — an invented key would let the caller satisfy the gate.
+    endpoints = endpoint_keys_for_type(plugin_id, known)
+    known_endpoints = endpoint_keys_for_type(plugin_id) or endpoint_keys_for_type(plugin_id, stored)
+    if require_endpoint and not known_endpoints:
+        kept = sorted(
+            key
+            for key in keys
+            if stored.get(key) and (key not in config or is_unchanged_secret(config[key]))
+        )
+        if kept:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Re-enter {', '.join(kept)}: the stored value is not reused "
+                    "for this plugin's settings"
+                ),
+            )
     try:
-        check_secret_endpoint(config, stored, keys, endpoint_keys_for_type(plugin_id, known))
+        check_secret_endpoint(config, stored, keys, endpoints)
     except SecretEndpointChangedError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     return keep_stored_secrets(config, stored, keys)
@@ -1053,6 +1083,143 @@ async def scan_plugin_options(
         logger.debug(f"scan_options failed for {plugin_id}: {e}")
 
     return {"options": [], "error": "Plugin does not support option scanning for this field"}
+
+
+# Scan with form config (homey switch tiles Task 2.5): answers are bounded so a
+# plugin cannot push large or odd payloads to the settings page.
+MAX_SCAN_OPTIONS = 1000
+MAX_SCAN_TEXT = 200
+
+
+class ScanWithConfigRequest(BaseModel):
+    """Body of ``POST /api/plugins/{plugin_id}/scan``: the field and the form's config.
+
+    Every field is checked in the route, not by the model: FastAPI's default
+    422 echoes the input, and this body can hold a key. The route's errors name
+    keys only, never values.
+    """
+
+    field: Annotated[Any, WithJsonSchema({"type": "string", "maxLength": 64})] = Field(
+        default=None, description="Config field key to scan options for"
+    )
+    config: Annotated[Any, WithJsonSchema({"type": "object", "additionalProperties": True})] = (
+        Field(default=None, description="The settings form's config")
+    )
+    instance_id: Annotated[Any, WithJsonSchema({"type": "string", "maxLength": 128})] = Field(
+        default=None, description="Instance being edited, if any"
+    )
+
+    model_config = ConfigDict(extra="allow")
+
+
+def _invalid_scan_body(message: str) -> HTTPException:
+    return HTTPException(status_code=422, detail={"code": "invalid_scan_body", "message": message})
+
+
+def _checked_scan_body(request: ScanWithConfigRequest) -> tuple[str, dict[str, Any], str | None]:
+    unknown = describe_unknown("body key", request.model_extra or {})
+    if unknown:
+        raise _invalid_scan_body(f"The request body has {unknown}.")
+    field = request.field
+    if not isinstance(field, str) or not 1 <= len(field) <= 64:
+        raise _invalid_scan_body("field must be a setting name.")
+    config = {} if request.config is None else request.config
+    if not isinstance(config, dict):
+        raise _invalid_scan_body("config must be an object.")
+    instance_id = request.instance_id
+    if instance_id is not None and (not isinstance(instance_id, str) or len(instance_id) > 128):
+        raise _invalid_scan_body("instance_id must be an instance id.")
+    return field, config, instance_id or None
+
+
+def _scan_text(value: Any, *, cut: bool = True) -> str | None:
+    if value is None or isinstance(value, dict | list | tuple | set):
+        return None
+    text = str(value)
+    if not cut:
+        return text or None
+    return text[:MAX_SCAN_TEXT] if text else None
+
+
+def _scan_response(result: dict[str, Any]) -> dict[str, Any]:
+    """Keep only ``{options: [{value, label}], error?}``, all strings."""
+    options: list[dict[str, str]] = []
+    raw = result.get("options")
+    for entry in raw if isinstance(raw, list) else []:
+        if len(options) >= MAX_SCAN_OPTIONS:
+            break
+        if not isinstance(entry, dict):
+            continue
+        value = _scan_text(entry.get("value"), cut=False)
+        # An id is stored comma-joined: cutting or splitting it would save a
+        # different id, so such an option is dropped, not changed.
+        if value is None or len(value) > MAX_SCAN_TEXT or "," in value:
+            continue
+        options.append({"value": value, "label": _scan_text(entry.get("label")) or value})
+    response: dict[str, Any] = {"options": options}
+    error = result.get("error")
+    if isinstance(error, str) and error:
+        response["error"] = error[:MAX_SCAN_TEXT]
+    return response
+
+
+@router.post("/plugins/{plugin_id}/scan")
+async def scan_plugin_options_with_config(
+    plugin_id: str, request: ScanWithConfigRequest
+) -> dict[str, Any]:
+    """List options for a config field using the settings form's config.
+
+    Admin-only (an unsafe method outside ``PUBLIC_WRITES``). The config may
+    hold a key: it is used for this one call and never stored, logged or
+    echoed. Secrets left blank are filled from the stored instance of this
+    type (``instance_id``) or the type config, and never reused when the
+    address changed (400). The answer carries only option strings.
+    """
+    plugin_class = plugin_loader.get_plugin_class(plugin_id)
+    if plugin_class is None:
+        raise HTTPException(status_code=404, detail="Plugin type not found")
+
+    field, form_config, instance_id = _checked_scan_body(request)
+    try:
+        config = await _keep_stored_type_secrets(
+            plugin_id, normalize_plugin_config(form_config), instance_id, require_endpoint=True
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Never let this reach the global handler: its traceback prints local
+        # values, and the form config is one of them.
+        logger.error("Scan with config for {} failed: {}", plugin_id, type(e).__name__)
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "scan_failed", "message": "Couldn't list the options."},
+        ) from None
+    config.pop("_instance_id", None)
+
+    try:
+        result = await plugin_class.scan_options_with_config(field, config)
+    except Exception as e:
+        # Type name only: exception text and tracebacks can carry the config.
+        logger.warning("Scan with config for {} failed: {}", plugin_id, type(e).__name__)
+        return {
+            "options": [],
+            "error": "Couldn't list the options. Check the settings and try again.",
+        }
+
+    try:
+        if not isinstance(result, dict):
+            return {"options": [], "error": "This plugin can't list options for this setting."}
+        response = _scan_response(result)
+    except Exception as e:
+        # Plugin output can fail to render; the global handler's traceback would
+        # print this frame's locals, which hold the filled secret.
+        logger.warning("Scan with config for {} failed: {}", plugin_id, type(e).__name__)
+        return {
+            "options": [],
+            "error": "Couldn't list the options. Check the settings and try again.",
+        }
+    logger.debug("Scan with config for {} field {}", plugin_id, field)
+    return response
 
 
 @router.get("/plugins/{plugin_id}/data")

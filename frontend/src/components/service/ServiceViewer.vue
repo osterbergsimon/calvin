@@ -16,6 +16,7 @@
         v-if="schemaKind"
         :schema="service.display_schema"
         :data="schemaData"
+        :data-updated-at="schemaQuery.dataUpdatedAt?.value"
         :plugin-id="service.id"
         :plugin-name="service.plugin_name || service.name"
         :link-action="linkAction"

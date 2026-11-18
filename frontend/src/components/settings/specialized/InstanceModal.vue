@@ -12,6 +12,12 @@
             :field-key="key"
             :schema="fieldSchema(key, schema)"
             :value="getFormValue(key, schema)"
+            :form-config="
+              fieldSchema(key, schema)?.ui?.component === 'multi-select-scan'
+                ? formConfig
+                : undefined
+            "
+            :instance-id="editingInstance?.id"
             @update="updateFormValue(key, $event)"
           />
           <!-- Geocode button for location field (for weather plugins like YR.no) -->
@@ -446,6 +452,37 @@ const handleGeocode = async () => {
   }
 };
 
+// The instance config the form holds, as test and save send it: strings
+// trimmed, numbers and booleans typed, display_order left out (a plugin-level
+// setting). Secrets are what the form holds (blank keeps the stored one), so
+// the server fills them; they are never read back from has_value.
+function instanceConfigFromForm() {
+  const config = {};
+  const schemaEntries = Object.entries(currentPlugin.value?.instance_config_schema || {});
+  for (const [key, schema] of schemaEntries) {
+    if (key === "display_order") continue;
+    const value = configValueOrDefault(formData.value[key], schema);
+    if (value !== undefined && value !== null) {
+      if (schema.type === "string" && typeof value === "string") {
+        config[key] = value.trim();
+      } else if (schema.type === "integer" || schema.type === "number") {
+        // Preserve a legitimate 0 — Number(0) is falsy so `|| default` would drop it.
+        config[key] = value !== "" ? Number(value) : (schema.default ?? 0);
+      } else if (schema.type === "boolean") {
+        config[key] = Boolean(value);
+      } else {
+        config[key] = value;
+      }
+    } else if (schema.default !== undefined) {
+      config[key] = schema.default;
+    }
+  }
+  return config;
+}
+
+// What a scan field (multi-select-scan) scans with: the form as it stands.
+const formConfig = computed(() => instanceConfigFromForm());
+
 const handleTest = async () => {
   if (!currentPlugin.value) return;
 
@@ -455,34 +492,7 @@ const handleTest = async () => {
 
   try {
     const pluginId = currentPlugin.value.id;
-    const plugin = currentPlugin.value;
-
-    // Build test config from instance form data
-    const testConfig = {};
-    if (plugin.instance_config_schema) {
-      for (const [key, schema] of Object.entries(plugin.instance_config_schema)) {
-        // Skip display_order - it's a global plugin setting
-        if (key === "display_order") {
-          continue;
-        }
-        const value = configValueOrDefault(formData.value[key], schema);
-        if (value !== undefined && value !== null) {
-          // Handle different types
-          if (schema.type === "string" && typeof value === "string") {
-            testConfig[key] = value.trim();
-          } else if (schema.type === "integer" || schema.type === "number") {
-            // Preserve a legitimate 0 — Number(0) is falsy so `|| default` would drop it.
-            testConfig[key] = value !== "" ? Number(value) : (schema.default ?? 0);
-          } else if (schema.type === "boolean") {
-            testConfig[key] = Boolean(value);
-          } else {
-            testConfig[key] = value;
-          }
-        } else if (schema.default !== undefined) {
-          testConfig[key] = schema.default;
-        }
-      }
-    }
+    const testConfig = instanceConfigFromForm();
 
     // When editing, blank secrets are filled server-side from the stored instance.
     const response = await pluginsApi.testPlugin(pluginId, testConfig, editingInstance.value?.id);
@@ -519,33 +529,8 @@ const handleSave = async () => {
     const pluginId = currentPlugin.value.id;
     const plugin = currentPlugin.value;
 
-    // Build config from instance_config_schema fields
     // Exclude display_order - it's a global plugin setting, not instance-specific
-    const config = {};
-    if (plugin.instance_config_schema) {
-      for (const [key, schema] of Object.entries(plugin.instance_config_schema)) {
-        // Skip display_order - it's handled at the plugin level
-        if (key === "display_order") {
-          continue;
-        }
-        const value = configValueOrDefault(formData.value[key], schema);
-        if (value !== undefined && value !== null) {
-          // Handle different types
-          if (schema.type === "string" && typeof value === "string") {
-            config[key] = value.trim();
-          } else if (schema.type === "integer" || schema.type === "number") {
-            // Preserve a legitimate 0 — Number(0) is falsy so `|| default` would drop it.
-            config[key] = value !== "" ? Number(value) : (schema.default ?? 0);
-          } else if (schema.type === "boolean") {
-            config[key] = Boolean(value);
-          } else {
-            config[key] = value;
-          }
-        } else if (schema.default !== undefined) {
-          config[key] = schema.default;
-        }
-      }
-    }
+    const config = instanceConfigFromForm();
 
     config.enabled = formData.value.enabled;
 

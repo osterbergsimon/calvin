@@ -187,6 +187,23 @@ class BasePlugin(ABC):
         """
         return None
 
+    @classmethod
+    async def scan_options_with_config(
+        cls, field_key: str, config: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        """Discover options for a field using the settings form's config.
+
+        Served admin-only at ``POST /api/plugins/{type_id}/scan``. ``config`` is
+        what the form holds, with secrets left blank filled from storage (never
+        for a changed address). Use it for this one call: do not store or log
+        it. Return ``{"options": [{"value", "label"}], "error"?: str}``; the
+        host keeps only those strings, so nothing else reaches the browser.
+        An ``error`` is shown in Settings, so it must hold no secrets.
+
+        Returns None by default, indicating the plugin has no such scan.
+        """
+        return None
+
     # ------------------------------------------------------------------
     # Optional hooks in the config-update flow
     # ------------------------------------------------------------------

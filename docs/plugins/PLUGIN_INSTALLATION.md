@@ -118,7 +118,7 @@ The host discovers the class, generates the settings form from
 
 Service plugins render through `display_schema` with a built-in `kind`
 (`status`, `card-grid`, `item-list`, `iframe`, `image-with-caption`,
-`metric-dashboard`, `weather-forecast`, `web-component`). For custom UI, ship
+`metric-dashboard`, `weather-forecast`, `web-component`, `switch-grid`). For custom UI, ship
 a pre-built web component under `frontend/`; it is served at
 `/api/plugins/{plugin_id}/static/{asset}` and receives each data payload on
 its `data` property. There is never a frontend rebuild.

@@ -135,3 +135,75 @@ describe("InstanceModal form", () => {
     expect(button.classes()).toContain("btn--secondary");
   });
 });
+
+describe("InstanceModal scan fields", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+  });
+
+  const hub = {
+    id: "homey",
+    name: "Homey",
+    type: "service",
+    instance_config_schema: {
+      host: { type: "string", label: "Address", default: "", ui: { component: "input" } },
+      api_key: { type: "password", label: "Key", default: "" },
+      devices: {
+        type: "string",
+        label: "Devices",
+        default: "",
+        ui: { component: "multi-select-scan" },
+      },
+    },
+  };
+
+  it("InstanceModal passes formConfig and instanceId to fields", async () => {
+    const wrapper = mount(InstanceModal, { props: { show: false, plugin: null, instance: null } });
+    await wrapper.setProps({
+      plugin: hub,
+      show: true,
+      instance: {
+        id: "inst-1",
+        name: "Hub",
+        enabled: true,
+        config: { host: " http://h.example ", api_key: "", devices: "a" },
+        has_value: { api_key: true },
+      },
+    });
+    await flushPromises();
+
+    const field = wrapper
+      .findAllComponents({ name: "PluginFieldRenderer" })
+      .find(c => c.props("fieldKey") === "devices");
+    expect(field.props("instanceId")).toBe("inst-1");
+    // The config it would test with: trimmed strings, the key as the form holds it (blank).
+    expect(field.props("formConfig")).toEqual({
+      host: "http://h.example",
+      api_key: "",
+      devices: "a",
+    });
+  });
+
+  it("InstanceModal passes formConfig only to the multi-select-scan field", async () => {
+    const wrapper = mount(InstanceModal, { props: { show: false, plugin: null, instance: null } });
+    await wrapper.setProps({
+      plugin: hub,
+      show: true,
+      instance: {
+        id: "inst-1",
+        name: "Hub",
+        enabled: true,
+        config: { host: "http://h.example", api_key: "", devices: "a" },
+        has_value: { api_key: true },
+      },
+    });
+    await flushPromises();
+    const fields = wrapper.findAllComponents({ name: "PluginFieldRenderer" });
+    const byKey = key => fields.find(c => c.props("fieldKey") === key);
+    expect(byKey("devices").props("formConfig")).toMatchObject({ host: "http://h.example" });
+    // The others keep the empty default: the typed key never reaches them.
+    expect(byKey("host").props("formConfig")).toEqual({});
+    expect(byKey("api_key").props("formConfig")).toEqual({});
+  });
+});

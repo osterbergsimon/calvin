@@ -203,6 +203,11 @@ class TestDisplaySchemaValidation:
                 },
             )
 
+    def test_display_schema_accepts_switch_grid(self):
+        metadata = PluginMetadata(type_id="x", name="X", display_schema={"kind": "switch-grid"})
+        assert metadata.display_schema is not None
+        assert metadata.display_schema["kind"] == "switch-grid"
+
     def test_statusbar_schema_rejects_unknown_kind(self):
         with pytest.raises(ValidationError, match="statusbar_schema.kind must be one of"):
             PluginMetadata(

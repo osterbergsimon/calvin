@@ -32,6 +32,38 @@ describe("SchemaRenderer dispatcher", () => {
     expect(wrapper.text()).not.toContain("not-a-real-kind");
   });
 
+  it("SchemaRenderer passes runAction to the renderer", () => {
+    const wrapper = mount(SchemaRenderer, {
+      props: {
+        schema: { kind: "switch-grid" },
+        data: { items: [] },
+        pluginId: "inst-1",
+      },
+      global: {
+        stubs: {
+          SwitchGrid: {
+            props: ["schema", "data", "runAction"],
+            template: '<div class="switch-grid-stub" :data-has-run="typeof runAction" />',
+          },
+        },
+      },
+    });
+    expect(wrapper.find(".switch-grid-stub").attributes("data-has-run")).toBe("function");
+  });
+
+  it("does not hand runAction to renderers that do not take it", () => {
+    const wrapper = mount(SchemaRenderer, {
+      props: {
+        schema: { kind: "status", item: { label: "Ping", value: "42" } },
+        data: {},
+        pluginId: "inst-1",
+      },
+    });
+    const html = wrapper.html().toLowerCase();
+    expect(html).not.toContain("runaction");
+    expect(html).not.toContain("run-action");
+  });
+
   it("dispatches web-component schemas to the web component host", () => {
     const wrapper = mount(SchemaRenderer, {
       props: {

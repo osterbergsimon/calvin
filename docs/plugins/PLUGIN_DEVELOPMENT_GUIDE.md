@@ -177,6 +177,7 @@ plugins ship data, not markup.
 | `image-with-caption` | Full-bleed image + caption. Pair with `panel_variant: "media"`. |
 | `metric-dashboard` | Grid of big metric tiles. |
 | `weather-forecast` | Current conditions + daily forecast. |
+| `switch-grid` | On/off tiles a tap switches, through the plugin's declared actions. |
 | `web-component` | Escape hatch — a pre-built custom element from the plugin's `frontend/` dir. |
 
 Unknown kinds — and the retired pre-1.0 keys `type: "api"`,
@@ -220,7 +221,9 @@ instance_config_schema={
 
 **UI components** (see [PluginFieldRenderer.vue](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/PluginFieldRenderer.vue)):
 `input`, `password`, `number`, `textarea`, `select` (with `options`),
-`select-scan` (options discovered via `scan_options`), `checkbox`,
+`select-scan` (options discovered via `scan_options`), `multi-select-scan`
+(several options, discovered via `scan_options_with_config` from the form's
+own values; stored as one comma-separated string of ids), `checkbox`,
 `directory` (filesystem picker).
 
 Action buttons (Save / Test / Fetch) are declared as `ui_actions`; structured
