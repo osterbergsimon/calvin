@@ -32,6 +32,7 @@ SUPPORTED_DISPLAY_KINDS = {
     "metric-dashboard",
     "weather-forecast",
     "web-component",
+    "switch-grid",
 }
 # Statusbar kinds — a statusbar item is a compact strip, not a full panel, so
 # it has its own (smaller) namespace. Mirrors SUPPORTED_STATUSBAR_KINDS in

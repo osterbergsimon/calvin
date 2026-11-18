@@ -19,6 +19,7 @@ import IframeRenderer from "./renderers/IframeRenderer.vue";
 import ImageWithCaption from "./renderers/ImageWithCaption.vue";
 import MetricDashboard from "./renderers/MetricDashboard.vue";
 import WeatherForecast from "./renderers/WeatherForecast.vue";
+import SwitchGrid from "./renderers/SwitchGrid.vue";
 import WebComponentHost from "./WebComponentHost.vue";
 
 export const renderers = {
@@ -30,6 +31,7 @@ export const renderers = {
   "metric-dashboard": MetricDashboard,
   "weather-forecast": WeatherForecast,
   "web-component": WebComponentHost,
+  "switch-grid": SwitchGrid,
 };
 
 export const SUPPORTED_DISPLAY_KINDS = Object.freeze(Object.keys(renderers));
