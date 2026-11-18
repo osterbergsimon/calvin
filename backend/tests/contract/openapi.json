@@ -1868,6 +1868,21 @@
             "title": "Name",
             "type": "string"
           },
+          "permissions": {
+            "anyOf": [
+              {
+                "items": {
+                  "const": "screens.power",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Permissions"
+          },
           "scope": {
             "enum": [
               "read",
@@ -2540,6 +2555,102 @@
           }
         },
         "title": "ScanWithConfigRequest",
+        "type": "object"
+      },
+      "ScreenPowerBody": {
+        "properties": {
+          "power": {
+            "enum": [
+              "on",
+              "off",
+              "schedule"
+            ],
+            "title": "Power",
+            "type": "string"
+          }
+        },
+        "required": [
+          "power"
+        ],
+        "title": "ScreenPowerBody",
+        "type": "object"
+      },
+      "ScreenPowerView": {
+        "properties": {
+          "agentHolds": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agentholds"
+          },
+          "by": {
+            "anyOf": [
+              {
+                "enum": [
+                  "automation",
+                  "settings"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By"
+          },
+          "desiredOn": {
+            "title": "Desiredon",
+            "type": "boolean"
+          },
+          "held": {
+            "title": "Held",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "online": {
+            "title": "Online",
+            "type": "boolean"
+          },
+          "power": {
+            "enum": [
+              "on",
+              "off",
+              "schedule"
+            ],
+            "title": "Power",
+            "type": "string"
+          },
+          "setAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Setat"
+          }
+        },
+        "required": [
+          "id",
+          "power",
+          "held",
+          "setAt",
+          "by",
+          "desiredOn",
+          "online",
+          "agentHolds"
+        ],
+        "title": "ScreenPowerView",
         "type": "object"
       },
       "SealedModeBody": {
@@ -5092,7 +5203,7 @@
     },
     "/api/kiosks/{kiosk_id}/config": {
       "get": {
-        "description": "Return a kiosk's effective (merged) config; records the kiosk + its agent report.\n\n``vw``/``vh`` are the kiosk's CSS viewport (``window.innerWidth/innerHeight``,\nreported at load and on resize) so the layout editor can preview a screen at\nits real aspect ratio (CLV-36).\n\nOnly a real poll is recorded (registers a new kiosk and bumps last-seen): one\nthat carries ``khost`` (the kiosk browser) or ``kagent`` (the display agent).\nA bare fetch (curl, a typo'd id, the Settings UI reading a screen) gets the\nconfig but changes nothing, so it can neither create a ghost nor make a dead\nscreen look online (calvin-7aqu).",
+        "description": "Return a kiosk's effective (merged) config; records the kiosk + its agent report.\n\n``vw``/``vh`` are the kiosk's CSS viewport (``window.innerWidth/innerHeight``,\nreported at load and on resize) so the layout editor can preview a screen at\nits real aspect ratio (CLV-36). ``kfeat`` is what the display agent\nunderstands, comma-separated (``hold``: it obeys ``screenHold``).\n\nA held screen power (calvin-2ifv) is projected as ``screenHold`` and as\n``screenNow``, so an agent too old to hold still obeys it until the next\nscheduled change. The stored layer is not changed.\n\nOnly a real poll is recorded (registers a new kiosk and bumps last-seen): one\nthat carries ``khost`` (the kiosk browser) or ``kagent`` (the display agent).\nA bare fetch (curl, a typo'd id, the Settings UI reading a screen) gets the\nconfig but changes nothing, so it can neither create a ghost nor make a dead\nscreen look online (calvin-7aqu).",
         "operationId": "get_kiosk_config_api_kiosks__kiosk_id__config_get",
         "parameters": [
           {
@@ -5198,6 +5309,22 @@
                 }
               ],
               "title": "Kwifi"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kfeat",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kfeat"
             }
           },
           {
@@ -5786,6 +5913,100 @@
           }
         },
         "summary": "Put Kiosk Overrides",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
+    "/api/kiosks/{kiosk_id}/screen-power": {
+      "get": {
+        "description": "A screen's power: held on or off, or following its schedule.",
+        "operationId": "get_screen_power_api_kiosks__kiosk_id__screen_power_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenPowerView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Screen Power",
+        "tags": [
+          "kiosks"
+        ]
+      },
+      "put": {
+        "description": "Hold a screen on or off until changed, or send it back to its schedule.\n\nOpen to an admin session, an admin key, and a limited key with the\n``screens.power`` permission (``PERMISSION_ROUTES``). A request that changes\nnothing writes nothing and does not count toward the change limit.",
+        "operationId": "put_screen_power_api_kiosks__kiosk_id__screen_power_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScreenPowerBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenPowerView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Screen Power",
         "tags": [
           "kiosks"
         ]

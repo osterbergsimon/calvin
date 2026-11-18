@@ -821,6 +821,30 @@ def _without_screen_now(overrides: dict | None) -> dict | None:
     return layer
 
 
+async def power_status(kiosk_id: str) -> dict | None:
+    """What the screen-power route needs about a known screen, or None.
+
+    ``{"hold", "lastSeen", "agentHolds", "overrides"}``; ``overrides`` is the raw
+    (sanitized) layer.
+    """
+    if not valid_kiosk_id(kiosk_id):
+        return None
+    row = await KioskDB.objects.get_or_none(id=kiosk_id)
+    if row is None:
+        return None
+    return {
+        "hold": _valid_hold(row.power_hold),
+        "lastSeen": as_utc(row.last_seen) if row.last_seen is not None else None,
+        "agentHolds": agent_holds(row.agent_features),
+        "overrides": sanitize_overrides(row.overrides, kiosk_id=kiosk_id),
+    }
+
+
+def without_screen_now(overrides: dict) -> dict:
+    """The layer minus any ``screenNow`` (a hold replaces it, calvin-2ifv)."""
+    return {k: v for k, v in overrides.items() if k not in _SCREEN_NOW_KEYS}
+
+
 @retry_on_db_locked()
 async def set_power_hold(
     kiosk_id: str, power: str, by: str, now: datetime | None = None

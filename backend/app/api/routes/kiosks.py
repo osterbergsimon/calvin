@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from loguru import logger
@@ -14,8 +15,9 @@ from app.security.route_policy import (
     direct_peer_ip,
     is_admin,
     is_loopback_peer,
+    request_api_key,
 )
-from app.services import display_check, kiosk_bundle, kiosk_registry
+from app.services import display_check, kiosk_bundle, kiosk_registry, screen_power
 from app.services.kiosk_registry import (
     _KIOSK_ID_RE,
     agent_update_requested,
@@ -28,6 +30,7 @@ from app.services.kiosk_registry import (
 )
 from app.utils.errors import internal_error
 from app.utils.public_url import public_base_url
+from app.utils.utc import utcnow
 
 router = APIRouter()
 
@@ -65,8 +68,20 @@ async def put_kiosk_overrides(kiosk_id: str, body: OverridesBody):
     _valid_id_or_400(kiosk_id)
     _check_floor_under_limit(merge_overrides(await build_global_config(), body.overrides))
     _checked_overrides(body.overrides)
-    await set_overrides(kiosk_id, body.overrides)
-    return {"id": kiosk_id, "overrides": body.overrides}
+    layer = await _without_screen_now_while_held(kiosk_id, body.overrides)
+    await set_overrides(kiosk_id, layer)
+    return {"id": kiosk_id, "overrides": layer}
+
+
+async def _without_screen_now_while_held(kiosk_id: str, layer: dict) -> dict:
+    """While a screen is held, no layer write may bring back ``screenNow``.
+
+    A Settings page opened before the hold still carries the old manual choice
+    and sends it with any save; the hold replaced it (calvin-2ifv).
+    """
+    if await kiosk_registry.get_power_hold(kiosk_id) is None:
+        return layer
+    return kiosk_registry.without_screen_now(layer)
 
 
 @router.delete("/kiosks/{kiosk_id}")
@@ -160,10 +175,109 @@ async def patch_kiosk_overrides(kiosk_id: str, body: OverridesBody, request: Req
         layer = {**stored, **body.overrides}
         _check_floor_under_limit(merge_overrides(await build_global_config(), layer))
     _checked_overrides(body.overrides)
-    merged = await merge_into_overrides(kiosk_id, body.overrides)
+    partial = await _without_screen_now_while_held(kiosk_id, body.overrides)
+    merged = await merge_into_overrides(kiosk_id, partial)
     if merged is None:
         raise HTTPException(status_code=404, detail="Unknown kiosk")
     return {"id": kiosk_id, "overrides": merged}
+
+
+# -- screen power held from home automation (calvin-2ifv) -------------------
+
+# The Screens list counts a kiosk online while it polled in the last 120 s.
+_ONLINE_S = 120
+
+
+class ScreenPowerBody(BaseModel):
+    power: Literal["on", "off", "schedule"]
+
+
+class ScreenPowerView(BaseModel):
+    id: str
+    power: Literal["on", "off", "schedule"]
+    held: bool
+    setAt: str | None  # noqa: N815 - wire name
+    by: Literal["automation", "settings"] | None
+    desiredOn: bool  # noqa: N815 - what the agent will do, not what the panel reports
+    online: bool
+    agentHolds: bool | None  # noqa: N815 - False: this screen's agent is too old to hold
+
+
+async def _power_status_or_404(kiosk_id: str) -> dict:
+    _valid_id_or_400(kiosk_id)
+    status = await kiosk_registry.power_status(kiosk_id)
+    if status is None:
+        # Never create a row from this route: a bare id must not register a ghost.
+        raise HTTPException(status_code=404, detail="Unknown kiosk")
+    return status
+
+
+async def _screen_power_view(kiosk_id: str, status: dict) -> ScreenPowerView:
+    hold = status["hold"]
+    merged = merge_overrides(await build_global_config(), status["overrides"])
+    screen_power.project_hold(merged, hold)
+    last_seen = status["lastSeen"]
+    return ScreenPowerView(
+        id=kiosk_id,
+        power=hold["power"] if hold else "schedule",
+        held=hold is not None,
+        setAt=hold["setAt"] if hold else None,
+        by=hold["by"] if hold else None,
+        desiredOn=screen_power.desired_on(merged, screen_power.now_in(merged)),
+        online=last_seen is not None and (utcnow() - last_seen).total_seconds() < _ONLINE_S,
+        agentHolds=status["agentHolds"],
+    )
+
+
+@router.get("/kiosks/{kiosk_id}/screen-power", response_model=ScreenPowerView)
+async def get_screen_power(kiosk_id: str):
+    """A screen's power: held on or off, or following its schedule."""
+    status = await _power_status_or_404(kiosk_id)
+    return await _screen_power_view(kiosk_id, status)
+
+
+@router.put("/kiosks/{kiosk_id}/screen-power", response_model=ScreenPowerView)
+async def put_screen_power(kiosk_id: str, body: ScreenPowerBody, request: Request):
+    """Hold a screen on or off until changed, or send it back to its schedule.
+
+    Open to an admin session, an admin key, and a limited key with the
+    ``screens.power`` permission (``PERMISSION_ROUTES``). A request that changes
+    nothing writes nothing and does not count toward the change limit.
+    """
+    status = await _power_status_or_404(kiosk_id)
+    hold = status["hold"]
+    if body.power == "schedule":
+        changes = hold is not None or any(
+            key in status["overrides"] for key in ("screenNow", "screen_now")
+        )
+    else:
+        changes = hold is None or hold["power"] != body.power
+    if not changes:
+        return await _screen_power_view(kiosk_id, status)
+
+    key = request_api_key(request)
+    caller = f"key:{key['id']}" if key is not None else "session"
+    wait = screen_power.change_limiter.check(caller)
+    if wait:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "code": "rate_limited",
+                "message": f"Too many changes. Try again in {wait} seconds.",
+                "retry_after": wait,
+            },
+            headers={"Retry-After": str(wait)},
+        )
+    if body.power == "schedule":
+        await kiosk_registry.clear_power_hold(kiosk_id)
+    else:
+        by = "automation" if key is not None else "settings"
+        await kiosk_registry.set_power_hold(kiosk_id, body.power, by)
+    screen_power.change_limiter.record(caller)
+    # The key's name only: never its secret (the log patcher also redacts keys).
+    who = f"API key {key['name']!r}" if key is not None else "an admin session"
+    logger.info(f"Screen {kiosk_id!r} power set to {body.power} by {who}")
+    return await _screen_power_view(kiosk_id, await _power_status_or_404(kiosk_id))
 
 
 @router.post("/kiosks/{kiosk_id}/update")
@@ -490,6 +604,7 @@ async def get_kiosk_config(
     kmsg: str | None = None,
     kstack: str | None = None,
     kwifi: str | None = None,
+    kfeat: str | None = None,
     vw: int | None = None,
     vh: int | None = None,
 ):
@@ -497,7 +612,12 @@ async def get_kiosk_config(
 
     ``vw``/``vh`` are the kiosk's CSS viewport (``window.innerWidth/innerHeight``,
     reported at load and on resize) so the layout editor can preview a screen at
-    its real aspect ratio (CLV-36).
+    its real aspect ratio (CLV-36). ``kfeat`` is what the display agent
+    understands, comma-separated (``hold``: it obeys ``screenHold``).
+
+    A held screen power (calvin-2ifv) is projected as ``screenHold`` and as
+    ``screenNow``, so an agent too old to hold still obeys it until the next
+    scheduled change. The stored layer is not changed.
 
     Only a real poll is recorded (registers a new kiosk and bumps last-seen): one
     that carries ``khost`` (the kiosk browser) or ``kagent`` (the display agent).
@@ -527,6 +647,7 @@ async def get_kiosk_config(
                 display_stack=kstack,
                 wifi_power_save=kwifi,
                 peer_ip=direct_peer_ip(request),
+                agent_features=kfeat,
             )
     except Exception as exc:
         logger.warning(f"Failed to record kiosk {kiosk_id!r}: {exc}")
@@ -535,6 +656,7 @@ async def get_kiosk_config(
     overrides = await get_overrides(kiosk_id)
     merged = merge_overrides(base, overrides)
     merged.pop("_agentUpdateRequested", None)  # never expose the host-internal flag verbatim
+    screen_power.project_hold(merged, await kiosk_registry.get_power_hold(kiosk_id))
     version = device_config_version(merged)
     update_requested = agent_update_requested(overrides)
 
