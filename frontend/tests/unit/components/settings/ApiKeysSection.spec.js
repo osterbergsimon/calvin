@@ -140,6 +140,30 @@ describe("ApiKeysSection", () => {
       expect(api.post).toHaveBeenCalledWith("/auth/keys", { name: "Script", scope: "admin" });
     });
 
+    it("offers a key that can only turn screens on and off (calvin-2ifv)", async () => {
+      await mountSection();
+      await openForm();
+      const card = get("scope-card-screens");
+      expect(card.text()).toContain("Turn screens on and off");
+      expect(card.text()).toContain(
+        "Lets home automation switch screens on and off. Can't see or change anything else."
+      );
+      await get("scope-screens").setValue(true);
+      await fillName("Homey");
+      api.post.mockResolvedValueOnce({
+        data: {
+          key: key({ name: "Homey", permissions: ["screens.power"], limited: true }),
+          secret: SECRET,
+        },
+      });
+      await submit();
+      expect(api.post).toHaveBeenCalledWith("/auth/keys", {
+        name: "Homey",
+        scope: "read",
+        permissions: ["screens.power"],
+      });
+    });
+
     it("uses the verbatim scope copy in a labelled fieldset", async () => {
       await mountSection();
       await openForm();
@@ -372,6 +396,15 @@ describe("ApiKeysSection", () => {
       const host = wrapper.findAll("[data-test='api-key-scope']")[2];
       expect(host.classes()).toContain("err");
       expect(host.find("svg.tag__icon").exists()).toBe(true);
+    });
+
+    it("names a limited key by what it can do, not Read", async () => {
+      await mountSection([
+        key({ id: "h", name: "Homey", permissions: ["screens.power"], limited: true }),
+        key({ id: "a", name: "A", permissions: [], limited: false }),
+      ]);
+      const chips = wrapper.findAll("[data-test='api-key-scope']").map(c => c.text());
+      expect(chips).toEqual(["Turn screens on and off", "Read"]);
     });
 
     it("formats prefix, created and last used", async () => {
