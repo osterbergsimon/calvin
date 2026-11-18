@@ -724,7 +724,9 @@ async def _keep_stored_type_secrets(
     400 asking the caller to re-enter it. With ``require_endpoint`` (the scan
     route) a stored secret is also never reused when the type names no
     endpoint field at all (no url-like name, ``url`` type or ``ui.endpoint``):
-    the host cannot tell whether the address changed, so it fails closed.
+    the host cannot tell whether the address changed, so it fails closed. That
+    decision is made from the type's schema (or, for legacy rows, the stored
+    config) only; keys the request invents never count.
     """
     stored: dict[str, Any] = {}
     stored_json = await config_service.get_value(f"plugin_{plugin_id}_config")
@@ -742,8 +744,12 @@ async def _keep_stored_type_secrets(
     keys = secret_keys_for_type(plugin_id, known)
     if not keys:
         return config
+    # What the host can tell the address from: the type's schema first, then
+    # the stored config for rows written before the schema said so. The request
+    # never counts here — an invented key would let the caller satisfy the gate.
     endpoints = endpoint_keys_for_type(plugin_id, known)
-    if require_endpoint and not endpoints:
+    known_endpoints = endpoint_keys_for_type(plugin_id) or endpoint_keys_for_type(plugin_id, stored)
+    if require_endpoint and not known_endpoints:
         kept = sorted(
             key
             for key in keys

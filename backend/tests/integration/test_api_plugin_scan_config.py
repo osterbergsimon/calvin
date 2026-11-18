@@ -386,6 +386,12 @@ MARKED_SCHEMA = {
     **ADDRESS_SCHEMA,
     "address": {"type": "string", "label": "Hub", "ui": {"endpoint": True}},
 }
+# A marked address next to a second, name-recognised endpoint key: the host
+# knows both, so neither may hide a change of the other.
+MASKED_SCHEMA = {
+    **MARKED_SCHEMA,
+    "host": {"type": "string", "label": "Hub host"},
+}
 
 
 class AddressPlugin(FakeScanPlugin):
@@ -404,11 +410,19 @@ class MarkedPlugin(FakeScanPlugin):
     result: Any = {"options": []}
 
 
+class MaskedPlugin(FakeScanPlugin):
+    metadata = PluginMetadata(
+        type_id="fake-masked", name="Fake Masked", instance_config_schema=MASKED_SCHEMA
+    )
+    seen: list[tuple[str, dict[str, Any]]] = []
+    result: Any = {"options": []}
+
+
 @pytest.fixture
 async def address_instances(monkeypatch):
     from app.models.db_models import PluginDB
 
-    for cls in (AddressPlugin, MarkedPlugin):
+    for cls in (AddressPlugin, MarkedPlugin, MaskedPlugin):
         monkeypatch.setitem(plugin_loader._types, cls.metadata.type_id, cls)
         cls.seen = []
     rows = [
@@ -418,9 +432,10 @@ async def address_instances(monkeypatch):
             plugin_type="service",
             name=type_id,
             enabled=True,
-            config={"address": "http://hub-a.invalid", "api_key": STORED},
+            config={"address": "http://hub-a.invalid", "api_key": STORED}
+            | ({"host": "hub-a"} if type_id == "fake-masked" else {}),
         )
-        for type_id in ("fake-address", "fake-marked")
+        for type_id in ("fake-address", "fake-marked", "fake-masked")
     ]
     yield
     for row in rows:
@@ -478,6 +493,90 @@ async def test_unmarked_address_with_typed_key_still_scans(test_client, address_
     )
     assert response.status_code == 200, response.text
     assert AddressPlugin.seen == [("devices", {"address": "http://new.invalid", "api_key": TYPED})]
+
+
+async def test_invented_endpoint_key_does_not_open_the_gate(test_client, address_instances):
+    # The gate asks what the host knows, never what the request says: inventing
+    # an endpoint-looking key (`host` is not in this type's schema) must not
+    # make the type's real address look recognisable. Reviewer's probe.
+    _login(test_client)
+    response = _scan(
+        test_client,
+        {
+            "field": "devices",
+            "config": {"address": "http://attacker.invalid", "api_key": "", "host": ""},
+            "instance_id": "fake-address-1",
+        },
+        plugin_id="fake-address",
+    )
+    assert response.status_code == 400
+    assert AddressPlugin.seen == []
+    assert STORED not in response.text
+    # Likewise an invented key with a value: the type still names no address.
+    assert (
+        _scan(
+            test_client,
+            {
+                "field": "devices",
+                "config": {
+                    "address": "http://attacker.invalid",
+                    "api_key": "",
+                    "url": "http://x.invalid",
+                },
+                "instance_id": "fake-address-1",
+            },
+            plugin_id="fake-address",
+        ).status_code
+        == 400
+    )
+    assert AddressPlugin.seen == []
+
+
+async def test_known_endpoint_key_cannot_mask_a_changed_address(test_client, address_instances):
+    # `host` is server-known (in the schema) as well as the marked `address`, so
+    # sending `host` unchanged cannot hide a change of `address`, and changing
+    # `host` is a change of its own.
+    _login(test_client)
+    masked = _scan(
+        test_client,
+        {
+            "field": "devices",
+            "config": {"address": "http://attacker.invalid", "api_key": "", "host": "hub-a"},
+            "instance_id": "fake-masked-1",
+        },
+        plugin_id="fake-masked",
+    )
+    assert masked.status_code == 400
+    assert MaskedPlugin.seen == []
+    assert STORED not in masked.text
+
+    other = _scan(
+        test_client,
+        {
+            "field": "devices",
+            "config": {"address": "http://hub-a.invalid", "api_key": "", "host": "evil.invalid"},
+            "instance_id": "fake-masked-1",
+        },
+        plugin_id="fake-masked",
+    )
+    assert other.status_code == 400
+    assert MaskedPlugin.seen == []
+
+    # Both unchanged: the stored key is reused as before.
+    same = _scan(
+        test_client,
+        {
+            "field": "devices",
+            "config": {"address": "http://hub-a.invalid", "api_key": "", "host": "hub-a"},
+            "instance_id": "fake-masked-1",
+        },
+        plugin_id="fake-masked",
+    )
+    assert same.status_code == 200, same.text
+    assert MaskedPlugin.seen == [
+        ("devices", {"address": "http://hub-a.invalid", "api_key": STORED, "host": "hub-a"})
+    ]
+    assert STORED not in same.text
 
 
 # --- unrenderable plugin output (m3) and option limits (m4) ---------------

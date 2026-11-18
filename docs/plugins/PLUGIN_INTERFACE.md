@@ -131,7 +131,9 @@ Each `instance_config_schema` entry is a field dict in one canonical shape:
   anything you like, but mark it `ui.endpoint: true` unless it matches one of
   those. The `POST /plugins/{type_id}/scan` route fails closed: with a stored
   secret to fill and no address field found, it answers `400` and does not
-  call the plugin.
+  call the plugin. That decision is the host's: it looks at the plugin's
+  schema (or a stored config written before the field was marked), never at
+  keys the request adds, so an extra endpoint-looking key does not open it.
 - **Booleans render as the shared on/off switch**, not a native checkbox.
 - **`type`** drives `normalize_config` conversion — numeric fields must be
   `integer`/`number`, never `string`, or the value won't convert.
