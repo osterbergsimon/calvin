@@ -112,6 +112,7 @@ Each `instance_config_schema` entry is a field dict in one canonical shape:
             "min": num, "max": num,   # enforced by the number renderer
             "type": "url",      # semantic hint (e.g. URL fields)
         },
+        "endpoint": True,       # optional — this field is the address a secret is sent to
     },
 }
 ```
@@ -121,6 +122,16 @@ Each `instance_config_schema` entry is a field dict in one canonical shape:
 - **`hidden: true` keeps a field out of the form** while its default still
   applies to the saved config. Type-level internals such as `display_order`
   are never shown even if a plugin leaves the flag off.
+- **`ui.endpoint: true` names the address a secret is sent to.** A stored
+  secret (`password` field) is reused when the settings form sends it blank,
+  but never when the same request changes the address, which would make Calvin
+  send it to any host. The host finds the address field by `ui.endpoint: true`,
+  a `url` type or validation type, or a key name containing `url`, `uri`,
+  `host`, `server`, `endpoint`, `domain` or `port`. Name your address field
+  anything you like, but mark it `ui.endpoint: true` unless it matches one of
+  those. The `POST /plugins/{type_id}/scan` route fails closed: with a stored
+  secret to fill and no address field found, it answers `400` and does not
+  call the plugin.
 - **Booleans render as the shared on/off switch**, not a native checkbox.
 - **`type`** drives `normalize_config` conversion — numeric fields must be
   `integer`/`number`, never `string`, or the value won't convert.
@@ -197,11 +208,15 @@ The `iframe` plugin uses these as the reference example.
   `{"field", "config", "instance_id"?}`. `config` is what the form holds;
   secrets left blank are filled from the stored instance of this type (or the
   type config), and never when the request changes the address they belong
-  to (that is a `400` asking to re-enter the key). Use `config` for this one
+  to (that is a `400` asking to re-enter the key). The address field is the
+  one found by [`ui.endpoint`](#config-field-shape) or its name or type; with
+  none, nothing stored is filled (`400`). Use `config` for this one
   call only: never store or log it. Return
   `{"options": [{"value", "label"}], "error"?: str}` or `None`; the host keeps
-  only those strings (at most 1000 options, 200 characters each), so nothing
-  else you return reaches the browser. An exception becomes a generic
+  only those strings (at most 1000 options, labels cut to 200 characters), so
+  nothing else you return reaches the browser. An option whose `value` is over
+  200 characters or contains a comma is dropped (the field stores ids joined
+  by commas). An exception becomes a generic
   `error` with no exception text. `error` is shown in Settings, so it must
   hold no secrets. Used by the `multi-select-scan` field
   ([frontend components](PLUGIN_FRONTEND_COMPONENTS.md)).

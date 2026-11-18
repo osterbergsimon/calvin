@@ -47,7 +47,7 @@
 // before and says why in one polite live region. Pending and unavailable tiles
 // are aria-disabled, never `disabled`, so a focused tile keeps focus when its
 // state flips (doctrine §5, focus never lost).
-import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { resolvePath } from "../../../utils/jsonPath";
 import EmptyState from "../../ui/EmptyState.vue";
 import InlineNote from "../../ui/InlineNote.vue";
@@ -55,6 +55,8 @@ import InlineNote from "../../ui/InlineNote.vue";
 const props = defineProps({
   schema: { type: Object, required: true },
   data: { type: [Object, Array, null], default: null },
+  // Changes on every successful fetch, identical payload or not.
+  dataUpdatedAt: { type: Number, default: 0 },
   runAction: {
     type: Function,
     default: () => Promise.reject(new Error("No action runner")),
@@ -112,9 +114,12 @@ const settled = reactive(new Map());
 const refused = reactive(new Set());
 const note = ref("");
 let noteTimer = null;
+let noteStamp = 0;
 
+// Fresh data of any kind, even an identical refetch (same object, no change
+// of `data`), hands the tile back to what the plugin reports.
 watch(
-  () => props.data,
+  () => [props.data, props.dataUpdatedAt],
   () => {
     settled.clear();
     refused.clear();
@@ -155,10 +160,19 @@ function stateWords(item) {
   return WORDS[shown(item)];
 }
 
-function setNote(text) {
+// The same words twice in a row (two 429s) must be announced twice: clear the
+// note, let the live region render empty, then set it again.
+async function setNote(text) {
   clearTimeout(noteTimer);
+  const repeat = Boolean(text) && note.value === text;
+  note.value = "";
+  noteTimer = null;
+  const stamp = ++noteStamp;
+  if (!text) return;
+  if (repeat) await nextTick();
+  if (stamp !== noteStamp) return;
   note.value = text;
-  noteTimer = text ? setTimeout(() => (note.value = ""), NOTE_MS) : null;
+  noteTimer = setTimeout(() => (note.value = ""), NOTE_MS);
 }
 
 function errorCode(error) {

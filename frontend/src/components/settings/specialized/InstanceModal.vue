@@ -12,7 +12,11 @@
             :field-key="key"
             :schema="fieldSchema(key, schema)"
             :value="getFormValue(key, schema)"
-            :form-config="formConfig"
+            :form-config="
+              fieldSchema(key, schema)?.ui?.component === 'multi-select-scan'
+                ? formConfig
+                : undefined
+            "
             :instance-id="editingInstance?.id"
             @update="updateFormValue(key, $event)"
           />

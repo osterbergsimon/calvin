@@ -21,11 +21,11 @@ const ACTION = { name: "set_onoff", params: { device: "d1", on: true } };
 let queryClient;
 let wrapper;
 
-function withAction(pluginId, { client = queryClient } = {}) {
+function withAction(pluginId, { client = queryClient, dataPath = null } = {}) {
   let run;
   const Host = defineComponent({
     setup() {
-      run = usePluginAction(pluginId);
+      run = usePluginAction(pluginId, dataPath);
       return () => h("div");
     },
   });
@@ -121,5 +121,44 @@ describe("usePluginAction", () => {
     const run = withAction("");
     await expect(run(ACTION)).rejects.toThrow();
     expect(runPluginAction).not.toHaveBeenCalled();
+  });
+
+  it("drops the stale action when the answered item carries none", async () => {
+    queryClient.setQueryData(KEY, {
+      items: [{ id: "d1", label: "Lamp A", state: "off", action: ACTION }],
+    });
+    runPluginAction.mockResolvedValue({ item: { id: "d1", state: "on" } });
+    const run = withAction("inst-1");
+    await run(ACTION);
+    const entry = queryClient.getQueryData(KEY).items[0];
+    expect(entry).toEqual({ id: "d1", label: "Lamp A", state: "on" });
+    expect(entry.action).toBeUndefined();
+  });
+
+  it("takes the new action when the answered item carries one", async () => {
+    const next = { name: "set_onoff", params: { device: "d1", on: false } };
+    queryClient.setQueryData(KEY, {
+      items: [{ id: "d1", label: "Lamp A", state: "off", action: ACTION }],
+    });
+    runPluginAction.mockResolvedValue({ item: { id: "d1", state: "on", action: next } });
+    const run = withAction("inst-1");
+    await run(ACTION);
+    expect(queryClient.getQueryData(KEY).items[0].action).toEqual(next);
+  });
+
+  it("patches at the schema's data_path", async () => {
+    queryClient.setQueryData(KEY, {
+      title: "Hub",
+      devices: [
+        { id: "d1", label: "Lamp A", state: "off" },
+        { id: "d2", label: "Lamp B", state: "on" },
+      ],
+    });
+    runPluginAction.mockResolvedValue({ item: { id: "d1", state: "on" } });
+    const run = withAction("inst-1", { dataPath: "$.devices" });
+    await run(ACTION);
+    const cached = queryClient.getQueryData(KEY);
+    expect(cached.devices.map(d => d.state)).toEqual(["on", "on"]);
+    expect(cached.title).toBe("Hub");
   });
 });

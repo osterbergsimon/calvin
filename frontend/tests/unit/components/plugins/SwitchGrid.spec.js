@@ -200,6 +200,67 @@ describe("SwitchGrid", () => {
     expect(tile(w, "Lamp A").text()).toContain("On");
   });
 
+  it("an identical refetch hands the tile back to the data (settled clears on dataUpdatedAt)", async () => {
+    const items = ITEMS.map(i => ({ ...i }));
+    const pending = deferred();
+    const w = mount(SwitchGrid, {
+      props: {
+        schema: { kind: "switch-grid", data_path: "$.devices" },
+        data: { devices: items },
+        dataUpdatedAt: 1,
+        runAction: vi.fn(() => pending.promise),
+      },
+      attachTo: document.body,
+    });
+    wrapper = w;
+    await tile(w, "Lamp A").trigger("click");
+    pending.resolve({ item: { id: "d1", state: "on" } });
+    await flushPromises();
+    expect(tile(w, "Lamp A").text()).toContain("On");
+
+    // The hub still says off: same data object, only the fetch time moves.
+    await w.setProps({ dataUpdatedAt: 2 });
+    expect(tile(w, "Lamp A").text()).toContain("Off");
+  });
+
+  it("a tile whose action was dropped is inert for a second tap", async () => {
+    const runAction = vi.fn().mockResolvedValue({});
+    const w = mountGrid({ runAction });
+    await tile(w, "Lamp A").trigger("click");
+    await flushPromises();
+    // The cache patch left the answered item without its action.
+    await w.setProps({
+      data: {
+        items: ITEMS.map(i => (i.id === "d1" ? { ...i, state: "on", action: undefined } : i)),
+      },
+    });
+    await tile(w, "Lamp A").trigger("click");
+    expect(runAction).toHaveBeenCalledTimes(1);
+    expect(tile(w, "Lamp A").attributes("aria-disabled")).toBe("true");
+  });
+
+  it("re-announces a repeated note: the live region empties first", async () => {
+    vi.useFakeTimers();
+    const w = mountGrid({
+      runAction: vi.fn(() => Promise.reject(httpError(429, "rate_limited"))),
+    });
+    await tile(w, "Lamp A").trigger("click");
+    await flushPromises();
+    const text = note(w).text();
+    expect(text).toContain("Too many taps");
+
+    const seen = [];
+    const region = note(w).element;
+    const observer = new MutationObserver(() => seen.push(region.textContent));
+    observer.observe(region, { childList: true, subtree: true, characterData: true });
+    await tile(w, "Lamp A").trigger("click");
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(0);
+    observer.disconnect();
+    expect(seen).toContain("");
+    expect(note(w).text()).toBe(text);
+  });
+
   it("reverts on any non-2xx and announces the reach note", async () => {
     const pending = deferred();
     const w = mountGrid({ runAction: vi.fn(() => pending.promise) });

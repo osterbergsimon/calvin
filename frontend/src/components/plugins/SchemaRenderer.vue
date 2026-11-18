@@ -32,16 +32,27 @@ const props = defineProps({
   // default presentation to the surface it's drawn on.
   context: { type: String, default: "panel" },
   linkAction: { type: String, default: null },
+  // When the data last arrived (ms, from the query), changing on every
+  // successful fetch even if the payload is identical. Only renderers that
+  // declare it get it (switch-grid clears its settled states on it).
+  dataUpdatedAt: { type: Number, default: 0 },
 });
 
 const renderer = computed(() => renderers[props.schema?.kind] || null);
 
 // Renderers that act (switch-grid) take `runAction`; the rest never see it, so
 // a function never lands on their root element as a stray attribute.
-const runAction = usePluginAction(() => props.pluginId);
-const actionProps = computed(() =>
-  renderer.value?.props && "runAction" in renderer.value.props ? { runAction } : {}
+const runAction = usePluginAction(
+  () => props.pluginId,
+  () => props.schema?.data_path
 );
+const actionProps = computed(() => {
+  const declared = renderer.value?.props || {};
+  return {
+    ...("runAction" in declared ? { runAction } : {}),
+    ...("dataUpdatedAt" in declared ? { dataUpdatedAt: props.dataUpdatedAt } : {}),
+  };
+});
 
 // Content scaling (calvin-fub phase 2): the six built-in body renderers set
 // their base font-size from --region-content-fs (emitted on the dashboard root

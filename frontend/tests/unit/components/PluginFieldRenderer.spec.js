@@ -177,7 +177,54 @@ describe("PluginFieldRenderer multi-select-scan field", () => {
     await scanButton(wrapper).trigger("click");
     await flushPromises();
     expect(wrapper.find(".inline-note").text()).toBe(
-      "The address changed, so type the key again before scanning."
+      "Type the key again before scanning: the saved one isn't reused here."
     );
+  });
+
+  it("keeps Scan focusable while scanning: aria-disabled, no native disabled, one scan", async () => {
+    let resolve;
+    scanWithConfig.mockReturnValue(new Promise(r => (resolve = r)));
+    const wrapper = mountField();
+    await scanButton(wrapper).trigger("click");
+    const button = scanButton(wrapper);
+    expect(button.attributes("aria-disabled")).toBe("true");
+    expect(button.attributes("aria-busy")).toBe("true");
+    expect(button.attributes("disabled")).toBeUndefined();
+    await button.trigger("click");
+    expect(scanWithConfig).toHaveBeenCalledTimes(1);
+    resolve({ options: [] });
+    await flushPromises();
+    expect(scanButton(wrapper).attributes("aria-disabled")).toBeUndefined();
+  });
+
+  it("keeps the note in an always-rendered status region", async () => {
+    scanWithConfig.mockResolvedValue({ options: [] });
+    const wrapper = mountField();
+    const region = wrapper.find('[role="status"]');
+    expect(region.exists()).toBe(true);
+    expect(region.text()).toBe("");
+    await scanButton(wrapper).trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[role="status"]').element).toBe(region.element);
+    expect(region.text()).toBe("Nothing found to choose from.");
+  });
+
+  it("re-announces an identical note: the region empties before it is set again", async () => {
+    scanWithConfig.mockResolvedValue({ options: [] });
+    const wrapper = mountField();
+    await scanButton(wrapper).trigger("click");
+    await flushPromises();
+    const region = wrapper.find('[role="status"]');
+    expect(region.text()).toBe("Nothing found to choose from.");
+
+    const seen = [];
+    const observer = new MutationObserver(() => seen.push(region.element.textContent));
+    observer.observe(region.element, { childList: true, subtree: true, characterData: true });
+    await scanButton(wrapper).trigger("click");
+    await flushPromises();
+    await new Promise(r => setTimeout(r, 0));
+    observer.disconnect();
+    expect(seen).toContain("");
+    expect(region.text()).toBe("Nothing found to choose from.");
   });
 });

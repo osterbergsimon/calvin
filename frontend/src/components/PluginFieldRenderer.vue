@@ -64,7 +64,13 @@
          devices). The value is one comma-separated string of ids. -->
     <div v-else-if="ui && ui.component === 'multi-select-scan'" class="scan-multi">
       <div class="scan-multi__row">
-        <Button variant="secondary" :disabled="multiScanning" @click="runMultiScan">
+        <!-- aria-disabled, not disabled: a focused Scan keeps focus while it runs -->
+        <Button
+          variant="secondary"
+          :aria-disabled="multiScanning ? 'true' : undefined"
+          :aria-busy="multiScanning ? 'true' : undefined"
+          @click="runMultiScan"
+        >
           {{ multiScanning ? "Scanning…" : "Scan" }}
         </Button>
       </div>
@@ -75,7 +81,9 @@
         :aria-label="label"
         @update:model-value="emitSelectedIds"
       />
-      <InlineNote v-if="multiScanNote" tone="err">{{ multiScanNote }}</InlineNote>
+      <div class="scan-multi__live" role="status" aria-live="polite">
+        <InlineNote v-if="multiScanNote" tone="err">{{ multiScanNote }}</InlineNote>
+      </div>
     </div>
 
     <!-- Select with scan button — fetches options from the backend -->
@@ -155,7 +163,7 @@
 
 <script setup>
 import ExternalLink from "@/components/ui/ExternalLink.vue";
-import { computed, ref } from "vue";
+import { computed, nextTick, ref } from "vue";
 import axios from "axios";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import Button from "@/components/ui/Button.vue";
@@ -305,9 +313,22 @@ const multiOptions = computed(() => {
 
 const emitSelectedIds = ids => emit("update", ids.join(","));
 
-async function runMultiScan() {
-  multiScanning.value = true;
+// The same note twice (two failed scans) must be announced twice: clear it and
+// let the live region render empty before setting it again.
+async function setMultiScanNote(text) {
+  const repeat = Boolean(text) && multiScanNote.value === text;
   multiScanNote.value = "";
+  const stamp = ++multiNoteStamp;
+  if (!text) return;
+  if (repeat) await nextTick();
+  if (stamp === multiNoteStamp) multiScanNote.value = text;
+}
+let multiNoteStamp = 0;
+
+async function runMultiScan() {
+  if (multiScanning.value) return;
+  multiScanning.value = true;
+  setMultiScanNote("");
   try {
     const res = await scanWithConfig(
       props.pluginId,
@@ -318,13 +339,14 @@ async function runMultiScan() {
     const options = Array.isArray(res?.options) ? res.options : [];
     multiScanned.value = options.filter(option => option && option.value != null);
     if (!multiScanned.value.length) {
-      multiScanNote.value = res?.error || "Nothing found to choose from.";
+      setMultiScanNote(res?.error || "Nothing found to choose from.");
     }
   } catch (err) {
-    multiScanNote.value =
+    setMultiScanNote(
       err?.response?.status === 400
-        ? "The address changed, so type the key again before scanning."
-        : "Couldn't scan. Check the settings above, then try again.";
+        ? "Type the key again before scanning: the saved one isn't reused here."
+        : "Couldn't scan. Check the settings above, then try again."
+    );
   } finally {
     multiScanning.value = false;
   }

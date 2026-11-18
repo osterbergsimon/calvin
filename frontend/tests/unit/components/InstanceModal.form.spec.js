@@ -184,4 +184,26 @@ describe("InstanceModal scan fields", () => {
       devices: "a",
     });
   });
+
+  it("InstanceModal passes formConfig only to the multi-select-scan field", async () => {
+    const wrapper = mount(InstanceModal, { props: { show: false, plugin: null, instance: null } });
+    await wrapper.setProps({
+      plugin: hub,
+      show: true,
+      instance: {
+        id: "inst-1",
+        name: "Hub",
+        enabled: true,
+        config: { host: "http://h.example", api_key: "", devices: "a" },
+        has_value: { api_key: true },
+      },
+    });
+    await flushPromises();
+    const fields = wrapper.findAllComponents({ name: "PluginFieldRenderer" });
+    const byKey = key => fields.find(c => c.props("fieldKey") === key);
+    expect(byKey("devices").props("formConfig")).toMatchObject({ host: "http://h.example" });
+    // The others keep the empty default: the typed key never reaches them.
+    expect(byKey("host").props("formConfig")).toEqual({});
+    expect(byKey("api_key").props("formConfig")).toEqual({});
+  });
 });
