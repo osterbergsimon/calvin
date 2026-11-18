@@ -2,6 +2,7 @@
  * API service for plugin-related operations.
  */
 
+import { unref } from "vue";
 import api, { LONG_REQUEST_TIMEOUT } from "./api";
 
 /**
@@ -255,5 +256,16 @@ export async function updatePluginInstance(instanceId, instanceData) {
  */
 export async function deletePluginInstance(instanceId) {
   const response = await api.delete(`/plugins/instances/${instanceId}`);
+  return response.data;
+}
+
+/**
+ * Run a declared action on a service plugin instance (homey switch tiles §2).
+ * Public route: the host validates the action and its params.
+ */
+export async function runPluginAction(instanceId, name, params = {}) {
+  const id = encodeURIComponent(unref(instanceId));
+  const action = encodeURIComponent(unref(name));
+  const response = await api.post(`/plugins/${id}/actions/${action}`, { params });
   return response.data;
 }

@@ -13,12 +13,14 @@
     :plugin-name="pluginName"
     :context="context"
     :link-action="linkAction"
+    v-bind="actionProps"
   />
 </template>
 
 <script setup>
 import { computed } from "vue";
 import { renderers } from "./rendererRegistry.js";
+import { usePluginAction } from "../../composables/usePluginAction.js";
 
 const props = defineProps({
   schema: { type: Object, required: true },
@@ -33,6 +35,13 @@ const props = defineProps({
 });
 
 const renderer = computed(() => renderers[props.schema?.kind] || null);
+
+// Renderers that act (switch-grid) take `runAction`; the rest never see it, so
+// a function never lands on their root element as a stray attribute.
+const runAction = usePluginAction(() => props.pluginId);
+const actionProps = computed(() =>
+  renderer.value?.props && "runAction" in renderer.value.props ? { runAction } : {}
+);
 
 // Content scaling (calvin-fub phase 2): the six built-in body renderers set
 // their base font-size from --region-content-fs (emitted on the dashboard root
