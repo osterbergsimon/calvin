@@ -18,7 +18,8 @@ from starlette.responses import JSONResponse
 from starlette.types import Receive, Scope, Send
 
 from app.mcp_server.tools import register_tools
-from app.security.route_policy import _authenticate_bearer, bearer_secret
+from app.security.api_keys import is_limited
+from app.security.route_policy import _authenticate_bearer, bearer_secret, limited_key_message
 
 _INSTRUCTIONS = (
     "Calvin is a self-hosted dashboard (calendars, photos, web services) shown on kiosks. "
@@ -94,6 +95,11 @@ class McpGateway:
                 detail.get("message", "Unauthorized"),
                 headers,
             )
+        if key is None or is_limited(key):
+            # A limited key gets nothing beyond an anonymous caller over HTTP,
+            # and every MCP tool is more than that (calvin-2ifv). One check
+            # here, so no tool can forget it.
+            return _error(403, "insufficient_scope", limited_key_message(key or {}))
         server = self._server
         if server is None:
             return _error(503, "mcp_unavailable", "The MCP server is not running.")

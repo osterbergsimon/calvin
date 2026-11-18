@@ -8,7 +8,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from loguru import logger
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 from app.security.admin_auth import (
     COOKIE_NAME,
@@ -361,6 +361,17 @@ async def auth_change_password(body: ChangePasswordBody, request: Request, respo
 class CreateKeyBody(BaseModel):
     name: str
     scope: Literal["read", "admin", "host"]
+    # A limited key (calvin-2ifv): only these, and always with scope "read".
+    permissions: list[Literal["screens.power"]] | None = None
+
+    @model_validator(mode="after")
+    def _limited_is_read(self) -> "CreateKeyBody":
+        if self.permissions is not None:
+            if not self.permissions:
+                raise ValueError("Choose at least one permission")
+            if self.scope != "read":
+                raise ValueError("A limited key always has the read scope")
+        return self
 
     @field_validator("name")
     @classmethod
@@ -407,7 +418,11 @@ async def create_api_key(body: CreateKeyBody):
             },
         )
     try:
-        record, secret = get_api_key_store().create(body.name, body.scope)
+        record, secret = get_api_key_store().create(
+            body.name,
+            body.scope,
+            permissions=list(body.permissions) if body.permissions is not None else None,
+        )
     except DuplicateKeyName:
         raise HTTPException(
             status_code=409,
@@ -416,7 +431,13 @@ async def create_api_key(body: CreateKeyBody):
                 "message": f"You already have a key called {body.name}.",
             },
         ) from None
-    logger.info("API key created: {} ({}, {})", record["name"], record["scope"], record["prefix"])
+    logger.info(
+        "API key created: {} ({}, {}{})",
+        record["name"],
+        record["scope"],
+        record["prefix"],
+        f", limited to {', '.join(record['permissions'])}" if record["limited"] else "",
+    )
     return {"key": record, "secret": secret}
 
 
