@@ -48,7 +48,7 @@ Validation at class definition (so errors surface at import, not render):
 
 - `display_schema.kind` must be one of `SUPPORTED_DISPLAY_KINDS`:
   `status`, `card-grid`, `item-list`, `iframe`, `image-with-caption`,
-  `metric-dashboard`, `weather-forecast`, `web-component`.
+  `metric-dashboard`, `weather-forecast`, `web-component`, `switch-grid`.
 - `statusbar_schema.kind` must be in `SUPPORTED_STATUSBAR_KINDS` (`status`).
 - `display_schema.panel_variant`, if present, must be one of
   `default`, `dense`, `media`, `iframe`.

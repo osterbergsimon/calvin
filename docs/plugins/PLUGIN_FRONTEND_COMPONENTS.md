@@ -168,6 +168,56 @@ display_schema={
 - A payload with `{"error": "...", "message": "..."}` renders as an error
   state instead of the forecast.
 
+### `switch-grid` — on/off tiles a tap switches
+
+[SwitchGrid.vue](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/renderers/SwitchGrid.vue)
+
+The one renderer that acts. Each item is a tile; a tap runs the item's
+`action` through the plugin's declared actions (`metadata.actions` and
+`perform_action`, see [Declared actions](PLUGIN_INTERFACE.md#declared-actions)),
+on the public route `POST /api/plugins/{instance_id}/actions/{name}`. The
+renderer knows nothing about the plugin: what a tap sends is in the payload.
+
+```json
+{
+  "display_schema": {
+    "kind": "switch-grid",
+    "poll_interval_ms": 15000,
+    "unreachable_text": "Couldn't reach the hub",
+    "empty_text": "No switches chosen yet."
+  }
+}
+```
+
+- `data_path` (default `$.items`) → a list of items:
+  `{"id", "label", "group"?, "state": "on" | "off" | "unavailable", "action": {"name", "params"} | null}`.
+  Tiles are grouped under `group` in first-seen order; items without one have
+  no heading. Set `params` to the target state (`on: true` when the device is
+  off), so a tap is explicit, never a blind toggle. `action: null` (or
+  `state: "unavailable"`) makes the tile inert; it reads "Not responding".
+- `perform_action` answers `{"item": {...}}` in the same item shape. The tile
+  settles on that state (the real state wins over the tap; an answer without
+  an `item` shows the data until it is fetched again), the cached data
+  is patched with it, and the plugin's data is fetched again so other tiles
+  and screens stay true. Set `poll_interval_ms` so changes made elsewhere
+  show up.
+- While the action runs the tile reads "Turning on…" / "Turning off…" and
+  ignores taps. A poll that lands meanwhile does not change it.
+- A failure returns the tile to what it showed and puts one line in the
+  grid's polite live region, cleared after 6 s or by the next good tap:
+
+  | Answer | Tile | Note |
+  |---|---|---|
+  | `403 plugin_action_refused` | unavailable until the next data | "Can't be switched from here" |
+  | `429 rate_limited` | reverts | "Too many taps. Try again in a moment." |
+  | `429 action_busy` | reverts | "Still busy with the last tap. Try again in a moment." |
+  | `504 plugin_action_timeout` | reverts | "No answer in time. Try again." |
+  | `404 unknown_action`, `422 invalid_action_params` / `invalid_action_body` | reverts | "This switch can't be used right now." |
+  | anything else (`404`/`409` for a removed or disabled instance, `502`, `500`, no answer) | reverts | `unreachable_text`, default "Couldn't reach it." |
+
+  A failed tap is retried by tapping again; nothing retries on its own.
+- `empty_text` is shown when there are no items.
+
 ### `web-component` — the escape hatch
 
 [WebComponentHost.vue](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/WebComponentHost.vue)

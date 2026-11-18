@@ -26,12 +26,26 @@
           </div>
         </section>
       </div>
+
+      <!-- switch-grid acts, so it gets a stub runner instead of the API:
+           Lamp A/B switch, Fan C fails to reach the hub, Plug E is refused. -->
+      <section class="gallery__panel gallery__panel--switch" data-test="gallery-switch-grid">
+        <header class="gallery__panel-header">switch-grid</header>
+        <div class="gallery__panel-body">
+          <SwitchGrid
+            :schema="switchGrid.schema"
+            :data="switchGrid.data"
+            :run-action="galleryRunAction"
+          />
+        </div>
+      </section>
     </div>
   </div>
 </template>
 
 <script setup>
 import SchemaRenderer from "../components/plugins/SchemaRenderer.vue";
+import SwitchGrid from "../components/plugins/renderers/SwitchGrid.vue";
 
 // ?theme=dark / ?theme=light renders a single theme (handy for screenshots)
 const themeParam = new URLSearchParams(window.location.search).get("theme");
@@ -42,6 +56,50 @@ const svgImage =
   encodeURIComponent(
     `<svg xmlns='http://www.w3.org/2000/svg' width='800' height='500'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23334155'/><stop offset='1' stop-color='%230e7490'/></linearGradient></defs><rect width='800' height='500' fill='url(%23g)'/><circle cx='620' cy='120' r='60' fill='%23f3b052' opacity='0.9'/></svg>`
   );
+
+const switchItem = (id, label, group, state) => ({
+  id,
+  label,
+  group,
+  state,
+  action:
+    state === "unavailable"
+      ? null
+      : { name: "set_onoff", params: { device: id, on: state !== "on" } },
+});
+
+const switchGrid = {
+  schema: { kind: "switch-grid", unreachable_text: "Couldn't reach Homey" },
+  data: {
+    items: [
+      switchItem("lamp-a", "Lamp A", "Group A", "on"),
+      switchItem("lamp-b", "Lamp B", "Group A", "off"),
+      switchItem("fan-c", "Fan C", "Group A", "off"),
+      switchItem("plug-d", "Plug D", "Group B", "unavailable"),
+      switchItem("plug-e", "Plug E", "Group B", "on"),
+    ],
+  },
+};
+
+const galleryFailure = (status, code) =>
+  Object.assign(new Error(`Request failed with status code ${status}`), {
+    response: { status, data: { detail: { code, message: "" } } },
+  });
+
+// Answers after a short wait so the pending label shows, like a real hub.
+function galleryRunAction(action) {
+  const { device, on } = action.params;
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      if (device === "fan-c") reject(galleryFailure(502, "plugin_action_failed"));
+      else if (device === "plug-e") reject(galleryFailure(403, "plugin_action_refused"));
+      else {
+        const item = switchGrid.data.items.find(i => i.id === device);
+        resolve({ item: { ...item, state: on ? "on" : "off" } });
+      }
+    }, 400);
+  });
+}
 
 const fixtures = {
   statusRow: {
@@ -305,6 +363,12 @@ const panels = [
   font-family: var(--font-display);
   font-size: var(--fs-xl);
   font-weight: 700;
+}
+
+.gallery__panel--switch {
+  max-width: 1400px;
+  margin-top: 1.5rem;
+  min-height: 0;
 }
 
 .gallery__panel-body {
