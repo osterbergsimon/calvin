@@ -373,3 +373,149 @@ def test_storage_failure_is_generic_500_with_no_traceback(test_client, monkeypat
     assert "locked" not in response.text
     assert not [line for line in lines if TYPED in line]
     assert FakeScanPlugin.seen == []
+
+
+# --- the address field must be known (M1) ---------------------------------
+
+ADDRESS_SCHEMA = {
+    "address": {"type": "string", "label": "Hub"},
+    "api_key": {"type": "password", "label": "Key"},
+    "devices": {"type": "string", "label": "Devices"},
+}
+MARKED_SCHEMA = {
+    **ADDRESS_SCHEMA,
+    "address": {"type": "string", "label": "Hub", "ui": {"endpoint": True}},
+}
+
+
+class AddressPlugin(FakeScanPlugin):
+    metadata = PluginMetadata(
+        type_id="fake-address", name="Fake Address", instance_config_schema=ADDRESS_SCHEMA
+    )
+    seen: list[tuple[str, dict[str, Any]]] = []
+    result: Any = {"options": []}
+
+
+class MarkedPlugin(FakeScanPlugin):
+    metadata = PluginMetadata(
+        type_id="fake-marked", name="Fake Marked", instance_config_schema=MARKED_SCHEMA
+    )
+    seen: list[tuple[str, dict[str, Any]]] = []
+    result: Any = {"options": []}
+
+
+@pytest.fixture
+async def address_instances(monkeypatch):
+    from app.models.db_models import PluginDB
+
+    for cls in (AddressPlugin, MarkedPlugin):
+        monkeypatch.setitem(plugin_loader._types, cls.metadata.type_id, cls)
+        cls.seen = []
+    rows = [
+        await PluginDB.objects.create(
+            id=f"{type_id}-1",
+            type_id=type_id,
+            plugin_type="service",
+            name=type_id,
+            enabled=True,
+            config={"address": "http://hub-a.invalid", "api_key": STORED},
+        )
+        for type_id in ("fake-address", "fake-marked")
+    ]
+    yield
+    for row in rows:
+        await row.delete()
+
+
+def _address_scan(client, type_id, address):
+    return _scan(
+        client,
+        {
+            "field": "devices",
+            "config": {"address": address, "api_key": ""},
+            "instance_id": f"{type_id}-1",
+        },
+        plugin_id=type_id,
+    )
+
+
+async def test_unmarked_address_field_fails_closed(test_client, address_instances):
+    # The reviewer's probe: a field the host cannot recognise as the address.
+    _login(test_client)
+    response = _address_scan(test_client, "fake-address", "http://attacker.invalid")
+    assert response.status_code == 400
+    assert AddressPlugin.seen == []
+    assert STORED not in response.text
+    # Even the unchanged address is refused: the host cannot tell it from a new one.
+    assert _address_scan(test_client, "fake-address", "http://hub-a.invalid").status_code == 400
+    assert AddressPlugin.seen == []
+
+
+async def test_marked_endpoint_unchanged_fills_the_key(test_client, address_instances):
+    _login(test_client)
+    response = _address_scan(test_client, "fake-marked", "http://hub-a.invalid")
+    assert response.status_code == 200, response.text
+    assert MarkedPlugin.seen == [
+        ("devices", {"address": "http://hub-a.invalid", "api_key": STORED})
+    ]
+
+
+async def test_marked_endpoint_changed_is_400(test_client, address_instances):
+    _login(test_client)
+    response = _address_scan(test_client, "fake-marked", "http://attacker.invalid")
+    assert response.status_code == 400
+    assert MarkedPlugin.seen == []
+    assert STORED not in response.text
+
+
+async def test_unmarked_address_with_typed_key_still_scans(test_client, address_instances):
+    # Nothing stored is reused, so there is nothing to fail closed on.
+    _login(test_client)
+    response = _scan(
+        test_client,
+        {"field": "devices", "config": {"address": "http://new.invalid", "api_key": TYPED}},
+        plugin_id="fake-address",
+    )
+    assert response.status_code == 200, response.text
+    assert AddressPlugin.seen == [("devices", {"address": "http://new.invalid", "api_key": TYPED})]
+
+
+# --- unrenderable plugin output (m3) and option limits (m4) ---------------
+
+
+class _Unprintable:
+    def __str__(self) -> str:
+        raise RuntimeError("cannot render")
+
+
+def test_unrenderable_option_is_generic_and_leaks_nothing(test_client):
+    FakeScanPlugin.result = {"options": [{"value": _Unprintable(), "label": "x"}]}
+    _login(test_client)
+    lines: list[str] = []
+    sink = logger.add(lambda m: lines.append(str(m)), level="DEBUG", diagnose=True)
+    try:
+        response = _scan(test_client)
+    finally:
+        logger.remove(sink)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["options"] == []
+    assert body["error"]
+    assert TYPED not in response.text
+    assert "cannot render" not in response.text
+    assert not [line for line in lines if TYPED in line]
+
+
+def test_options_with_overlong_or_comma_values_are_dropped(test_client):
+    FakeScanPlugin.result = {
+        "options": [
+            {"value": "x" * 201, "label": "too long"},
+            {"value": "a,b", "label": "comma"},
+            {"value": "y" * 200, "label": "z" * 300},
+            {"value": "ok", "label": "Ok"},
+        ]
+    }
+    _login(test_client)
+    options = _scan(test_client).json()["options"]
+    assert [o["value"] for o in options] == ["y" * 200, "ok"]
+    assert len(options[0]["label"]) == 200

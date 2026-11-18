@@ -26,6 +26,7 @@ from app.plugins.utils.secrets import (
     SecretEndpointChangedError,
     check_secret_endpoint,
     endpoint_keys_for_type,
+    is_unchanged_secret,
     keep_stored_secrets,
     secret_keys_for_type,
 )
@@ -707,7 +708,11 @@ async def get_plugin(plugin_id: str):
 
 
 async def _keep_stored_type_secrets(
-    plugin_id: str, config: dict[str, Any], instance_id: str | None = None
+    plugin_id: str,
+    config: dict[str, Any],
+    instance_id: str | None = None,
+    *,
+    require_endpoint: bool = False,
 ) -> dict[str, Any]:
     """
     Fill secrets the settings form sent back blank or masked from what is stored.
@@ -716,7 +721,10 @@ async def _keep_stored_type_secrets(
     (audit S4). Stored values come from the type config and, when the update
     targets an instance, from that instance. A stored secret is never reused
     when the request changes the URL/host it authenticates against; that is a
-    400 asking the caller to re-enter it.
+    400 asking the caller to re-enter it. With ``require_endpoint`` (the scan
+    route) a stored secret is also never reused when the type names no
+    endpoint field at all (no url-like name, ``url`` type or ``ui.endpoint``):
+    the host cannot tell whether the address changed, so it fails closed.
     """
     stored: dict[str, Any] = {}
     stored_json = await config_service.get_value(f"plugin_{plugin_id}_config")
@@ -734,8 +742,23 @@ async def _keep_stored_type_secrets(
     keys = secret_keys_for_type(plugin_id, known)
     if not keys:
         return config
+    endpoints = endpoint_keys_for_type(plugin_id, known)
+    if require_endpoint and not endpoints:
+        kept = sorted(
+            key
+            for key in keys
+            if stored.get(key) and (key not in config or is_unchanged_secret(config[key]))
+        )
+        if kept:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Re-enter {', '.join(kept)}: the stored value is not reused "
+                    "for this plugin's settings"
+                ),
+            )
     try:
-        check_secret_endpoint(config, stored, keys, endpoint_keys_for_type(plugin_id, known))
+        check_secret_endpoint(config, stored, keys, endpoints)
     except SecretEndpointChangedError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     return keep_stored_secrets(config, stored, keys)
@@ -1103,10 +1126,12 @@ def _checked_scan_body(request: ScanWithConfigRequest) -> tuple[str, dict[str, A
     return field, config, instance_id or None
 
 
-def _scan_text(value: Any) -> str | None:
+def _scan_text(value: Any, *, cut: bool = True) -> str | None:
     if value is None or isinstance(value, dict | list | tuple | set):
         return None
     text = str(value)
+    if not cut:
+        return text or None
     return text[:MAX_SCAN_TEXT] if text else None
 
 
@@ -1119,8 +1144,10 @@ def _scan_response(result: dict[str, Any]) -> dict[str, Any]:
             break
         if not isinstance(entry, dict):
             continue
-        value = _scan_text(entry.get("value"))
-        if value is None:
+        value = _scan_text(entry.get("value"), cut=False)
+        # An id is stored comma-joined: cutting or splitting it would save a
+        # different id, so such an option is dropped, not changed.
+        if value is None or len(value) > MAX_SCAN_TEXT or "," in value:
             continue
         options.append({"value": value, "label": _scan_text(entry.get("label")) or value})
     response: dict[str, Any] = {"options": options}
@@ -1149,7 +1176,7 @@ async def scan_plugin_options_with_config(
     field, form_config, instance_id = _checked_scan_body(request)
     try:
         config = await _keep_stored_type_secrets(
-            plugin_id, normalize_plugin_config(form_config), instance_id
+            plugin_id, normalize_plugin_config(form_config), instance_id, require_endpoint=True
         )
     except HTTPException:
         raise
@@ -1173,10 +1200,20 @@ async def scan_plugin_options_with_config(
             "error": "Couldn't list the options. Check the settings and try again.",
         }
 
-    if not isinstance(result, dict):
-        return {"options": [], "error": "This plugin can't list options for this setting."}
+    try:
+        if not isinstance(result, dict):
+            return {"options": [], "error": "This plugin can't list options for this setting."}
+        response = _scan_response(result)
+    except Exception as e:
+        # Plugin output can fail to render; the global handler's traceback would
+        # print this frame's locals, which hold the filled secret.
+        logger.warning("Scan with config for {} failed: {}", plugin_id, type(e).__name__)
+        return {
+            "options": [],
+            "error": "Couldn't list the options. Check the settings and try again.",
+        }
     logger.debug("Scan with config for {} field {}", plugin_id, field)
-    return _scan_response(result)
+    return response
 
 
 @router.get("/plugins/{plugin_id}/data")

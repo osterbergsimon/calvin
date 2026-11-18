@@ -74,7 +74,10 @@ def secret_keys_for_type(type_id: str, config: dict[str, Any] | None = None) -> 
 
 
 def endpoint_keys(schema: dict[str, Any] | None, config: dict[str, Any] | None = None) -> set[str]:
-    """Keys that say where a secret goes: url/host/server/port-like names, or url-typed fields."""
+    """
+    Keys that say where a secret goes: url/host/server/port-like names, url-typed
+    fields, and any field a plugin marks ``"ui": {"endpoint": true}``.
+    """
     keys = {key for key in (config or {}) if _ENDPOINT_KEY_RE.search(key)}
     for key, entry in (schema or {}).items():
         if not isinstance(entry, dict):
@@ -83,7 +86,11 @@ def endpoint_keys(schema: dict[str, Any] | None, config: dict[str, Any] | None =
         ui = ui if isinstance(ui, dict) else {}
         validation = ui.get("validation")
         validation = validation if isinstance(validation, dict) else {}
-        if _ENDPOINT_KEY_RE.search(key) or "url" in (entry.get("type"), validation.get("type")):
+        if (
+            _ENDPOINT_KEY_RE.search(key)
+            or "url" in (entry.get("type"), validation.get("type"))
+            or ui.get("endpoint") is True
+        ):
             keys.add(key)
     return keys
 
