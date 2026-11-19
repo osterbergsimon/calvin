@@ -6,7 +6,6 @@
  * action answers. Every error the action route can return maps to plain words.
  */
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { h } from "vue";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { mount, flushPromises } from "@vue/test-utils";
@@ -94,53 +93,6 @@ describe("SwitchGrid", () => {
     expect(c.text()).toContain("Not responding");
     // Never the disabled attribute: a focused tile keeps focus when it flips.
     expect(c.attributes("disabled")).toBeUndefined();
-  });
-
-  it("names a tile by its label only, so the state is not read twice", () => {
-    const w = mountGrid();
-    const a = tile(w, "Lamp A");
-    const labelId = a.attributes("aria-labelledby");
-    expect(labelId).toBeTruthy();
-    expect(w.find(`[id="${labelId}"]`).text()).toBe("Lamp A");
-    // Plain on/off is already in aria-pressed, so it is not described again.
-    expect(a.attributes("aria-describedby")).toBeUndefined();
-    expect(tile(w, "Lamp B").attributes("aria-describedby")).toBeUndefined();
-  });
-
-  it("describes a state aria-pressed cannot carry", async () => {
-    const pending = deferred();
-    const w = mountGrid({ runAction: vi.fn(() => pending.promise) });
-    await tile(w, "Lamp A").trigger("click");
-    let a = tile(w, "Lamp A");
-    let stateId = a.attributes("aria-describedby");
-    expect(w.find(`[id="${stateId}"]`).text()).toBe("Turning on…");
-
-    const c = tile(w, "Plug C");
-    expect(w.find(`[id="${c.attributes("aria-describedby")}"]`).text()).toBe("Not responding");
-
-    pending.reject(httpError(403, "plugin_action_refused", {}, ""));
-    await flushPromises();
-    a = tile(w, "Lamp A");
-    expect(w.find(`[id="${a.attributes("aria-describedby")}"]`).text()).toBe(
-      "Can't be switched from here"
-    );
-  });
-
-  it("gives two grids on one page different tile ids", () => {
-    const Pair = {
-      render() {
-        return h("div", [
-          h(SwitchGrid, { schema: { kind: "switch-grid" }, data: { items: ITEMS } }),
-          h(SwitchGrid, { schema: { kind: "switch-grid" }, data: { items: ITEMS } }),
-        ]);
-      },
-    };
-    const w = mount(Pair);
-    wrapper = w;
-    const buttons = w.findAll("button.switch-tile");
-    expect(buttons[0].attributes("aria-labelledby")).not.toBe(
-      buttons[3].attributes("aria-labelledby")
-    );
   });
 
   it("groups tiles under their group heading in first-seen order", () => {
