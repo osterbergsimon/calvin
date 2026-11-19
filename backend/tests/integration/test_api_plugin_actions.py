@@ -452,6 +452,32 @@ async def test_hung_action_times_out_504_and_plugin_is_cancelled(
     assert action_in_flight.tracked_keys() == 0
 
 
+async def test_plugin_raised_timeout_is_generic_500_not_the_host_504(test_client, register):
+    """Only the host's own deadline is a 504; a plugin's timeout is any other crash."""
+    plugin = await register()
+    plugin.raise_error = TimeoutError(f"upstream timed out with {SECRET}")
+    lines: list[str] = []
+    sink_id = logger.add(lambda message: lines.append(str(message)), level="DEBUG")
+    try:
+        response = _post(test_client)
+    finally:
+        logger.remove(sink_id)
+
+    assert response.status_code == 500
+    assert _detail(response)["code"] == "plugin_action_error"
+    assert "plugin_action_timeout" not in response.text
+    assert SECRET not in response.text
+
+    joined = "".join(lines)
+    # The same answer and log as any other unexpected plugin exception: type and
+    # raise site, never the message.
+    assert "TimeoutError" in joined
+    assert "test_api_plugin_actions.py" in joined
+    assert "timed out with" not in joined
+    assert SECRET not in joined
+    assert action_in_flight.tracked_keys() == 0
+
+
 class GatedPlugin(FakeSwitchPlugin):
     """``perform_action`` blocks until ``release`` (a thread-safe event) is set."""
 

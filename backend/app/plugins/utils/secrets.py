@@ -100,6 +100,11 @@ def endpoint_keys_for_type(type_id: str, config: dict[str, Any] | None = None) -
     return endpoint_keys(_type_schema(type_id), config)
 
 
+def declared_keys_for_type(type_id: str) -> set[str]:
+    """Config keys the plugin type's current schema declares."""
+    return set(_type_schema(type_id))
+
+
 class SecretEndpointChangedError(ValueError):
     """A stored secret was about to be reused for a different endpoint."""
 

@@ -1825,8 +1825,10 @@ export interface paths {
      *     enabled (409) and running (409; this route never starts an instance), the
      *     action is declared (404), the params match the declaration (422), and the
      *     instance is under its rate limit and has fewer than two actions running
-     *     (both 429). The call is cancelled after ``ACTION_TIMEOUT_S`` (504). Only then is ``perform_action``
-     *     called, with the validated params. Its dict is returned unchanged.
+     *     (both 429). Then ``perform_action`` is called with the validated params; if
+     *     it has not returned after ``ACTION_TIMEOUT_S`` the host cancels it and
+     *     answers 504, while a ``TimeoutError`` the plugin raises itself is treated
+     *     like any other unexpected exception (500). Its dict is returned unchanged.
      */
     post: operations["run_plugin_action_api_plugins__plugin_id__actions__action__post"];
     delete?: never;

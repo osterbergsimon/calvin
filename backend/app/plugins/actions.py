@@ -159,9 +159,9 @@ MAX_IN_FLIGHT = 2
 class ActionInFlightLimiter:
     """Per-instance cap on actions still running (the rate limiter counts starts).
 
-    Semaphores are made only for keys the route asks about after validation, and
-    idle ones (nothing running) are dropped on every acquire, so memory stays
-    bounded by the number of instances with a running action.
+    Only keys with a running action are kept: ``release`` drops a key when its
+    count reaches zero, so memory stays bounded by the number of instances with
+    a running action.
     """
 
     def __init__(self, limit: int = MAX_IN_FLIGHT) -> None:
@@ -173,8 +173,6 @@ class ActionInFlightLimiter:
 
         Called from the event loop only, so no lock is needed.
         """
-        for k in [k for k, n in self._running.items() if n <= 0]:
-            del self._running[k]
         count = self._running.get(key, 0)
         if count >= self.limit:
             return False

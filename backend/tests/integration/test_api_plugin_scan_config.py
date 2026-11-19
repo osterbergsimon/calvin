@@ -466,6 +466,39 @@ async def test_unmarked_address_field_fails_closed(test_client, address_instance
     assert AddressPlugin.seen == []
 
 
+async def test_stale_stored_endpoint_key_does_not_open_the_gate(test_client, address_instances):
+    # A legacy row can hold an endpoint-looking key (`host`) that this type's
+    # current schema does not declare. That key must not convince the gate the
+    # type has a known address while the real, unmarked `address` goes unchecked.
+    from app.models.db_models import PluginDB
+
+    row = await PluginDB.objects.create(
+        id="fake-address-legacy-1",
+        type_id="fake-address",
+        plugin_type="service",
+        name="legacy",
+        enabled=True,
+        config={"address": "http://hub-a.invalid", "api_key": STORED, "host": "hub-a"},
+    )
+    try:
+        _login(test_client)
+        response = _scan(
+            test_client,
+            {
+                "field": "devices",
+                "config": {"address": "http://attacker.invalid", "api_key": ""},
+                "instance_id": row.id,
+            },
+            plugin_id="fake-address",
+        )
+    finally:
+        await row.delete()
+
+    assert response.status_code == 400
+    assert AddressPlugin.seen == []
+    assert STORED not in response.text
+
+
 async def test_marked_endpoint_unchanged_fills_the_key(test_client, address_instances):
     _login(test_client)
     response = _address_scan(test_client, "fake-marked", "http://hub-a.invalid")
