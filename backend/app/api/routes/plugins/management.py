@@ -25,6 +25,7 @@ from app.plugins.utils.instance_manager import apply_plugin_config_update
 from app.plugins.utils.secrets import (
     SecretEndpointChangedError,
     check_secret_endpoint,
+    declared_keys_for_type,
     endpoint_keys_for_type,
     is_unchanged_secret,
     keep_stored_secrets,
@@ -725,8 +726,9 @@ async def _keep_stored_type_secrets(
     route) a stored secret is also never reused when the type names no
     endpoint field at all (no url-like name, ``url`` type or ``ui.endpoint``):
     the host cannot tell whether the address changed, so it fails closed. That
-    decision is made from the type's schema (or, for legacy rows, the stored
-    config) only; keys the request invents never count.
+    decision is made from the type's schema only (for legacy rows, a stored key
+    also counts only when the current schema declares it); keys the request
+    invents never count.
     """
     stored: dict[str, Any] = {}
     stored_json = await config_service.get_value(f"plugin_{plugin_id}_config")
@@ -745,10 +747,15 @@ async def _keep_stored_type_secrets(
     if not keys:
         return config
     # What the host can tell the address from: the type's schema first, then
-    # the stored config for rows written before the schema said so. The request
-    # never counts here — an invented key would let the caller satisfy the gate.
+    # stored keys the current schema also declares (rows written before the
+    # schema said so). A stored key the schema does not declare never counts:
+    # it could otherwise hide an address the type declares but does not mark.
+    # The request never counts here — an invented key would satisfy the gate.
     endpoints = endpoint_keys_for_type(plugin_id, known)
-    known_endpoints = endpoint_keys_for_type(plugin_id) or endpoint_keys_for_type(plugin_id, stored)
+    known_endpoints = endpoint_keys_for_type(plugin_id)
+    if not known_endpoints:
+        declared = declared_keys_for_type(plugin_id)
+        known_endpoints = endpoint_keys_for_type(plugin_id, stored) & declared
     if require_endpoint and not known_endpoints:
         kept = sorted(
             key

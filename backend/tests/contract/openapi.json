@@ -6816,7 +6816,7 @@
     },
     "/api/plugins/{plugin_id}/actions/{action}": {
       "post": {
-        "description": "Run ``action`` on the service plugin instance ``plugin_id``.\n\nChecks, in order: the instance exists and is a service plugin (404), is\nenabled (409) and running (409; this route never starts an instance), the\naction is declared (404), the params match the declaration (422), and the\ninstance is under its rate limit and has fewer than two actions running\n(both 429). The call is cancelled after ``ACTION_TIMEOUT_S`` (504). Only then is ``perform_action``\ncalled, with the validated params. Its dict is returned unchanged.",
+        "description": "Run ``action`` on the service plugin instance ``plugin_id``.\n\nChecks, in order: the instance exists and is a service plugin (404), is\nenabled (409) and running (409; this route never starts an instance), the\naction is declared (404), the params match the declaration (422), and the\ninstance is under its rate limit and has fewer than two actions running\n(both 429). Then ``perform_action`` is called with the validated params; if\nit has not returned after ``ACTION_TIMEOUT_S`` the host cancels it and\nanswers 504, while a ``TimeoutError`` the plugin raises itself is treated\nlike any other unexpected exception (500). Its dict is returned unchanged.",
         "operationId": "run_plugin_action_api_plugins__plugin_id__actions__action__post",
         "parameters": [
           {

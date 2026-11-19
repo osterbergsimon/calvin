@@ -4,6 +4,7 @@ import pytest
 
 from app.plugins.actions import (
     MAX_STRING_PARAM,
+    ActionInFlightLimiter,
     ActionParamsError,
     ActionRateLimiter,
     PluginActionError,
@@ -102,6 +103,26 @@ def test_rate_limiter_drops_idle_keys():
     now[0] = 5.0
     rl.allow("fresh")
     assert rl.tracked_keys() == 1
+
+
+def test_in_flight_limiter_caps_each_key_and_forgets_idle_ones():
+    limiter = ActionInFlightLimiter(limit=2)
+    assert limiter.try_acquire("a") is True
+    assert limiter.try_acquire("a") is True
+    assert limiter.try_acquire("b") is True
+    assert limiter.try_acquire("a") is False
+    assert limiter.tracked_keys() == 2
+
+    limiter.release("a")
+    assert limiter.try_acquire("a") is True
+    limiter.release("a")
+    limiter.release("a")
+    # A key with no running action is dropped, not kept at zero.
+    assert limiter.tracked_keys() == 1
+
+    limiter.release("b")
+    limiter.release("unknown")  # harmless, never creates a key
+    assert limiter.tracked_keys() == 0
 
 
 def test_refused_is_an_action_error():

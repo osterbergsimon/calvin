@@ -70,6 +70,27 @@ def _plugin_message(error: PluginActionError) -> str:
     return message[:MAX_ERROR_MESSAGE] or "The action failed."
 
 
+def _unexpected_error(error: BaseException, action: str, plugin_id: str) -> HTTPException:
+    """Log an unexpected plugin exception and build the generic 500 for it.
+
+    Not ``internal_error(error=e)``: a traceback (with loguru's diagnose on, the
+    default) prints local values, which in plugin frames can be config or
+    secrets. Log only the exception type and where it was raised.
+    """
+    logger.error(
+        "Plugin action {} on {} raised {} at {}",
+        action,
+        plugin_id,
+        type(error).__name__,
+        _raise_site(error),
+    )
+    return _error(
+        500,
+        "plugin_action_error",
+        "The action failed. Check the server logs for details.",
+    )
+
+
 @router.post("/plugins/{plugin_id}/actions/{action}")
 async def run_plugin_action(
     plugin_id: str, action: str, request: PluginActionRequest
@@ -80,8 +101,10 @@ async def run_plugin_action(
     enabled (409) and running (409; this route never starts an instance), the
     action is declared (404), the params match the declaration (422), and the
     instance is under its rate limit and has fewer than two actions running
-    (both 429). The call is cancelled after ``ACTION_TIMEOUT_S`` (504). Only then is ``perform_action``
-    called, with the validated params. Its dict is returned unchanged.
+    (both 429). Then ``perform_action`` is called with the validated params; if
+    it has not returned after ``ACTION_TIMEOUT_S`` the host cancels it and
+    answers 504, while a ``TimeoutError`` the plugin raises itself is treated
+    like any other unexpected exception (500). Its dict is returned unchanged.
     """
     db_plugin = await PluginDB.objects.get_or_none(id=plugin_id)
     instance = plugin_manager.get_plugin(plugin_id) if db_plugin else None
@@ -141,9 +164,17 @@ async def run_plugin_action(
     logger.info("Plugin action {} on {} params={}", action, plugin_id, params)
 
     try:
-        result = await asyncio.wait_for(instance.perform_action(action, params), ACTION_TIMEOUT_S)
-    except TimeoutError:
-        # wait_for has cancelled the plugin's call. Log names only, no traceback.
+        timeout = asyncio.timeout(ACTION_TIMEOUT_S)
+        async with timeout:
+            result = await instance.perform_action(action, params)
+    except TimeoutError as e:
+        if not timeout.expired():
+            # A timeout the plugin raised itself (an aiohttp/httpx/asyncio
+            # deadline, say) is not the host's deadline: answer and log it like
+            # any other unexpected plugin exception.
+            raise _unexpected_error(e, action, plugin_id) from None
+        # The host's deadline cancelled the plugin's call. Log names only, no
+        # traceback.
         logger.warning("Plugin action {} on {} timed out", action, plugin_id)
         raise _error(
             504, "plugin_action_timeout", "The action took too long and was stopped."
@@ -155,21 +186,7 @@ async def run_plugin_action(
         logger.warning("Plugin action {} on {} failed", action, plugin_id)
         raise _error(502, "plugin_action_failed", _plugin_message(e)) from None
     except Exception as e:
-        # Not ``internal_error(error=e)``: a traceback (with loguru's diagnose
-        # on, the default) prints local values, which in plugin frames can be
-        # config or secrets. Log only the exception type and where it was raised.
-        logger.error(
-            "Plugin action {} on {} raised {} at {}",
-            action,
-            plugin_id,
-            type(e).__name__,
-            _raise_site(e),
-        )
-        raise _error(
-            500,
-            "plugin_action_error",
-            "The action failed. Check the server logs for details.",
-        ) from None
+        raise _unexpected_error(e, action, plugin_id) from None
     finally:
         action_in_flight.release(plugin_id)
 
