@@ -70,7 +70,7 @@ describe("PluginFieldRenderer multi-select-scan field", () => {
         schema: SCHEMA,
         value,
         formConfig: FORM,
-        instanceId: "inst-1",
+        instanceId: undefined,
         ...extra,
       },
     });
@@ -88,7 +88,8 @@ describe("PluginFieldRenderer multi-select-scan field", () => {
 
   it("scan posts the form config and instance id", async () => {
     scanWithConfig.mockResolvedValue({ options: [] });
-    const wrapper = mountField();
+    const wrapper = mountField("", { instanceId: "inst-1" });
+    await flushPromises();
     await scanButton(wrapper).trigger("click");
     expect(scanWithConfig).toHaveBeenCalledWith("homey", "devices", FORM, "inst-1");
   });
@@ -134,13 +135,52 @@ describe("PluginFieldRenderer multi-select-scan field", () => {
     expect(lastEmit(wrapper)).toBe("b");
   });
 
-  it("keeps saved ids a scan did not find, labelled with the id", async () => {
+  it("keeps saved ids a scan did not find, labelled as not found by the last scan", async () => {
     scanWithConfig.mockResolvedValue({ options: [{ value: "a", label: "Lamp A" }] });
     const wrapper = mountField("gone-1,a");
     await scanButton(wrapper).trigger("click");
     await flushPromises();
-    expect(chips(wrapper).map(c => c.text())).toEqual(["Lamp A", "gone-1"]);
+    expect(chips(wrapper).map(c => c.text())).toEqual(["Lamp A", "Not found by the last scan"]);
     expect(chips(wrapper).map(c => c.attributes("aria-pressed"))).toEqual(["true", "true"]);
+  });
+
+  it("editing an existing instance scans once on mount and shows saved device names", async () => {
+    scanWithConfig.mockResolvedValue({
+      options: [{ value: "a", label: "Lamp A (Kitchen)" }],
+    });
+    const wrapper = mountField("a,gone-1", { instanceId: "inst-1" });
+    await flushPromises();
+
+    expect(scanWithConfig).toHaveBeenCalledTimes(1);
+    expect(scanWithConfig).toHaveBeenCalledWith("homey", "devices", FORM, "inst-1");
+    expect(chips(wrapper).map(c => c.text())).toEqual([
+      "Lamp A (Kitchen)",
+      "Not found by the last scan",
+    ]);
+    expect(chips(wrapper).map(c => c.attributes("aria-pressed"))).toEqual(["true", "true"]);
+    // Nothing is dropped or re-emitted just because the scan settled.
+    expect(wrapper.emitted("update")).toBeUndefined();
+  });
+
+  it("a failed scan on mount keeps the saved ids selected", async () => {
+    scanWithConfig.mockRejectedValue(new Error("Network Error"));
+    const wrapper = mountField("a,b", { instanceId: "inst-1" });
+    await flushPromises();
+
+    expect(chips(wrapper).map(c => c.text())).toEqual([
+      "Not found by the last scan",
+      "Not found by the last scan",
+    ]);
+    expect(chips(wrapper).map(c => c.attributes("aria-pressed"))).toEqual(["true", "true"]);
+    expect(wrapper.emitted("update")).toBeUndefined();
+    expect(wrapper.find(".inline-note").text()).toBe(
+      "Couldn't scan. Check the settings above, then try again."
+    );
+  });
+
+  it("does not scan on mount for a new instance", () => {
+    mountField("a");
+    expect(scanWithConfig).not.toHaveBeenCalled();
   });
 
   it("scan error shows an InlineNote and keeps the selection", async () => {
@@ -151,7 +191,7 @@ describe("PluginFieldRenderer multi-select-scan field", () => {
     expect(wrapper.find(".inline-note").text()).toBe(
       "Couldn't scan. Check the settings above, then try again."
     );
-    expect(chips(wrapper).map(c => c.text())).toEqual(["id-1"]);
+    expect(chips(wrapper).map(c => c.text())).toEqual(["Not found by the last scan"]);
     expect(wrapper.emitted("update")).toBeUndefined();
   });
 
@@ -177,7 +217,7 @@ describe("PluginFieldRenderer multi-select-scan field", () => {
     await scanButton(wrapper).trigger("click");
     await flushPromises();
     expect(wrapper.find(".inline-note").text()).toBe(
-      "Type the key again before scanning: the saved one isn't reused here."
+      "You changed the address, so type the key again before scanning."
     );
   });
 

@@ -163,7 +163,7 @@
 
 <script setup>
 import ExternalLink from "@/components/ui/ExternalLink.vue";
-import { computed, nextTick, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import axios from "axios";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import Button from "@/components/ui/Button.vue";
@@ -299,15 +299,22 @@ const selectedIds = computed(() => {
 const multiScanned = ref([]);
 const multiScanning = ref(false);
 const multiScanNote = ref("");
+// Whether a scan has run. Before the first one, a saved id is all we have to
+// show; afterwards an id the scan did not find is called out by name.
+const multiScanAttempted = ref(false);
 
-// Scanned options first; saved ids the scan did not find stay listed under
-// their id, so nothing chosen is dropped without the admin seeing it.
+// Scanned options first; saved ids the scan did not find stay listed (and
+// selected) under plain words, so nothing chosen is dropped without the admin
+// seeing it.
 const multiOptions = computed(() => {
   const scanned = multiScanned.value.map(toOption);
   const known = new Set(scanned.map(option => option.value));
   const missing = selectedIds.value
     .filter(id => !known.has(id))
-    .map(id => ({ value: id, label: id }));
+    .map(id => ({
+      value: id,
+      label: multiScanAttempted.value ? "Not found by the last scan" : id,
+    }));
   return [...scanned, ...missing];
 });
 
@@ -328,6 +335,7 @@ let multiNoteStamp = 0;
 async function runMultiScan() {
   if (multiScanning.value) return;
   multiScanning.value = true;
+  multiScanAttempted.value = true;
   setMultiScanNote("");
   try {
     const res = await scanWithConfig(
@@ -344,13 +352,19 @@ async function runMultiScan() {
   } catch (err) {
     setMultiScanNote(
       err?.response?.status === 400
-        ? "Type the key again before scanning: the saved one isn't reused here."
+        ? "You changed the address, so type the key again before scanning."
         : "Couldn't scan. Check the settings above, then try again."
     );
   } finally {
     multiScanning.value = false;
   }
 }
+
+// Editing an existing instance: scan once so saved ids show their names. A
+// failed scan changes nothing, so the saved ids stay selected.
+onMounted(() => {
+  if (props.instanceId) runMultiScan();
+});
 
 async function runScan() {
   scanning.value = true;
