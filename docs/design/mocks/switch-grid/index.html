@@ -68,8 +68,11 @@ figcaption { font-size:.85rem; color:#5d6b75; margin-top:8px; }
 .switch-tile[aria-busy="true"] { cursor:progress; }
 .switch-tile[aria-busy="true"] .switch-tile__lamp { border-style:dashed; background:transparent; }
 .switch-tile[aria-busy="true"] .switch-tile__state { color:var(--ink); }
-.switch-tile--unavailable { opacity:.5; cursor:not-allowed; }
+/* Not responding is a status people read from across the room, not a disabled control: no opacity
+   (it took the words to 2.1:1). Label and state in --ink-3 (5.2:1 light, 4.5:1 Backlit). */
+.switch-tile--unavailable { cursor:not-allowed; }
 .switch-tile--unavailable:hover { background:var(--bg-2); }
+.switch-tile--unavailable .switch-tile__label, .switch-tile--unavailable .switch-tile__state { color:var(--ink-3); }
 .switch-tile--unavailable .switch-tile__lamp { border-style:dotted; }
 
 .switch-grid__note { min-height:1.25rem; margin:0; font-size:var(--text-meta); color:var(--err); }
@@ -80,8 +83,8 @@ figcaption { font-size:.85rem; color:#5d6b75; margin-top:8px; }
 <div class="board">
   <h1>Switch tiles</h1>
   <p>Each chosen device is one tile: its name, a lamp and the state in words. On uses the selected
-  treatment (orange tint and border), off is the plain surface, and a tile that is not responding is
-  dimmed with the words. While a tap is on its way the tile says what it is doing ("Turning on…") and
+  treatment (orange tint and border), off is the plain surface, and a tile that is not responding keeps
+  full contrast: grey text (--ink-3) and a dotted lamp, never faded. While a tap is on its way the tile says what it is doing ("Turning on…") and
   the lamp turns dashed. Notes go in one line under the grid, read out politely.</p>
   <div id="frames"></div>
 </div>
@@ -105,7 +108,7 @@ figcaption { font-size:.85rem; color:#5d6b75; margin-top:8px; }
           <button class="switch-tile" type="button" aria-pressed="false"><span class="switch-tile__top"><span class="switch-tile__label">Fan with a longer name F</span><span class="switch-tile__lamp"></span></span><span class="switch-tile__state">Off</span></button>
         </div>
       </section>
-      <p class="switch-grid__note" role="status" aria-live="polite">Fan with a longer name F: Couldn't reach Homey</p>
+      <p class="switch-grid__note" role="status" aria-live="polite">Fan with a longer name F: Couldn't reach Homey.</p>
     </div>
   </div>
 </template>
