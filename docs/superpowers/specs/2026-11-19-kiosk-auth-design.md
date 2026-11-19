@@ -220,7 +220,7 @@ GETs. Their handlers do their own checks.
 
 **The code.**
 
-- 6 characters from a 32-letter alphabet with no 0/O, 1/I/L or U, shown as `K7Q-4MD`. When it is
+- 6 characters from a 30-character alphabet (digits and capitals with no 0/O, 1/I/L or U), shown as `K7Q-4MD`. When it is
   typed, case and the dash are ignored.
 - It lives 10 minutes. The server chooses it, so it is never derived from the secret.
 - No two live pending entries share a code.
