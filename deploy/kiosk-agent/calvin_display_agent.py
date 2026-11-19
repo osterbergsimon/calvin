@@ -978,6 +978,9 @@ class BrightnessController:
         # clock), or None while the panel is wanted on. A held-off screen uses
         # it to re-assert the hold after its idle time (calvin-dcfs).
         self.off_asserted_at = None
+        # A hold can last all night, so its re-assert is logged once per hold,
+        # not once per idle interval.
+        self.hold_reassert_logged = False
         # Set once the agent is shutting down: no ramp or check may write after.
         self.stopping = threading.Event()
 
@@ -1140,6 +1143,11 @@ class BrightnessController:
         previous = self.settings
         on = desired_on(cfg, now)
         dim = settings["sleep_mode"] == "dim"
+        held_off = screen_hold(cfg) is False
+        if not held_off:
+            # A hold that ends and starts again is a new hold: log its first
+            # re-assert, but never more than once while it lasts.
+            self.hold_reassert_logged = False
 
         # Owner answer 4: the ramp was switched off while the panel slept at 0.
         # The same one-last step-up is needed when "Dim only" is switched back
@@ -1254,7 +1262,7 @@ class BrightnessController:
             not on
             and last_on is False
             and self.panel_off
-            and screen_hold(cfg) is False
+            and held_off
             and self.off_asserted_at is not None
             and (_as_aware(now) - _as_aware(self.off_asserted_at)).total_seconds()
             >= hold_resleep_seconds(cfg)
@@ -1266,7 +1274,9 @@ class BrightnessController:
             if switch == "failed":
                 return last_on
             self.off_asserted_at = now
-            self.log("display -> OFF (held off; sleeping again after a touch)")
+            if not self.hold_reassert_logged:
+                self.hold_reassert_logged = True
+                self.log("held off: re-asserting off")
             return False
 
         # "Dim only" switched to standby while the panel sleeps dimmed: it is

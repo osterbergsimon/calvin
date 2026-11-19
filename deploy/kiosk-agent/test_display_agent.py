@@ -2605,7 +2605,7 @@ def _ramp_cfg(**over):
     return base
 
 
-def _controller(ddc=None, fault=None, clock=None):
+def _controller(ddc=None, fault=None, clock=None, log_fn=None):
     clock = clock or FakeClock()
     applied = []
     controller = agent.BrightnessController(
@@ -2616,6 +2616,7 @@ def _controller(ddc=None, fault=None, clock=None):
         applier=lambda on: applied.append(on) or "cog",
         connected=lambda: True,
         cog=lambda: True,
+        log_fn=log_fn,
     )
     return controller, clock, applied
 
@@ -5512,6 +5513,31 @@ def test_held_off_without_an_idle_time_checks_about_once_a_minute():
     assert controller.reconcile(cfg, _local(hour=23), True) is False
     assert controller.reconcile(cfg, _local(hour=23, minute=1), False) is False
     assert applied == [False, False]
+
+
+def test_a_held_off_reassert_logs_once_per_hold():
+    logged = []
+    controller, clock, applied = _controller(log_fn=logged.append)
+    cfg = _cfg(
+        screen_hold={"power": "off"},
+        display_timeout_enabled=True,
+        display_timeout=60,
+    )
+    assert controller.reconcile(cfg, _local(hour=23), True) is False
+    # Two re-asserts an idle interval apart: one line, not one per interval.
+    assert controller.reconcile(cfg, _local(hour=23, minute=1), False) is False
+    assert controller.reconcile(cfg, _local(hour=23, minute=2), False) is False
+    reasserts = [line for line in logged if "held off" in line]
+    assert reasserts == ["held off: re-asserting off"]
+    assert applied == [False, False, False]
+
+    # The hold ends and a new one starts: the new hold logs its first re-assert.
+    no_hold = _cfg(display_schedule_enabled=False)
+    assert controller.reconcile(no_hold, _local(hour=23, minute=3), False) is True
+    assert controller.reconcile(cfg, _local(hour=23, minute=4), True) is False
+    assert controller.reconcile(cfg, _local(hour=23, minute=5), False) is False
+    reasserts = [line for line in logged if "held off" in line]
+    assert reasserts == ["held off: re-asserting off"] * 2
 
 
 def test_a_held_on_screen_is_never_reasserted_off():
