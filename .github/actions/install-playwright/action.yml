@@ -1,9 +1,11 @@
 name: Install Playwright browsers
 description: >
-  Install Playwright browsers and system deps with a per-attempt time box and
-  one retry. A stalled apt download (no data from a mirror) otherwise hangs
-  until the job timeout; each attempt is killed after 3 minutes (normal run is
-  under 1 minute).
+  Install Playwright browsers and their system packages reliably. Browsers are
+  cached per Playwright version; the apt .deb files for the system packages are
+  cached too. The browser download and the apt step are separate, each with its
+  own time box and retries with backoff. The slow part on CI is apt pulling font
+  packages from the Ubuntu mirror (it can crawl at tens of kB/s without ever
+  tripping apt's idle timeout), so that step is the one worth caching.
 inputs:
   browsers:
     description: Space-separated browser names passed to `playwright install`
@@ -14,24 +16,94 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Install browsers (time-boxed, one retry)
+    - name: Resolve Playwright version
+      id: pw
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
         BROWSERS: ${{ inputs.browsers }}
       run: |
+        version=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")
+        echo "version=${version}" >> "$GITHUB_OUTPUT"
+        echo "browsers=$(echo "$BROWSERS" | tr ' ' '-')" >> "$GITHUB_OUTPUT"
+
+    - name: Cache Playwright browsers
+      id: browsers-cache
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-browsers-${{ runner.os }}-${{ runner.arch }}-${{ steps.pw.outputs.version }}-${{ steps.pw.outputs.browsers }}
+
+    - name: Cache system package downloads
+      id: apt-cache
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ~/.cache/playwright-apt
+        key: playwright-apt-${{ runner.os }}-${{ runner.arch }}-${{ steps.pw.outputs.version }}-${{ steps.pw.outputs.browsers }}
+
+    - name: Download browsers (time-boxed, retried)
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        BROWSERS: ${{ inputs.browsers }}
+        CACHE_HIT: ${{ steps.browsers-cache.outputs.cache-hit }}
+      run: |
+        echo "Browser cache hit: ${CACHE_HIT:-false}"
+        start=$(date +%s)
+        for attempt in 1 2 3; do
+          # No-op when the cache restored the browsers.
+          # shellcheck disable=SC2086
+          if timeout --kill-after=10 150 npx playwright install $BROWSERS; then
+            echo "Browser download took $(( $(date +%s) - start ))s"
+            exit 0
+          fi
+          echo "::warning::Playwright browser download attempt ${attempt} failed or timed out"
+          sleep $(( attempt * 10 ))
+        done
+        echo "::error::Playwright browser download failed after 3 attempts"
+        exit 1
+
+    - name: Install system packages (time-boxed, retried)
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        BROWSERS: ${{ inputs.browsers }}
+        CACHE_HIT: ${{ steps.apt-cache.outputs.cache-hit }}
+      run: |
+        echo "System package cache hit: ${CACHE_HIT:-false}"
         # Make apt give up on a silent mirror instead of waiting forever.
         printf 'Acquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAcquire::Retries "3";\n' \
           | sudo tee /etc/apt/apt.conf.d/99-ci-timeouts >/dev/null
-        for attempt in 1 2; do
+        cache_dir="$HOME/.cache/playwright-apt"
+        mkdir -p "$cache_dir"
+        # The apt archive dir is root-owned, so cached .debs are copied in and out.
+        sudo cp --update=none "$cache_dir"/*.deb /var/cache/apt/archives/ 2>/dev/null || true
+        # Keep downloaded .debs after install (Ubuntu images may clean them).
+        echo 'APT::Keep-Downloaded-Packages "true"; Binary::apt::APT::Keep-Downloaded-Packages "true";' \
+          | sudo tee /etc/apt/apt.conf.d/99-keep-debs >/dev/null
+        sudo rm -f /etc/apt/apt.conf.d/docker-clean
+        start=$(date +%s)
+        status=1
+        for attempt in 1 2 3; do
           # shellcheck disable=SC2086
-          if timeout --kill-after=10 180 npx playwright install --with-deps $BROWSERS; then
-            exit 0
+          if timeout --kill-after=10 240 npx playwright install-deps $BROWSERS; then
+            status=0
+            break
           fi
-          echo "::warning::Playwright browser install attempt ${attempt} failed or timed out"
+          echo "::warning::Playwright system package install attempt ${attempt} failed or timed out"
           sudo pkill -x apt-get || true
           sudo dpkg --configure -a || true
-          sleep 5
+          # The default mirror can crawl for minutes at a time; retry against
+          # another one. Downloaded .debs stay in the apt archive dir, so a retry resumes.
+          printf 'http://azure.archive.ubuntu.com/ubuntu/\tpriority:1\n' \
+            | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+          sleep $(( attempt * 10 ))
         done
-        echo "::error::Playwright browser install failed after 2 attempts"
-        exit 1
+        echo "System package install took $(( $(date +%s) - start ))s"
+        # Save whatever was downloaded, even on failure, for the next run.
+        sudo find /var/cache/apt/archives -maxdepth 1 -name '*.deb' -exec cp --update=none {} "$cache_dir"/ \; || true
+        sudo chown -R "$(id -u):$(id -g)" "$cache_dir" || true
+        if [ "$status" -ne 0 ]; then
+          echo "::error::Playwright system package install failed after 3 attempts"
+          exit 1
+        fi
