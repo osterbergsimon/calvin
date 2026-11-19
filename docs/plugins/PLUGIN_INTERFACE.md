@@ -284,9 +284,11 @@ What the host guarantees before `perform_action` runs:
   it up; that is fine on a home LAN.
 - At most 2 actions run at once per instance (else `429` with `Retry-After: 1`,
   and the plugin is not called). An action that has not returned after 10
-  seconds is cancelled and answered `504` (`plugin_action_timeout`), so
-  `perform_action` must be safe to cancel and should use its own shorter
-  upstream timeouts.
+  seconds is cancelled by the host and answered `504`
+  (`plugin_action_timeout`), so `perform_action` must be safe to cancel and
+  should use its own shorter upstream timeouts. Only the host's own deadline is
+  that `504`: a `TimeoutError` raised by the plugin (an aiohttp/httpx/asyncio
+  timeout, say) is any other unexpected exception and gets the generic `500`.
 - Each call is logged at info level with the instance id, action and params,
   never with config.
 
@@ -301,8 +303,9 @@ What stays with the plugin:
   see (`502`); the message is trimmed to 200 characters and must hold no
   secrets, config values or exception text. The message is shown to the caller
   and also written to the server log, so a plugin must never put secrets in it
-  (the same goes for the `PluginActionRefused` message). Any other exception becomes a
-  generic `500` and only its type and raise site are logged.
+  (the same goes for the `PluginActionRefused` message). Any other exception,
+  including a `TimeoutError` the plugin raises itself, becomes a generic `500`
+  and only its type and raise site are logged.
 - **The returned dict goes to anonymous callers unchanged.** Never put config
   or secrets in it.
 
@@ -310,11 +313,13 @@ Both error classes live in `app.plugins.actions`. Error bodies are
 `{"detail": {"code", "message"}}` with codes `plugin_not_found`,
 `plugin_disabled`, `plugin_stopped`, `unknown_action`, `invalid_action_params`,
 `invalid_action_body`, `rate_limited`, `action_busy`, `plugin_action_refused`,
-`plugin_action_failed`, `plugin_action_timeout` and `plugin_action_error`. A body
-that is not a JSON object is rejected by request validation with the app's
-generic `422` shape, `{"detail": [...], "body": "Validation error"}`; an object
-with other top-level keys than `params` gets `invalid_action_body` (at most 10
-names, each cut to 64 characters).
+`plugin_action_failed`, `plugin_action_timeout` and `plugin_action_error`. The
+two `422` codes also carry `errors`, a list of short strings that name keys and
+types only and never echo values: `invalid_action_params` lists one entry per
+bad param, and `invalid_action_body` lists the unknown top-level keys (at most
+10 names, each cut to 64 characters). A body that is not a JSON object is
+rejected by request validation with the app's generic `422` shape,
+`{"detail": [...], "body": "Validation error"}`.
 
 `fetch()` is the one data verb for service and backend plugins. It replaces
 the retired per-plugin fetch variants and the deprecated fetch hooks; there is
