@@ -87,9 +87,10 @@ condition on `"held":true` is enough to branch.
   paused." with **Back to schedule**.
 - A person's **Turn on now** or **Turn off now** in Settings ends the hold and works as
   always: it lasts until the next scheduled change.
-- A touch on a screen held off can wake it, depending on the display. Calvin does not put it
-  back to sleep by itself: it stays lit until the screen's power is changed, in Settings or
-  from home automation.
+- A touch on a screen held off can wake it, depending on the display. It is not left lit:
+  Calvin sleeps it again at its next check, once the screen's idle time (**Turn off when
+  idle**) has passed, or about once a minute when no idle time is set. The hold itself is
+  unchanged.
 
 ## Security notes
 

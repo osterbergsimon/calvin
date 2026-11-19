@@ -135,6 +135,13 @@ def _first_boundary_after(cfg, moment):
 # server can tell which screens can hold a screen-power choice (calvin-2ifv).
 AGENT_FEATURES = ("hold",)
 
+# A touch can wake a panel the agent turned off (on X11 an input event undoes a
+# forced DPMS off) and the agent cannot see that happen. While a hold keeps the
+# screen off, re-assert the off after the screen's idle time, so a woken panel
+# sleeps again instead of staying lit against the hold (calvin-dcfs). "Turn off
+# when idle" set to Never has no idle time; then check about once a poll.
+HOLD_RESLEEP_SECONDS = 60
+
 
 def screen_hold(cfg):
     """True/False from a held screen power, or None when there is none.
@@ -151,6 +158,24 @@ def screen_hold(cfg):
     if power not in ("on", "off"):
         return None
     return power == "on"
+
+
+def hold_resleep_seconds(cfg):
+    """How long a touch-woken, held-off screen may stay lit, in seconds.
+
+    It follows the screen's own "Turn off when idle" time: a hold should leave
+    a touch usable no longer than any other off screen would. With that setting
+    on Never there is no idle time to follow, so a held-off screen is checked
+    about once a poll; it still goes back to sleep rather than staying lit.
+    """
+    enabled = _as_bool(
+        cfg_get(cfg, "display_timeout_enabled", "displayTimeoutEnabled"),
+        default=False,
+    )
+    seconds = _as_int(cfg_get(cfg, "display_timeout", "displayTimeout"))
+    if enabled and seconds is not None and seconds > 0:
+        return seconds
+    return HOLD_RESLEEP_SECONDS
 
 
 def _screen_now(cfg):
@@ -949,6 +974,10 @@ class BrightnessController:
         # The level a dim-only sleep stopped at (the screen's floor); None when
         # the panel sleeps at 0 or is awake.
         self.dim_level = None
+        # When the agent last asserted the panel off (a datetime from the poll
+        # clock), or None while the panel is wanted on. A held-off screen uses
+        # it to re-assert the hold after its idle time (calvin-dcfs).
+        self.off_asserted_at = None
         # Set once the agent is shutting down: no ramp or check may write after.
         self.stopping = threading.Event()
 
@@ -1186,6 +1215,7 @@ class BrightnessController:
                         cancel=cancel,
                     )
                     self.pending_restore = None
+                self.off_asserted_at = None
                 return True
 
             # Wanted OFF.
@@ -1204,6 +1234,7 @@ class BrightnessController:
                 if result == "failed":  # writes failed: standby is the safe fallback
                     dim = False
                 else:
+                    self.off_asserted_at = None
                     return False
             if not dim:
                 switch = self._sleep_standby(settings, cancel)
@@ -1212,7 +1243,31 @@ class BrightnessController:
                     return True
                 if switch == "failed":
                     return last_on
+                self.off_asserted_at = now
                 return False
+
+        # A held-off panel can be woken by a touch without the agent seeing it.
+        # Re-assert the hold once the screen's idle time has passed, so a woken
+        # panel sleeps again instead of staying lit against the hold
+        # (calvin-dcfs). A scheduled off is left exactly as it was.
+        if (
+            not on
+            and last_on is False
+            and self.panel_off
+            and screen_hold(cfg) is False
+            and self.off_asserted_at is not None
+            and (_as_aware(now) - _as_aware(self.off_asserted_at)).total_seconds()
+            >= hold_resleep_seconds(cfg)
+        ):
+            switch = self._sleep_standby(settings, cancel)
+            if switch == "cancelled":
+                self.reschedule = True
+                return True
+            if switch == "failed":
+                return last_on
+            self.off_asserted_at = now
+            self.log("display -> OFF (held off; sleeping again after a touch)")
+            return False
 
         # "Dim only" switched to standby while the panel sleeps dimmed: it is
         # still powered, so apply the standby off now rather than at the next wake.
@@ -1232,6 +1287,7 @@ class BrightnessController:
             else:
                 self.panel_off = True
                 self.sleeping = True
+                self.off_asserted_at = now
                 self.log("brightness: dim switched to standby while asleep; panel off")
             return False
 

@@ -528,9 +528,10 @@ server answers with `screenHold`. Both directions stay compatible:
 **Settings › Screens** shows "This screen needs an update to stay this way" for a
 screen whose agent can't hold yet. Choose **Update** for that screen (see
 [Updating a kiosk later](#updating-a-kiosk-later)). A touch on a screen held off
-can wake it, depending on the display. Calvin does not put it back to sleep by
-itself: it stays lit until the screen's power is changed, in Settings or from
-home automation.
+can wake it, depending on the display. It is not left lit: Calvin sleeps it again
+at its next check, once the screen's idle time (**Turn off when idle**) has
+passed, or about once a minute when no idle time is set. The hold itself is
+unchanged.
 
 ## Troubleshooting
 
