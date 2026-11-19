@@ -20,7 +20,7 @@ Each part is one reviewable PR into `develop`, in this order. Optional mode is t
 | Part | PR | Tasks | Size | Risk |
 |---|---|---|---|---|
 | A | `feat(backend): kiosk pairing and the kiosk principal (calvin-0xns)` | 1-4 | ~1.5 days | **HIGH** (`security/`, `kiosks.py`, Alembic) |
-| B | `feat(backend): gate paired screens' writes and presence fields (calvin-0xns)` | 5-8 | ~1.5 days | **HIGH** (policy, registry writes, backup) |
+| B | `feat(backend): gate paired screens' writes and presence fields (calvin-0xns)` | 5-8 | ~1.5 days | **HIGH** (policy, registry writes, backup, removed-screen restore) |
 | C | `feat(kiosk): display agent pairs and hands its secret to the browser (calvin-0xns)` | 9-11 | ~1.5 days | **HIGH** (agent, root scripts, units) |
 | D | `docs(design): kiosk pairing UI spec` (by the design lead) | 12 | design lead's estimate | design gate |
 | E | `feat(frontend): kiosk browser pairing hand-off and code card (calvin-0xns)` | 13 | ~1 day | **HIGH** (secret handling in the page) |
@@ -45,6 +45,7 @@ Dependencies:
   - after 5 wrong approval codes per address per minute, a doubling cooldown in its own `LoginRateLimiter` bucket.
 - Columns: `kiosks.credential_hash` String(64), nullable; `kiosks.paired_at` UTCDateTime, nullable. Only the SHA-256 hex of the secret is stored, and it is compared with `hmac.compare_digest`.
 - Household mode: config key `kioskPairing`, `"optional"` (also when absent or any other value) or `"required"`. It is admin-only and never added to `CONFIG_DISPLAY_KEYS`.
+- Removed screens: config key `kioskRemoved`, a JSON list of kiosk ids, oldest first, ids only, at most `REMOVED_KIOSK_CAP = 50`. Absent or malformed reads as `[]`. A removal appends and a full list drops the oldest; approving a code or a one-time install code for that id removes it. It is admin-only, not in `CONFIG_DISPLAY_KEYS`, and travels as an ordinary household config row in backups.
 - Cookie `calvin_kiosk` = `k1.<hex kiosk id>.<16 hex fingerprint>.<issued epoch>.<hmac>`, with HMAC-SHA256 under the admin store's `server_secret`. Attributes: `HttpOnly`, `SameSite=Strict`, `Path=/`, `Max-Age=34560000`. It is re-signed when older than 30 days.
 - Config answer field: `kioskAuth = {"state": "paired"|"unpaired", "mode": "optional"|"required", "hasAgent": bool, "browser": "paired"|"unpaired"|"unknown"}`. `browser` goes only to the screen itself.
 - Presence fields: `screenHold`, `screen_hold`, `screenNow`, `screen_now`, `displayCheck`, `display_check`, and the list's `powerHold`.
@@ -64,11 +65,11 @@ Dependencies:
 2. **Unpair while the screen is offline, then the screen comes back with the old secret.** It is treated as unpaired. The agent makes a new secret and never keeps retrying the old one. Test in Task 9: `test_unpaired_answer_rotates_secret_once`.
 3. **The admin password file is reset.** Every kiosk cookie dies, the agent restarts the browser at most once per 10 minutes, and the screen is paired again with no person involved. Test in Task 9: `test_browser_unpaired_twice_restarts_once_per_cooldown`. Test in Task 4: `test_cookie_dies_on_server_secret_change`.
 4. **Two tabs of Settings approve the same code at once.** One wins and the other gets 404 `pairing_code_invalid`. No second row is created and no hash is overwritten. Test in Task 3: `test_concurrent_approval_single_winner`.
-5. **A restore onto a server where the screen was re-paired since the backup.** The current pairing is kept and the screen keeps working. Test in Task 8: `test_restore_keeps_current_pairing`.
+5. **A restore onto a server where the screen was re-paired since the backup.** The current pairing is kept and the screen keeps working. Test in Task 8: `test_restore_keeps_current_pairing`. The same restore must not bring back a removed screen paired: its id in `kioskRemoved` makes the created row unpaired. Test in Task 8: `test_removed_screen_restores_unpaired`.
 
 ## High-risk tasks
 
-⚠ Task 1 (migration), ⚠ Task 2 (pairing store), ⚠ Task 3 (pairing routes), ⚠ Task 4 (principal in the route policy, cookie), ⚠ Task 5 (projection), ⚠ Task 6 (write gate and `KIOSK_ROUTES`), ⚠ Task 8 (backup), ⚠ Task 9 (agent), ⚠ Task 10 (units and root scripts), ⚠ Task 13 (browser hand-off).
+⚠ Task 1 (migration), ⚠ Task 2 (pairing store), ⚠ Task 3 (pairing routes), ⚠ Task 4 (principal in the route policy, cookie), ⚠ Task 5 (projection), ⚠ Task 6 (write gate and `KIOSK_ROUTES`), ⚠ Task 8 (backup, and the restore of `credential_hash` for removed screens), ⚠ Task 9 (agent), ⚠ Task 10 (units and root scripts), ⚠ Task 13 (browser hand-off).
 
 Each part ends with a **dedicated review step**: superpowers:requesting-code-review on that PR's diff, with that part's high-risk tasks and the Review Focus lines as the checklist. Fix each finding with a test first, before the PR leaves draft. Parts A, B and C also get a security pass against the design's "Rules the tests pin" list.
 
@@ -78,7 +79,7 @@ Each part ends with a **dedicated review step**: superpowers:requesting-code-rev
 |---|---|
 | `backend/alembic/versions/<rev>_kiosk_pairing.py`, `backend/app/models/db_models.py` | two columns (down_revision `b8e2f4a6c9d1`, check with `uv run alembic heads`) |
 | `backend/app/services/kiosk_pairing.py` (new) | pure, in memory: secrets, codes, pending pairings, install codes, limits |
-| `backend/app/services/kiosk_registry.py` | credential read/write, gated `record_kiosk`, `pairing_mode()`, list fields |
+| `backend/app/services/kiosk_registry.py` | credential read/write, gated `record_kiosk`, `pairing_mode()`, removed-id list helpers, list fields |
 | `backend/app/security/kiosk_auth.py` (new) | `kiosk_principal`, cookie sign/verify, `require_screen_itself`, `is_gated` |
 | `backend/app/security/route_policy.py` | prefix dispatch, `KIOSK_ROUTES`, new public writes |
 | `backend/app/security/api_keys.py` | reserved prefixes |
@@ -86,7 +87,7 @@ Each part ends with a **dedicated review step**: superpowers:requesting-code-rev
 | `backend/app/api/routes/kiosks.py` | pairing routes, gated config/list/overrides/screen-power, `kioskAuth` |
 | `backend/app/api/routes/kiosk_pairing.py` (new, optional split) | the pairing routes, if `kiosks.py` grows past ~800 lines |
 | `backend/app/services/kiosk_view.py` (new) | `strip_presence(merged)`, `can_see_presence(...)` |
-| `backend/app/services/backup/{exporter,restorer,format}.py` | `pairing` on kiosk rows |
+| `backend/app/services/backup/{exporter,restorer,format}.py` | `pairing` on kiosk rows, and the removed-id union that keeps restored screens unpaired |
 | `backend/app/services/kiosk_bundle.py` | `render_install_script(..., pair_code=)` |
 | `deploy/kiosk-agent/calvin_display_agent.py` | credential, bearer, pairing loop, browser restart, `kfeat=pair` |
 | `deploy/systemd/calvin-kiosk-remote.service`, `calvin-cog.service` | `#pair=` fragment |
@@ -321,30 +322,80 @@ Each part ends with a **dedicated review step**: superpowers:requesting-code-rev
 - [ ] **Step 2-4:** FAIL → implement → PASS.
 - [ ] **Step 5:** Commit `feat(backend): household choice to accept only paired screens (calvin-0xns)`.
 
-### Task 8: ⚠ Backup carries pairings
+### Task 8: ⚠ **HIGH RISK** Backup carries pairings and the removed list
+
+**Why high risk:** it decides which `credential_hash` a restore writes. A mistake either re-pairs
+a removed or stolen screen, or unpairs a screen the owner still has.
 
 **Files:**
-- Modify `backup/format.py` (`KioskRow.pairing: dict | None = None`), `exporter.py` and `restorer.py` (`_restore_kiosks`).
-- Tests: `tests/unit/test_backup_format.py`, `tests/integration/test_backup_restore.py` (new functions).
+- Modify `backup/format.py` (`KioskRow.pairing: dict | None = None`), `exporter.py`, and
+  `restorer.py`: snapshot `kioskRemoved` before `_restore_config`, union it into the restored
+  config, and pass the union to `_restore_kiosks`.
+- Modify `kiosk_registry.py`: the removed-id helpers over `config_service`.
+- Modify `kiosks.py`: `delete_kiosk` records the id; approving a code, or an install code, forgets it.
+- Tests: `tests/unit/test_backup_format.py`, `tests/integration/test_backup_restore.py` (new
+  functions), `tests/unit/test_kiosk_removed.py` (new) and
+  `tests/integration/test_api_kiosks_removed.py` (new).
+
+**Interfaces — Produces (kiosk_registry):**
+- `REMOVED_KIOSK_CAP = 50`
+- `async removed_kiosk_ids() -> list[str]`: oldest first. Absent, or a value that is not a list of
+  strings, gives `[]` (a malformed value also logs a warning); it never raises.
+- `async note_kiosk_removed(kiosk_id) -> list[str]`: appends unless present, drops the oldest over
+  the cap, and returns the new list. Column-scoped write through `config_service`
+  (`value_type="json"`), under `retry_on_db_locked`.
+- `async forget_kiosk_removed(kiosk_id) -> None`: no-op when not listed.
+
+**Interfaces — Produces (backup):**
+- `KioskRow.pairing: dict | None = None`, exported as `{"credentialHash", "pairedAt"}` and left out
+  for unpaired rows. `FORMAT_VERSION` stays 1; `KioskRow` ignores unknown keys.
+- `async _restore_kiosks(doc, removed: frozenset[str], out) -> None`: a row it must create whose id
+  is in `removed` is created with no `credential_hash` and no `paired_at`, and counts in
+  `out.removed_screens`.
+- The restore answer gains `counts.removedScreens`, beside `counts.pairedScreens`.
 
 - [ ] **Step 1: failing tests**
-  - Export: a paired row has `pairing == {"credentialHash", "pairedAt"}`, and an unpaired row has no `pairing`.
-  - Nothing in memory is exported: pending pairings and install codes.
-  - A round trip onto an empty DB → the screen is paired, and its old bearer passes `kiosk_principal`.
-  - `test_restore_keeps_current_pairing`: the row is paired with hash B and the backup holds hash A → B stays.
-  - The row is unpaired and the backup holds A → it stays unpaired.
-  - An older backup (no `pairing`) → the screens are unpaired, with no error.
+  - Export: a paired row has `pairing == {"credentialHash", "pairedAt"}` and an unpaired row has
+    none. Pending pairings and install codes are never exported.
+  - A round trip onto an empty DB → the screen is paired and its old bearer passes `kiosk_principal`.
+  - `test_restore_keeps_current_pairing`: the row is paired with hash B and the backup holds A → B
+    stays. The row is unpaired and the backup holds A → it stays unpaired.
+  - An older backup without `pairing` and without `kioskRemoved` → onto a fresh DB, the screens are
+    unpaired, the list reads `[]`, and there is no error. Onto a server that had a list, the
+    existing list survives a `merge` and is kept through the union on a `replace`.
+  - `test_removed_screen_restores_unpaired`: remove `kitchen` (row gone, list `["kitchen"]`), then
+    restore a backup whose `kitchen` row is paired → the row exists with `credential_hash` and
+    `paired_at` both None, the backup's old bearer does not pass `kiosk_principal`, and
+    `counts.removedScreens == 1`.
+  - Removed after the backup: take a backup with `kitchen` paired, remove it, then restore that
+    backup in both `merge` and `replace` → `kitchen` comes back unpaired and the restored config
+    still holds its id (the union). In `replace` the pre-restore list is the one that survives.
+  - Re-added screen leaves the list: after removal, approve a code for `kitchen`, and separately an
+    install code → `removed_kiosk_ids()` no longer holds it, the row is paired, and a restore of the
+    same backup keeps it paired because the row exists.
+  - An existing row whose id is listed keeps its current pairing: the list only decides rows to
+    create.
+  - Cap: 51 removals keep the last 50 in order, and the dropped id's older backup restores it
+    paired again (`test_removed_list_keeps_last_50`).
+  - Ids only: after a removal, the `kioskRemoved` row holds ids and nothing else: no `clv_`, no
+    64-hex hash, no hostname, no address. Removing the same id twice does not duplicate it.
+  - A malformed value (a bare string, a dict, a number inside the list) reads as `[]` or drops the
+    bad entries, logs a warning, and never raises.
+  - Backup round trip: `kioskRemoved` comes back identical, since it is an ordinary config row.
+  - Neither an anonymous nor an admin `POST /api/config` accepts `kioskRemoved`, and it is not in
+    `CONFIG_DISPLAY_KEYS` (pin).
   - An existing row is updated with `_columns=["hostname", "overrides"]` only (spy on `update`).
-  - A `replace` restore of a backup without `kioskPairing` keeps the current `"required"`; a backup with `"optional"` sets it.
+  - A `replace` restore of a backup without `kioskPairing` keeps the current `"required"`; a backup
+    with `"optional"` sets it.
   - A malformed `credentialHash` (not 64 hex) → ignored with a warning.
-  - The restore summary reports `pairedScreens: N`.
+  - The restore summary reports `pairedScreens` and `removedScreens`.
 - [ ] **Step 2-4:** FAIL → implement → PASS.
-- [ ] **Step 5:** Commit `feat(backend): backups keep screens paired (calvin-0xns)`.
+- [ ] **Step 5:** Commit `feat(backend): backups keep screens paired and respect removed screens (calvin-0xns)`.
 
 ### Part B review
 
 - [ ] Full backend checks, as in Part A.
-- [ ] superpowers:requesting-code-review on the Part B diff. Checklist: Tasks 5, 6 and 8, the design's section 7 table row by row, section 8, and Review Focus lines 1 and 5.
+- [ ] superpowers:requesting-code-review on the Part B diff. Checklist: Tasks 5, 6 and 8, the design's section 7 table row by row, sections 8, 9 and 12 (removal, restore and the removed list), and Review Focus lines 1 and 5.
 - [ ] Open PR 2 as a draft.
 
 ## Part C: agent, units, installer (PR 3)
@@ -501,7 +552,7 @@ Each part ends with a **dedicated review step**: superpowers:requesting-code-rev
 - `docs/setup/KIOSK_INSTALL.md`: pairing, the install command with its code, signed installs recommended, reinstall, card swap, unpair a stolen screen, and what optional mode leaves open.
 - `docs/setup/KIOSK_PROVISIONING.md`: the files on the Pi and `--pair-code`.
 - `docs/configuration/ADMIN_AUTH.md`: the trust model, the new routes in "What needs the admin password", and the kiosk secret not being an API key.
-- `docs/configuration/BACKUP_RESTORE.md`: the pairing fingerprints and the restore rule.
+- `docs/configuration/BACKUP_RESTORE.md`: the pairing fingerprints, the removed screen ids, and the restore rule.
 - `docs/integrations/HOME_AUTOMATION.md`: a gated, unpaired screen doesn't follow holds.
 
 - [ ] **Step 1:** Write.

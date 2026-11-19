@@ -1,6 +1,8 @@
 # Kiosk authentication: paired screens and display agents
 
-Date: 2026-11-19. Status: draft for owner approval. The owner approved every pick in the research.
+Date: 2026-11-19. Status: draft for building. The owner approved every pick in the research,
+and answered the three questions that were open in this design (see
+[Owner decisions](#owner-decisions-2026-11-19)).
 Evidence, code references and the options that were weighed are in the research:
 [Authenticating kiosks and their display agents](../../research/2026-11-18-kiosk-authentication.md).
 This page records what was decided and how it fits the screen-power work that merged since
@@ -55,8 +57,8 @@ dashboard, whatever happens.
 - The all-in-one display. It has no kiosk id, and it keeps the loopback check it has today.
 - The integrity of agent updates. That belongs to the manifest signature and the planned
   Ed25519 release signing. Pairing must not reuse the manifest signing key.
-- Making required the default for fresh installs. A later release decides that (owner
-  question 2 below).
+- Making required the default for fresh installs. Fresh installs stay optional in this release;
+  a later release decides whether that changes (owner decision 2).
 
 ## Anti-goals
 
@@ -155,6 +157,22 @@ The research compared four ([section 2](../../research/2026-11-18-kiosk-authenti
   - The policy reads it from the household config table, never from a merged per-screen config,
     so a screen's layer cannot switch it off.
   - It is backed up with the rest of the config.
+- The screens the owner removed are a second config key, `kioskRemoved`: a JSON list of kiosk
+  ids, oldest first, at most 50.
+  - It holds **ids only**: never a secret, a hash, a hostname, an address or a timestamp. An id
+    names a screen; it cannot authenticate as one.
+  - It is admin-only: it is **not** in `CONFIG_DISPLAY_KEYS`, and no config route accepts it.
+    Removing a screen, approving a pairing, and a restore (which keeps the union, section 12) are
+    the only writers, through `config_service` (`value_type="json"`).
+  - It is read from the household config table, never from a per-screen layer, and it travels in
+    backups with the rest of the config.
+  - Absent, or any value that is not a list of strings, reads as an empty list. That is the
+    migration: an upgraded server starts with nothing removed, so its restores behave as they did
+    before.
+  - A new removal appends the id, and an id already in the list is not duplicated. When the list
+    already holds 50, the oldest entry is dropped. So a screen removed more than 50 removals ago
+    is forgotten, and an older backup that still holds it can bring it back paired; removing it
+    again remembers it again.
 
 ### 3. The kiosk principal and the route policy
 
@@ -387,10 +405,16 @@ What follows from the table:
     (section 6).
   - The screen shows a new code.
 - **A stolen screen**: Unpair it. If it is not coming back, **Remove** it too. Removal deletes
-  the row, and with it the hash. Then make a fresh backup: an older one would bring the screen
-  back paired (owner question 3).
+  the row, and with it the hash, and records the id in `kioskRemoved` (section 2). A restore of an
+  older backup then brings that screen back unpaired, so a copy of its secret never works again
+  (owner decision 3). A fresh backup is still good practice, but it is no longer what keeps the
+  old screen out.
 - **Pair again** (when a secret might have leaked, but the screen is still yours): Unpair, then
-  type the new code.
+  type the new code. Approving a pairing for an id in `kioskRemoved` removes it from the list, as
+  does approving an install code for it, so the household config stops calling a screen the owner
+  has deliberately added back "removed". It does not rewrite an older backup that already names
+  the id: restoring that backup on a server that no longer has the row still brings it back
+  unpaired, which is safe.
 - **Reinstall** keeps `/var/lib/calvin/agent`, and with it the secret, as it keeps the id. A bats
   test pins this.
 - **SD card swap** gives a new machine-id. That means a new default id and no secret, so the
@@ -432,12 +456,13 @@ What follows from the table:
 | **New backend, required mode** | dashboard only; no reports, holds or sign-out | pairs, then full service |
 
 - **Upgrade:** the migration adds two empty columns, so every screen starts unpaired, and the
-  mode is optional. Nothing changes until a screen is paired.
+  mode is optional. Nothing changes until a screen is paired. `kioskRemoved` is absent and reads
+  as an empty list, so no restore is affected until the owner removes a screen.
 - **Downgrade, image only** (columns stay): the old backend ignores the columns. New agents fall
   back as above. Upgrading again finds the hashes, so the screens are still paired.
 - **Downgrade with `alembic downgrade`:** the hashes are gone. After upgrading again, every agent
   is told it is unpaired: it makes a new secret and shows a new code.
-- The leftover `kioskPairing` config key is ignored by an older backend.
+- The leftover `kioskPairing` and `kioskRemoved` config keys are ignored by an older backend.
 
 ### 12. Backups
 
@@ -448,15 +473,31 @@ What follows from the table:
   - Pending pairings and install codes are never exported.
 - **Restore rule** *(my call)*:
   - A kiosk row the server does not have yet takes the backup's pairing, so a restore onto a fresh
-    server keeps the screens paired.
+    server keeps the screens paired — unless its id is in `kioskRemoved` (next bullet).
   - A row that already exists keeps its current pairing, paired or not. A restore never re-pairs a
     screen the owner unpaired after the backup, and never breaks a screen paired since.
     `_restore_kiosks` therefore updates an existing row column-scoped
     (`_columns=["hostname", "overrides"]`), not with a whole-row `update()`, so it cannot race a
     pairing made during the restore.
   - The restore summary says how many screens came back paired.
+- **Removed screens in a restore** (owner decision 3):
+  - `kioskRemoved` is not a per-kiosk field. It is an ordinary household config row, so the export
+    and the restore carry it with the rest of the config. An older backup with no such row
+    contributes nothing to the union: the server keeps the list it had (empty on a fresh server).
+  - A row the server does not have comes back **unpaired** when its id is in the list, whatever
+    pairing the backup carries. Its `pairing` is dropped, no `credential_hash` or `paired_at` is
+    written, and it appears in Settings as not paired with a code.
+  - The effective list is the **union** of the backup's list and the list the server had before the
+    restore. That pre-restore list is snapshotted before `_restore_config` runs, so a `replace`
+    restore cannot lose it. A screen removed after the last backup therefore still comes back
+    unpaired, and the restored config keeps the union so later restores agree.
+  - The list only decides rows the server does not have. An existing row keeps its current pairing
+    as the rule above says, so a screen paired again since the backup is never unpaired by it.
+  - The restore summary counts the rows that came back unpaired because they had been removed
+    (`counts.removedScreens`), beside `counts.pairedScreens`.
 - `BACKUP_RESTORE.md` says the file now holds a one-way fingerprint per paired screen, not the
-  screen's secret. It cannot be used to pretend to be a screen.
+  screen's secret. It cannot be used to pretend to be a screen. It also says the file holds the
+  ids of removed screens, which name screens but authenticate none.
 
 ### 13. What people must be able to do (UI spec by the design lead)
 
@@ -493,7 +534,8 @@ state must tell them. The sample wording in this page shows intent; the design l
 
 A fresh reader went through this design as its builder would. Answers that were already in the
 design are now stated above. The rest were settled here, each marked *(my call)* unless it is
-plainly what the sections above imply. Only the owner can settle the three questions at the end.
+plainly what the sections above imply. The owner settled the three remaining questions on
+2026-11-19 (see Owner decisions).
 
 **Pairing flow**
 
@@ -523,7 +565,7 @@ plainly what the sections above imply. Only the owner can settle the three quest
   - The page starts browser-only pairing only after three config answers in a row, at least
     3 minutes, say `hasAgent: false` *(my call)*. That leaves a newly updated agent time to start
     first.
-- **Remove** drops the id's pending entries too.
+- **Remove** drops the id's pending entries too, and records the id in `kioskRemoved` (section 9).
 - **No admin password yet.** Nobody could approve a pairing and there is no `server_secret` to
   sign a cookie. So `POST .../pair` and `POST .../browser-session` answer 409 `setup_required`.
   The agent tries again on its next poll, and the screen shows no code.
@@ -596,8 +638,8 @@ plainly what the sections above imply. Only the owner can settle the three quest
 |---|---|---|---|
 | **On the home network, no sign-in, no sniffing** | Everything in the research's section 1 table: read presence, ghost screens, fake status, sign screens out, forge display-check faults, flip `agent_features` | For a paired screen: nothing beyond the household dashboard and `showUI`. For an unpaired screen: as today | Nothing beyond the household dashboard and `showUI`. Starting pairings is rate-limited, and they expire without an admin |
 | **On the network and sniffing plain HTTP** | Same, plus the admin cookie | Can copy a screen's bearer or cookie and act as that screen until it is unpaired; also the admin cookie | Same. Only HTTPS in front of Calvin closes this, as for the admin cookie |
-| **Has a stolen screen** (the Pi and its card) | Everything a LAN attacker can | Can act as that one screen: read its own presence fields, report its status, sign it out, report on its display checks. Cannot sign in, gain admin, or read other screens' presence. **Unpair** closes it within a minute. If that Pi was given the manifest signing key, the thief also holds that key (unchanged by this work; Ed25519 release signing removes it) | Same |
-| **Has a backup file** | Plugin config minus stripped secrets; the signing key only when exported on purpose | Plus the hash of each screen's secret: a SHA-256 of 256 random bits, which cannot be reversed or used as a credential | Same |
+| **Has a stolen screen** (the Pi and its card) | Everything a LAN attacker can | Can act as that one screen: read its own presence fields, report its status, sign it out, report on its display checks. Cannot sign in, gain admin, or read other screens' presence. **Unpair** closes it within a minute. **Remove** also records its id, so an older backup restores it unpaired and its secret stays dead (owner decision 3). If that Pi was given the manifest signing key, the thief also holds that key (unchanged by this work; Ed25519 release signing removes it) | Same |
+| **Has a backup file** | Plugin config minus stripped secrets; the signing key only when exported on purpose | Plus the hash of each screen's secret: a SHA-256 of 256 random bits, which cannot be reversed or used as a credential. Plus the list of removed screen ids: ids name screens but authenticate no one | Same |
 | **Can type at a paired screen's touchscreen** | The dashboard, plus a kiosk-length sign-in if they know the password | Same: page JavaScript never holds the secret, and the cookie is HttpOnly | Same |
 
 ### What each phase closes
@@ -655,6 +697,10 @@ plainly what the sections above imply. Only the owner can settle the three quest
   - unpairing kills the cookie.
 - A backup round trip keeps screens paired. An older backup restores them as unpaired. A restore
   onto an existing row never changes that row's pairing.
+- A screen whose id is in `kioskRemoved` comes back unpaired from a backup that carries its
+  pairing, including when the owner removed it after that backup was made. Approving a pairing for
+  it takes the id off the list. The list keeps ids only, and at most 50, oldest dropped. A backup
+  without the list contributes nothing to the union, so a fresh server reads it as empty.
 - No `clv_kiosk_…` or `clv_pair_…` reaches a log line, whether it came in a header or in a query.
 
 ## Left to the builder
@@ -677,28 +723,21 @@ plainly what the sections above imply. Only the owner can settle the three quest
   - `BACKUP_RESTORE.md`;
   - `HOME_AUTOMATION.md`: a gated, unpaired screen doesn't follow holds.
 
-## Open questions for the owner
+## Owner decisions (2026-11-19)
 
-Only the owner can settle these. Each has a default the build follows unless the owner says
-otherwise.
+The owner answered all three questions this design left open. These are decisions, not options the
+build may choose differently. Answer 3 is worked into the design above: section 2 (storage and the
+key's bound), section 9 (removal and pairing again), section 12 (backups and the restore rule),
+section 14 (**Remove**), and the threat model.
 
-1. **A code on a screen nobody has started pairing.** As designed, every unpaired screen whose
-   agent can pair shows its code over the dashboard from the moment it is updated, for as long as
-   it stays unpaired, in both modes.
-   - (a) Keep it: the code is a standing nudge, and it never covers the dashboard.
-     *(default)*
-   - (b) Show it only for 10 minutes after someone opens **Pair a screen** in Settings. The
-     server would tell unpaired screens that a pairing window is open, so the code shows up to a
-     minute late.
-2. **Required mode for fresh installs.** Every screen of a fresh install pairs through the
-   install command anyway.
-   - (a) Stay optional in this release; decide in a later one. *(default)*
-   - (b) Start fresh installs in required mode now.
-3. **Restoring a screen that was removed.** A restore cannot tell "this server never had the
-   screen" (a fresh server, where pairings must come back) from "the owner removed it". So a
-   screen that was unpaired and then removed comes back paired when an older backup is restored.
-   For a stolen screen, that means the thief's copy works again.
-   - (a) Accept it. The restore summary names the screens that came back paired, and the docs say
-     to make a fresh backup after retiring a stolen screen. *(default)*
-   - (b) Remove keeps a short list of removed screen ids in the household config, and a restore
-     brings those back unpaired. This adds a small piece of state that a backup carries.
+1. **A code on a screen nobody has started pairing: keep it.** Every unpaired screen whose agent
+   can pair shows its code over the dashboard from the moment it is updated, for as long as it
+   stays unpaired, in both modes. The code is a standing nudge, and it never covers the dashboard.
+2. **Required mode for fresh installs: fresh installs stay optional in this release.** A later
+   release decides whether required becomes their start. A fresh install still pairs each screen
+   through the install command when the owner chooses to.
+3. **Restoring a screen that was removed: keep a list of removed ids.** `kioskRemoved` lives in the
+   household config and holds the ids of removed screens, oldest first, at most 50, and never a
+   secret. A restore brings a listed screen back unpaired, so a removed or stolen screen does not
+   come back usable from an older backup. Section 2 gives the key and its bound; section 12 gives
+   the restore rule.
