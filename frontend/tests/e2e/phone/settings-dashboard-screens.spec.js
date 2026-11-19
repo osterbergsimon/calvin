@@ -177,9 +177,10 @@ test.describe("phone: Screens", () => {
 
     // Either choice can be the one that is available, depending on the wall
     // clock the CI runs at. Pick the enabled one so the test is time-agnostic.
+    // Both stay in the page and the focus order (aria-disabled, not disabled).
     const offButton = page.locator('[data-test="screen-now-off"]');
     const onButton = page.locator('[data-test="screen-now-on"]');
-    const turningOff = await offButton.isEnabled();
+    const turningOff = (await offButton.getAttribute("aria-disabled")) !== "true";
     await (turningOff ? offButton : onButton).click();
     const power = turningOff ? "off" : "on";
     const state = turningOff ? "Off now" : "On now";
@@ -192,7 +193,7 @@ test.describe("phone: Screens", () => {
       /^(On|Off) until \d{2}:\d{2}$/
     );
 
-    await page.getByRole("button", { name: "Follow schedule" }).click();
+    await page.getByRole("button", { name: "Back to schedule" }).click();
     await expect.poll(() => api.overridesByKiosk.hallway?.screenNow).toBeUndefined();
 
     // The manual choice is a kiosk override, never a host-acting route.
@@ -217,7 +218,7 @@ test.describe("phone: Screens", () => {
     await openSection(page, "screen-power");
 
     await expect(page.locator('[data-test="screen-now-state"]')).toHaveText(
-      "Off, held by home automation"
+      "Off, set by home automation. The schedule is paused."
     );
     await page.getByRole("button", { name: "Back to schedule" }).click();
     await expect.poll(() => api.screenPowerRequests).toEqual(["schedule"]);

@@ -136,8 +136,12 @@ describe("Button doctrine contract", () => {
     expect(STYLE).toMatch(/\.btn\s*\{[^}]*min-width:\s*var\(--touch-target\)/s);
   });
 
-  it("halves opacity and blocks the cursor when disabled", () => {
-    expect(STYLE).toMatch(/\.btn:disabled\s*\{[^}]*opacity:\s*0\.5/s);
-    expect(STYLE).toMatch(/\.btn:disabled\s*\{[^}]*cursor:\s*not-allowed/s);
+  it("halves opacity and blocks the cursor when disabled or aria-disabled", () => {
+    // aria-disabled keeps a control in the focus order (calvin-2ifv), so it
+    // needs the same look and cursor as :disabled, and no hover style.
+    const unavailable =
+      /\.btn:disabled,\s*\.btn\[aria-disabled="true"\]\s*\{[^}]*opacity:\s*0\.5[^}]*cursor:\s*not-allowed/s;
+    expect(STYLE).toMatch(unavailable);
+    expect(STYLE).toMatch(/\.btn:not\(:disabled\):not\(\[aria-disabled="true"\]\):hover/);
   });
 });

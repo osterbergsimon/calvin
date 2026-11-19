@@ -146,7 +146,7 @@ describe("ApiKeysSection", () => {
       const card = get("scope-card-screens");
       expect(card.text()).toContain("Turn screens on and off");
       expect(card.text()).toContain(
-        "Lets home automation switch screens on and off. Beyond that it can only do what anyone on your network can do without a key."
+        "For home automation: turns screens on and off. Otherwise it's like having no key."
       );
       await get("scope-screens").setValue(true);
       await fillName("Homey");
@@ -404,7 +404,7 @@ describe("ApiKeysSection", () => {
         key({ id: "a", name: "A", permissions: [], limited: false }),
       ]);
       const chips = wrapper.findAll("[data-test='api-key-scope']").map(c => c.text());
-      expect(chips).toEqual(["Turn screens on and off", "Read"]);
+      expect(chips).toEqual(["Screens on and off", "Read"]);
     });
 
     it("formats prefix, created and last used", async () => {

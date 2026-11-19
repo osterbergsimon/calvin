@@ -525,11 +525,12 @@ server answers with `screenHold`. Both directions stay compatible:
 | **Server from before holds** | as before | sends `kfeat`, which the server ignores; as before |
 | **Server with holds** | obeys the hold as a "Screen now" choice, so it follows the next scheduled change | obeys `screenHold` until it changes |
 
-**Settings › Screens** shows "This screen needs a software update to hold" for a
-screen whose agent can't hold yet. Press **Update** for that screen (see
+**Settings › Screens** shows "This screen needs an update to stay this way" for a
+screen whose agent can't hold yet. Choose **Update** for that screen (see
 [Updating a kiosk later](#updating-a-kiosk-later)). A touch on a screen held off
-behaves as during a scheduled off: depending on the display stack it may wake
-the panel until the next change.
+can wake it, depending on the display. Calvin does not put it back to sleep by
+itself: it stays lit until the screen's power is changed, in Settings or from
+home automation.
 
 ## Troubleshooting
 

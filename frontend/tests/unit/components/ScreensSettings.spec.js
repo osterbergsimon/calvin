@@ -976,7 +976,7 @@ describe("ScreensSettings — Power", () => {
     });
   });
 
-  it("shows the current state, when the schedule takes over, and Follow schedule", async () => {
+  it("shows the current state, when the schedule takes over, and Back to schedule", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-11T09:00:00+02:00"));
     try {
@@ -998,8 +998,12 @@ describe("ScreensSettings — Power", () => {
 
       expect(wrapper.find("[data-test='screen-now-state']").text()).toBe("Off now");
       expect(wrapper.find("[data-test='screen-now-until']").text()).toBe("Off until 22:00");
-      expect(wrapper.find("[data-test='screen-now-off']").attributes("disabled")).toBeDefined();
-      expect(wrapper.find("[data-test='screen-now-on']").attributes("disabled")).toBeUndefined();
+      expect(wrapper.find("[data-test='screen-now-off']").attributes("aria-disabled")).toBe("true");
+      expect(
+        wrapper.find("[data-test='screen-now-on']").attributes("aria-disabled")
+      ).toBeUndefined();
+      // One action, one name: a manual choice goes back the same way a hold does.
+      expect(wrapper.find("[data-test='screen-now-follow']").text()).toBe("Back to schedule");
 
       await wrapper.find("[data-test='screen-now-follow']").trigger("click");
       await flushPromises();
@@ -1207,7 +1211,9 @@ describe("ScreensSettings — save messages name the real wait", () => {
     // schedule, the schedule rows and the physical orientation all ride it.
     const onButton = wrapper.find("[data-test='screen-now-on']");
     const offButton = wrapper.find("[data-test='screen-now-off']");
-    await (onButton.attributes("disabled") === undefined ? onButton : offButton).trigger("click");
+    await (onButton.attributes("aria-disabled") === undefined ? onButton : offButton).trigger(
+      "click"
+    );
     await flushPromises();
     expect(savedIn(wrapper, "screen-power")).toBe("Saved. This screen updates within a minute.");
 
@@ -1278,7 +1284,7 @@ describe("ScreensSettings — save failures", () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain(
-      "Couldn't save to the server. Check the connection and try again."
+      "Couldn't reach Calvin. Check that it's running and on the same network."
     );
     expect(wrapper.text()).not.toContain("Saved.");
   });
@@ -2497,7 +2503,7 @@ describe("ScreensSettings — optimistic control writes (calvin-g25v)", () => {
 
     expect(flip.props("modelValue")).toBe(false);
     expect(wrapper.text()).toContain(
-      "Couldn't save to the server. Check the connection and try again."
+      "Couldn't reach Calvin. Check that it's running and on the same network."
     );
   });
 
@@ -2565,7 +2571,7 @@ describe("ScreensSettings — optimistic control writes (calvin-g25v)", () => {
         .props("modelValue")
     ).toBe("landscape");
     expect(wrapper.text()).toContain(
-      "Couldn't save to the server. Check the connection and try again."
+      "Couldn't reach Calvin. Check that it's running and on the same network."
     );
 
     await flushPromises();

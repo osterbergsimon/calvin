@@ -197,13 +197,13 @@ import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 const HOST_UNAVAILABLE = "Not available: this Calvin doesn't control its machine.";
 // A limited key (calvin-2ifv) is stored as a read key with permissions, so
 // its option maps to scope "read" plus the permission list on submit.
-const PERMISSION_LABELS = { "screens.power": "Turn screens on and off" };
+const PERMISSION_LABELS = { "screens.power": "Screens on and off" };
 const scopeOptions = [
   {
     value: "screens",
     label: "Turn screens on and off",
     description:
-      "Lets home automation switch screens on and off. Beyond that it can only do what anyone on your network can do without a key.",
+      "For home automation: turns screens on and off. Otherwise it's like having no key.",
     request: { scope: "read", permissions: ["screens.power"] },
   },
   {
