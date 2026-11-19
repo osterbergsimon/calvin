@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Device picker</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<!--
+  Mock for the multi-select-scan field with a long list (spec: 2026-11-19-scan-picker-long-lists.md).
+  Role tokens copied from frontend/src/styles/theme.css (light and Backlit). Device and room names are
+  placeholders. Frames are the Dialog md width (30rem = 480px) and a 390px phone.
+-->
+<style>
+:root {
+  --bg-0:#eef1f4; --bg-1:#ffffff; --bg-2:#ffffff; --line:#dde3e8; --line-soft:#e8edf1;
+  --ink:#1b242b; --ink-2:#5d6b75; --ink-3:#636e77; --focus:#e08a1e; --focus-ink:#1b242b;
+  --focus-text:#875c24; --err:#c0392b;
+  --font-ui:"IBM Plex Sans",system-ui,sans-serif;
+  --text-caption:.75rem; --text-meta:.8rem; --text-body:.9rem; --text-label:1rem; --text-title:1.15rem;
+  --weight-body:400; --weight-strong:500; --weight-title:600;
+  --gap-1:.25rem; --gap-2:.5rem; --gap-3:.75rem; --gap-4:1rem; --gap-5:1.25rem;
+  --radius-control:8px; --radius-card:12px; --radius-panel:16px; --radius-round:999px;
+  --touch-target:2.75rem; --control-height:3rem;
+}
+.dark {
+  --bg-0:#0e1316; --bg-1:#151c21; --bg-2:#1d262d; --line:#27313a; --line-soft:#1e272e;
+  --ink:#eaf0f3; --ink-2:#9aa7b0; --ink-3:#818d96; --focus:#f3b052; --focus-ink:#151c21;
+  --focus-text:#efcd9a; --err:#ef6b5e;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:#d9dee3; font-family:var(--font-ui); color:#1b242b; }
+.board { padding:32px 16px; max-width:1100px; margin:0 auto; }
+h1 { font-size:1.4rem; font-weight:600; margin:0 0 8px; }
+.board > p { max-width:72ch; margin:0 0 24px; line-height:1.5; }
+.row { display:flex; flex-wrap:wrap; gap:32px; align-items:flex-start; }
+figure { margin:0 0 40px; }
+figcaption { font-size:.85rem; color:#5d6b75; margin-top:8px; max-width:480px; line-height:1.4; }
+.frame { background:var(--bg-1); color:var(--ink); border:1px solid var(--line); border-radius:var(--radius-panel); padding:var(--gap-5); }
+.w480 { width:480px; } .w390 { width:390px; }
+
+/* ---- the field (PluginFieldRenderer, multi-select-scan) ---- */
+.field { display:flex; flex-direction:column; gap:var(--gap-2); }
+.field__label { font-size:var(--text-label); font-weight:var(--weight-strong); }
+.field__hint { font-size:var(--text-meta); color:var(--ink-2); margin:0; }
+.btn { font:inherit; font-size:var(--text-body); font-weight:var(--weight-strong); min-height:var(--touch-target); padding:0 var(--gap-4);
+  border-radius:var(--radius-control); border:1px solid var(--line); background:var(--bg-2); color:var(--ink); cursor:pointer; }
+.btn--link { border:0; background:none; padding:0 var(--gap-1); text-decoration:underline; min-height:var(--touch-target); }
+.bar { display:flex; gap:var(--gap-2); align-items:center; flex-wrap:wrap; }
+.search { flex:1 1 12rem; display:flex; flex-direction:column; gap:var(--gap-1); }
+.search label { font-size:var(--text-meta); color:var(--ink-2); }
+.search input { font:inherit; font-size:var(--text-body); height:var(--control-height); padding:0 var(--gap-3);
+  border:1px solid var(--line); border-radius:var(--radius-control); background:var(--bg-2); color:var(--ink); width:100%; }
+.search input.is-focus { outline:2px solid var(--focus); outline-offset:2px; }
+
+.picker { display:flex; flex-direction:column; gap:var(--gap-4); margin-top:var(--gap-2); }
+.group { display:flex; flex-direction:column; gap:var(--gap-2); border-top:1px solid var(--line-soft); padding-top:var(--gap-3); }
+.group:first-child { border-top:0; padding-top:0; }
+.group__head { display:flex; align-items:center; justify-content:space-between; gap:var(--gap-2); min-height:var(--touch-target); }
+.group__title { margin:0; font-size:var(--text-body); font-weight:var(--weight-strong); color:var(--ink); }
+.group__meta { font-size:var(--text-meta); color:var(--ink-2); font-weight:var(--weight-body); margin-left:var(--gap-2); }
+.chips { display:flex; flex-wrap:wrap; gap:var(--gap-2); justify-content:flex-start; }
+.chip { font:inherit; font-size:var(--text-body); font-weight:var(--weight-strong); color:var(--ink-2); background:var(--bg-2);
+  border:1px solid var(--line); border-radius:var(--radius-control); padding:0 var(--gap-3);
+  min-height:var(--touch-target); min-width:var(--touch-target); cursor:pointer; }
+.chip[aria-pressed="true"] { background:var(--focus); color:var(--focus-ink); border-color:var(--focus); }
+.chip--missing[aria-pressed="true"] { background:transparent; color:var(--ink); border:1px dashed var(--ink-3); }
+.chip.is-focus { outline:2px solid var(--focus); outline-offset:2px; }
+.chosen .chip[aria-pressed="true"]::after { content:" ×"; }
+.empty { font-size:var(--text-body); color:var(--ink-2); margin:0; }
+.count { font-size:var(--text-meta); color:var(--ink-2); margin:0; }
+</style>
+</head>
+<body>
+<div class="board">
+  <h1>Device picker for long lists</h1>
+  <p>A scan can return dozens of devices. Above 12 options the field adds a search box and groups the chips by
+  room. The devices already chosen always sit first, in their own "Chosen" group, so searching never hides them.
+  Chosen chips are the filled selected treatment and carry a × so it's clear a tap removes them.</p>
+
+  <div class="row">
+    <figure>
+      <div class="frame w480" data-state="grouped"></div>
+      <figcaption>A. Dialog width, light. 3 of 28 chosen, grouped by room, search box empty. "Lamp B" shows focus.</figcaption>
+    </figure>
+    <figure>
+      <div class="frame w390 dark" data-state="grouped"></div>
+      <figcaption>A at phone width, Backlit. The search box takes the full line; chips wrap.</figcaption>
+    </figure>
+  </div>
+  <div class="row">
+    <figure>
+      <div class="frame w390" data-state="filtered"></div>
+      <figcaption>B. Searching "lamp": only matching chips show, empty rooms disappear, Chosen stays. The count line
+      is the polite live region.</figcaption>
+    </figure>
+    <figure>
+      <div class="frame w480 dark" data-state="nomatch"></div>
+      <figcaption>C. No match, Backlit. A saved device the last scan didn't find stays in Chosen, dashed, labelled
+      "Not found by the last scan".</figcaption>
+    </figure>
+  </div>
+</div>
+
+<script>
+  // Placeholder data: 28 devices in 5 rooms; 3 chosen (one of them not found by the scan in state C).
+  const rooms = {
+    "Kitchen": ["Lamp A", "Lamp B", "Ceiling", "Kettle plug", "Under-cabinet strip", "Fan C"],
+    "Living room": ["Lamp D", "Floor lamp", "TV plug", "Lamp E", "Shelf lights", "Heater"],
+    "Hallway": ["Ceiling", "Lamp F", "Porch light"],
+    "Bedroom": ["Lamp G", "Lamp H", "Ceiling", "Fan I", "Humidifier"],
+    "Garage": ["Ceiling", "Charger plug", "Freezer plug", "Workbench", "Lamp J", "Outdoor light", "Door light", "Fan K"],
+  };
+  const chosen = [["Kitchen", "Lamp A"], ["Living room", "Lamp D"], ["Bedroom", "Lamp G"]];
+  const isChosen = (r, n) => chosen.some(([cr, cn]) => cr === r && cn === n);
+  const total = Object.values(rooms).flat().length;
+
+  const chip = (label, pressed, extra = "") =>
+    `<button type="button" class="chip ${extra}" aria-pressed="${pressed}">${label}</button>`;
+
+  function render(state) {
+    const query = state === "filtered" ? "lamp" : state === "nomatch" ? "dishwasher" : "";
+    const match = n => !query || n.toLowerCase().includes(query);
+    const chosenChips = chosen.map(([r, n]) =>
+      state === "nomatch" && n === "Lamp G"
+        ? chip("Not found by the last scan", "true", "chip--missing")
+        : chip(`${n} (${r})`, "true")
+    ).join("");
+    let shown = 0;
+    const groups = Object.entries(rooms).map(([room, names]) => {
+      const hits = names.filter(match);
+      shown += hits.length;
+      if (!hits.length) return "";
+      const picked = names.filter(n => isChosen(room, n)).length;
+      return `<section class="group" role="group" aria-labelledby="g-${room}">
+        <div class="group__head"><h4 class="group__title" id="g-${room}">${room}${picked ? `<span class="group__meta">${picked} chosen</span>` : ""}</h4></div>
+        <div class="chips">${hits.map(n => chip(n, isChosen(room, n), n === "Lamp B" && state === "grouped" ? "is-focus" : "")).join("")}</div>
+      </section>`;
+    }).join("");
+    const countLine = query
+      ? (shown ? `${shown} of ${total} devices match.` : "")
+      : "";
+    return `<div class="field">
+      <span class="field__label" id="devices-label">Devices</span>
+      <p class="field__hint" id="devices-hint">Choose Scan, then pick the devices to show. Only these can be switched.</p>
+      <div class="bar">
+        <div class="search"><label for="find">Find devices</label><input id="find" type="search" value="${query}" class="${query ? "is-focus" : ""}" /></div>
+        <button type="button" class="btn" style="align-self:flex-end">Scan again</button>
+      </div>
+      <div class="picker" role="group" aria-labelledby="devices-label" aria-describedby="devices-hint">
+        <section class="group chosen" role="group" aria-labelledby="g-chosen">
+          <div class="group__head"><h4 class="group__title" id="g-chosen">Chosen<span class="group__meta">3</span></h4>
+            <button type="button" class="btn btn--link">Clear all</button></div>
+          <div class="chips">${chosenChips}</div>
+        </section>
+        ${groups}
+        ${query && !shown ? `<p class="empty">No devices match “${query}”. <button type="button" class="btn btn--link">Clear search</button></p>` : ""}
+      </div>
+      <p class="count" role="status" aria-live="polite">${countLine}</p>
+    </div>`;
+  }
+  document.querySelectorAll("[data-state]").forEach(el => (el.innerHTML = render(el.dataset.state)));
+</script>
+</body>
+</html>
