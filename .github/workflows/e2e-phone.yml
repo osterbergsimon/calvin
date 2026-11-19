@@ -36,7 +36,7 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser
-        timeout-minutes: 8
+        timeout-minutes: 15
         uses: ./.github/actions/install-playwright
         with:
           browsers: chromium
