@@ -192,7 +192,7 @@ test.describe("phone: Screens", () => {
       /^(On|Off) until \d{2}:\d{2}$/
     );
 
-    await page.getByRole("button", { name: "Follow schedule" }).click();
+    await page.getByRole("button", { name: "Back to schedule" }).click();
     await expect.poll(() => api.overridesByKiosk.hallway?.screenNow).toBeUndefined();
 
     // The manual choice is a kiosk override, never a host-acting route.
@@ -217,7 +217,7 @@ test.describe("phone: Screens", () => {
     await openSection(page, "screen-power");
 
     await expect(page.locator('[data-test="screen-now-state"]')).toHaveText(
-      "Off, held by home automation"
+      "Off, set by home automation. The schedule is paused."
     );
     await page.getByRole("button", { name: "Back to schedule" }).click();
     await expect.poll(() => api.screenPowerRequests).toEqual(["schedule"]);

@@ -231,13 +231,13 @@
           />
         </SettingRow>
         <InlineNote
-          v-if="nameMsg"
+          v-if="nameMsg.text"
           class="screens-saved"
-          :tone="toneFor(nameMsg)"
+          :tone="nameMsg.tone"
           role="status"
           aria-live="polite"
         >
-          {{ nameMsg }}
+          {{ nameMsg.text }}
         </InlineNote>
       </SettingsSection>
 
@@ -305,13 +305,13 @@
           </template>
         </SettingRow>
         <InlineNote
-          v-if="pagesMsg"
+          v-if="pagesMsg.text"
           class="screens-saved"
-          :tone="toneFor(pagesMsg)"
+          :tone="pagesMsg.tone"
           role="status"
           aria-live="polite"
         >
-          {{ pagesMsg }}
+          {{ pagesMsg.text }}
         </InlineNote>
       </SettingsSection>
 
@@ -328,13 +328,13 @@
           />
         </template>
         <InlineNote
-          v-if="lookMsg"
+          v-if="lookMsg.text"
           class="screens-saved"
-          :tone="toneFor(lookMsg)"
+          :tone="lookMsg.tone"
           role="status"
           aria-live="polite"
         >
-          {{ lookMsg }}
+          {{ lookMsg.text }}
         </InlineNote>
       </SettingsSection>
 
@@ -401,13 +401,13 @@
           <InlineNote>{{ previewCaption }}</InlineNote>
         </Card>
         <InlineNote
-          v-if="displayMsg"
+          v-if="displayMsg.text"
           class="screens-saved"
-          :tone="toneFor(displayMsg)"
+          :tone="displayMsg.tone"
           role="status"
           aria-live="polite"
         >
-          {{ displayMsg }}
+          {{ displayMsg.text }}
         </InlineNote>
       </SettingsSection>
 
@@ -424,13 +424,13 @@
           />
         </template>
         <InlineNote
-          v-if="effectsMsg"
+          v-if="effectsMsg.text"
           class="screens-saved"
-          :tone="toneFor(effectsMsg)"
+          :tone="effectsMsg.tone"
           role="status"
           aria-live="polite"
         >
-          {{ effectsMsg }}
+          {{ effectsMsg.text }}
         </InlineNote>
       </SettingsSection>
 
@@ -446,13 +446,13 @@
           />
         </template>
         <InlineNote
-          v-if="controlsMsg"
+          v-if="controlsMsg.text"
           class="screens-saved"
-          :tone="toneFor(controlsMsg)"
+          :tone="controlsMsg.tone"
           role="status"
           aria-live="polite"
         >
-          {{ controlsMsg }}
+          {{ controlsMsg.text }}
         </InlineNote>
       </SettingsSection>
 
@@ -511,8 +511,8 @@
               tone="warn"
               data-test="screen-now-old-agent"
             >
-              This screen needs a software update to hold. Until then it follows the next scheduled
-              change.
+              This screen needs an update to stay this way. Until then, its next scheduled change
+              switches it.
             </InlineNote>
             <InlineNote v-if="dimmingSeconds !== null" data-test="screen-now-dimming">
               Dimming… then off · about {{ dimmingSeconds }} s
@@ -538,7 +538,7 @@
             data-test="screen-now-follow"
             @click="followSchedule"
           >
-            {{ powerHold ? "Back to schedule" : "Follow schedule" }}
+            Back to schedule
           </Button>
         </SettingRow>
         <BrightnessGroup
@@ -562,14 +562,14 @@
           @turn-on="setScreenNow('on')"
         />
         <InlineNote
-          v-if="powerMsg"
+          v-if="powerMsg.text"
           class="screens-saved"
           data-test="screen-now-message"
-          :tone="toneFor(powerMsg)"
+          :tone="powerMsg.tone"
           role="status"
           aria-live="polite"
         >
-          {{ powerMsg }}
+          {{ powerMsg.text }}
         </InlineNote>
       </SettingsSection>
 
@@ -609,13 +609,13 @@
           />
         </SettingRow>
         <InlineNote
-          v-if="touchMsg"
+          v-if="touchMsg.text"
           class="screens-saved"
-          :tone="toneFor(touchMsg)"
+          :tone="touchMsg.tone"
           role="status"
           aria-live="polite"
         >
-          {{ touchMsg }}
+          {{ touchMsg.text }}
         </InlineNote>
       </SettingsSection>
 
@@ -640,13 +640,13 @@
           <Button data-test="open-default-remote" @click="openDefaultRemote">Open Default</Button>
         </SettingRow>
         <InlineNote
-          v-if="remoteMsg"
+          v-if="remoteMsg.text"
           class="screens-saved"
-          :tone="toneFor(remoteMsg)"
+          :tone="remoteMsg.tone"
           role="status"
           aria-live="polite"
         >
-          {{ remoteMsg }}
+          {{ remoteMsg.text }}
         </InlineNote>
       </SettingsSection>
 
@@ -662,13 +662,13 @@
           @reset="() => resetBehaviour(descriptor.key)"
         />
         <InlineNote
-          v-if="behaviourMsg"
+          v-if="behaviourMsg.text"
           class="screens-saved"
-          :tone="toneFor(behaviourMsg)"
+          :tone="behaviourMsg.tone"
           role="status"
           aria-live="polite"
         >
-          {{ behaviourMsg }}
+          {{ behaviourMsg.text }}
         </InlineNote>
       </SettingsSection>
 
@@ -727,13 +727,13 @@
           </Button>
         </SettingRow>
         <InlineNote
-          v-if="removeMsg"
+          v-if="removeMsg.text"
           class="screens-saved"
-          :tone="toneFor(removeMsg)"
+          :tone="removeMsg.tone"
           role="status"
           aria-live="polite"
         >
-          {{ removeMsg }}
+          {{ removeMsg.text }}
         </InlineNote>
       </SettingsSection>
 
@@ -750,7 +750,7 @@
             </Button>
           </template>
         </InlineNote>
-        <InlineNote v-if="footerMsg" :tone="toneFor(footerMsg)">{{ footerMsg }}</InlineNote>
+        <InlineNote v-if="footerMsg.text" :tone="footerMsg.tone">{{ footerMsg.text }}</InlineNote>
       </Card>
 
       <ScreenRegionEditor
@@ -847,6 +847,7 @@ import ScreenSettingRow from "@/components/settings/shared/ScreenSettingRow.vue"
 import ChangedHereLine from "@/components/settings/shared/ChangedHereLine.vue";
 import { effectsLevelLabel, resolveEffectsLevel } from "@/utils/effectsLevel";
 import { flushKioskOverridesQueues, kioskOverridesQueue } from "@/utils/kioskOverridesQueue";
+import { friendlyError } from "@/utils/friendlyError";
 
 const props = defineProps({
   config: { type: Object, required: true },
@@ -1065,18 +1066,28 @@ if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
   }
 }
 
-const nameMsg = ref("");
-const pagesMsg = ref("");
-const lookMsg = ref("");
+// A note carries its tone beside its words, so changing the copy can never
+// change the colour (a "Couldn't…" that no longer starts that way stays red).
+const noteRef = () => ref({ text: "", tone: "ok" });
+const say = (target, text, tone = "ok") => {
+  target.value = { text, tone };
+};
+const clear = target => {
+  target.value = { text: "", tone: "ok" };
+};
+
+const nameMsg = noteRef();
+const pagesMsg = noteRef();
+const lookMsg = noteRef();
 const lookNote = ref({ key: "", text: "" });
-const displayMsg = ref("");
-const effectsMsg = ref("");
-const controlsMsg = ref("");
-const powerMsg = ref("");
-const touchMsg = ref("");
-const remoteMsg = ref("");
-const behaviourMsg = ref("");
-const footerMsg = ref("");
+const displayMsg = noteRef();
+const effectsMsg = noteRef();
+const controlsMsg = noteRef();
+const powerMsg = noteRef();
+const touchMsg = noteRef();
+const remoteMsg = noteRef();
+const behaviourMsg = noteRef();
+const footerMsg = noteRef();
 const overridesQueue = computed(() =>
   selectedId.value ? kioskOverridesQueue(selectedId.value) : null
 );
@@ -1207,19 +1218,19 @@ const footerCopy = computed(() => {
 });
 
 function clearMessages() {
-  remoteMsg.value = "";
-  nameMsg.value = "";
-  pagesMsg.value = "";
-  lookMsg.value = "";
+  clear(remoteMsg);
+  clear(nameMsg);
+  clear(pagesMsg);
+  clear(lookMsg);
   clearLookNote();
-  displayMsg.value = "";
-  effectsMsg.value = "";
-  controlsMsg.value = "";
-  powerMsg.value = "";
-  touchMsg.value = "";
-  behaviourMsg.value = "";
-  footerMsg.value = "";
-  removeMsg.value = "";
+  clear(displayMsg);
+  clear(effectsMsg);
+  clear(controlsMsg);
+  clear(powerMsg);
+  clear(touchMsg);
+  clear(behaviourMsg);
+  clear(footerMsg);
+  clear(removeMsg);
 }
 
 function openDefault({ fromRoute = false } = {}) {
@@ -1370,8 +1381,8 @@ const powerHold = computed(() => selectedKiosk.value?.powerHold ?? null);
 // them so a double tap cannot send the pair twice.
 const powerBusy = ref(false);
 const POWER_CHOICE_FAILED = {
-  on: "The hold ended, but turning the screen on didn't save. Try again.",
-  off: "The hold ended, but turning the screen off didn't save. Try again.",
+  on: "The screen is back on its schedule, but turning it on didn't save. Try again.",
+  off: "The screen is back on its schedule, but turning it off didn't save. Try again.",
 };
 const desiredOnNow = computed(() => {
   if (powerHold.value) return powerHold.value.power === "on";
@@ -1388,8 +1399,8 @@ const powerStateCopy = computed(() => {
   if (!hold) return desiredOnNow.value ? "On now" : "Off now";
   const state = hold.power === "on" ? "On" : "Off";
   return hold.by === "automation"
-    ? `${state}, held by home automation`
-    : `${state}, held until someone changes it`;
+    ? `${state}, set by home automation. The schedule is paused.`
+    : `${state} until someone changes it. The schedule is paused.`;
 });
 const untilCopy = computed(() => {
   const override = activeOverride.value;
@@ -1404,7 +1415,7 @@ const untilCopy = computed(() => {
 async function setScreenNow(power) {
   if (powerBusy.value) return;
   powerBusy.value = true;
-  powerMsg.value = "";
+  clear(powerMsg);
   try {
     // A person's own choice ends a hold first, then works as always: until the
     // next scheduled change. Ask the server first: home automation may have held
@@ -1418,7 +1429,7 @@ async function setScreenNow(power) {
     const saved = await persist(next, powerMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
     // The hold is already gone, so the plain save error would hide that the
     // screen is now on its schedule.
-    if (!saved && wasHeld) powerMsg.value = POWER_CHOICE_FAILED[power];
+    if (!saved && wasHeld) say(powerMsg, POWER_CHOICE_FAILED[power], "err");
   } finally {
     powerBusy.value = false;
   }
@@ -1438,12 +1449,12 @@ async function isHeldNow() {
 async function endHold() {
   const kioskId = selectedId.value;
   if (!kioskId) return false;
-  powerMsg.value = "";
+  clear(powerMsg);
   try {
     await store.setScreenPower(kioskId, "schedule");
     return true;
-  } catch {
-    powerMsg.value = "Couldn't save to the server. Check the connection and try again.";
+  } catch (err) {
+    say(powerMsg, friendlyError(err, "change this screen"), "err");
     return false;
   }
 }
@@ -1488,7 +1499,7 @@ async function followSchedule() {
   if (powerHold.value) {
     if (await endHold()) {
       const online = selectedKiosk.value ? isOnline(selectedKiosk.value) : false;
-      powerMsg.value = online ? APPLIED_BY_AGENT : OFFLINE_COPY;
+      say(powerMsg, online ? APPLIED_BY_AGENT : OFFLINE_COPY);
     }
     return;
   }
@@ -1545,17 +1556,15 @@ const effOsk = computed(() =>
 async function persist(next, messageRef, onlineCopy, offlineCopy) {
   const kioskId = selectedId.value;
   if (!kioskId) return false;
-  if (messageRef) messageRef.value = "";
+  if (messageRef) clear(messageRef);
   try {
     await kioskOverridesQueue(kioskId).replaceAll(next);
     const online = selectedKiosk.value ? isOnline(selectedKiosk.value) : false;
-    if (messageRef) messageRef.value = online ? onlineCopy : offlineCopy;
+    if (messageRef) say(messageRef, online ? onlineCopy : offlineCopy);
     await refreshDesiredVersion(kioskId);
     return true;
-  } catch {
-    if (messageRef) {
-      messageRef.value = "Couldn't save to the server. Check the connection and try again.";
-    }
+  } catch (err) {
+    if (messageRef) say(messageRef, friendlyError(err, "change this screen"), "err");
     return false;
   }
 }
@@ -1568,14 +1577,6 @@ const OFFLINE_COPY = "Saved. Changes apply when this screen reconnects.";
 // and applies its own rows itself. Keep one phrase per path.
 const APPLIED_BY_AGENT = "Saved. This screen updates within a minute.";
 const APPLIED_BY_PAGE = "Saved. This screen updates within 30 seconds.";
-
-function toneFor(message) {
-  return message.startsWith("Couldn't") ||
-    message.startsWith("Pick ") ||
-    message.startsWith("The hold ended")
-    ? "err"
-    : "ok";
-}
 
 function setName(value) {
   const trimmed = value.trim();
@@ -1594,7 +1595,7 @@ function togglePage(pageId, checked) {
   if (checked) ids.add(pageId);
   else ids.delete(pageId);
   if (ids.size === 0) {
-    pagesMsg.value = "Pick at least one page.";
+    say(pagesMsg, "Pick at least one page.", "err");
     return;
   }
   const next = { ...overrides.value };
@@ -1995,7 +1996,7 @@ function askUseAsDefault() {
   confirm.show = true;
 }
 
-const removeMsg = ref("");
+const removeMsg = noteRef();
 const removeBlockedReason = computed(() =>
   selectedKiosk.value?.displayCheckActive
     ? "A display check is running on this screen. Stop it first."
@@ -2018,10 +2019,13 @@ async function removeSelected() {
   try {
     await store.removeKiosk(id);
   } catch (err) {
-    removeMsg.value =
+    say(
+      removeMsg,
       err?.response?.status === 409
         ? "Couldn't remove it: a display check is running on this screen."
-        : `Couldn't remove ${name}. Try again.`;
+        : `Couldn't remove ${name}. Try again.`,
+      "err"
+    );
     return;
   }
   // Land on the list, which has the next screen to pick.

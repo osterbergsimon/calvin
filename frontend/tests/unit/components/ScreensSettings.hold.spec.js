@@ -81,7 +81,9 @@ describe("ScreensSettings — a held screen", () => {
   it("says the screen is held by home automation", async () => {
     const { wrapper } = mountScreens({ kiosks: [kiosk({ powerHold: HOLD })] });
     await open(wrapper);
-    expect(text(wrapper, "screen-now-state")).toBe("Off, held by home automation");
+    expect(text(wrapper, "screen-now-state")).toBe(
+      "Off, set by home automation. The schedule is paused."
+    );
     expect(wrapper.find("[data-test='screen-now-until']").exists()).toBe(false);
     expect(text(wrapper, "screen-now-follow")).toBe("Back to schedule");
     expect(wrapper.find("[data-test='screen-now-off']").attributes("disabled")).toBeDefined();
@@ -90,11 +92,21 @@ describe("ScreensSettings — a held screen", () => {
   });
 
   it("says who else can hold it", async () => {
-    const { wrapper } = mountScreens({
+    const on = mountScreens({
       kiosks: [kiosk({ powerHold: { ...HOLD, power: "on", by: "settings" } })],
     });
-    await open(wrapper);
-    expect(text(wrapper, "screen-now-state")).toBe("On, held until someone changes it");
+    await open(on.wrapper);
+    expect(text(on.wrapper, "screen-now-state")).toBe(
+      "On until someone changes it. The schedule is paused."
+    );
+
+    const off = mountScreens({
+      kiosks: [kiosk({ powerHold: { ...HOLD, power: "off", by: "settings" } })],
+    });
+    await open(off.wrapper);
+    expect(text(off.wrapper, "screen-now-state")).toBe(
+      "Off until someone changes it. The schedule is paused."
+    );
   });
 
   it("ignores a stale manual choice while held", async () => {
@@ -103,7 +115,9 @@ describe("ScreensSettings — a held screen", () => {
       overrides: { screenNow: { power: "off", setAt: new Date().toISOString() } },
     });
     await open(wrapper);
-    expect(text(wrapper, "screen-now-state")).toBe("On, held by home automation");
+    expect(text(wrapper, "screen-now-state")).toBe(
+      "On, set by home automation. The schedule is paused."
+    );
   });
 
   it("Back to schedule ends the hold through the screen-power call", async () => {
@@ -125,10 +139,15 @@ describe("ScreensSettings — a held screen", () => {
     await open(wrapper);
     await wrapper.find("[data-test='screen-now-follow']").trigger("click");
     await flushPromises();
-    expect(wrapper.text()).toContain(
-      "Couldn't save to the server. Check the connection and try again."
+    expect(text(wrapper, "screen-now-message")).toBe(
+      "Couldn't reach Calvin. Check that it's running and on the same network."
     );
-    expect(text(wrapper, "screen-now-state")).toBe("Off, held by home automation");
+    expect(wrapper.find("[data-test='screen-now-message']").classes()).toContain(
+      "inline-note--err"
+    );
+    expect(text(wrapper, "screen-now-state")).toBe(
+      "Off, set by home automation. The schedule is paused."
+    );
   });
 
   it("Turn on now ends the hold, then saves the choice as today", async () => {
@@ -183,7 +202,7 @@ describe("ScreensSettings — a held screen", () => {
     await flushPromises();
     expect(store.setScreenPower).toHaveBeenCalledWith("kitchen", "schedule");
     expect(text(wrapper, "screen-now-message")).toBe(
-      "The hold ended, but turning the screen on didn't save. Try again."
+      "The screen is back on its schedule, but turning it on didn't save. Try again."
     );
     expect(wrapper.find("[data-test='screen-now-message']").classes()).toContain(
       "inline-note--err"
@@ -202,7 +221,7 @@ describe("ScreensSettings — a held screen", () => {
     await flushPromises();
     expect(store.setScreenPower).toHaveBeenCalledWith("kitchen", "schedule");
     expect(text(wrapper, "screen-now-message")).toBe(
-      "The hold ended, but turning the screen off didn't save. Try again."
+      "The screen is back on its schedule, but turning it off didn't save. Try again."
     );
   });
 
@@ -243,7 +262,7 @@ describe("ScreensSettings — a held screen", () => {
     });
     await open(wrapper);
     expect(text(wrapper, "screen-now-old-agent")).toBe(
-      "This screen needs a software update to hold. Until then it follows the next scheduled change."
+      "This screen needs an update to stay this way. Until then, its next scheduled change switches it."
     );
   });
 

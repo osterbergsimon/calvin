@@ -976,7 +976,7 @@ describe("ScreensSettings — Power", () => {
     });
   });
 
-  it("shows the current state, when the schedule takes over, and Follow schedule", async () => {
+  it("shows the current state, when the schedule takes over, and Back to schedule", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-11T09:00:00+02:00"));
     try {
@@ -1000,6 +1000,8 @@ describe("ScreensSettings — Power", () => {
       expect(wrapper.find("[data-test='screen-now-until']").text()).toBe("Off until 22:00");
       expect(wrapper.find("[data-test='screen-now-off']").attributes("disabled")).toBeDefined();
       expect(wrapper.find("[data-test='screen-now-on']").attributes("disabled")).toBeUndefined();
+      // One action, one name: a manual choice goes back the same way a hold does.
+      expect(wrapper.find("[data-test='screen-now-follow']").text()).toBe("Back to schedule");
 
       await wrapper.find("[data-test='screen-now-follow']").trigger("click");
       await flushPromises();
@@ -1278,7 +1280,7 @@ describe("ScreensSettings — save failures", () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain(
-      "Couldn't save to the server. Check the connection and try again."
+      "Couldn't reach Calvin. Check that it's running and on the same network."
     );
     expect(wrapper.text()).not.toContain("Saved.");
   });
@@ -2497,7 +2499,7 @@ describe("ScreensSettings — optimistic control writes (calvin-g25v)", () => {
 
     expect(flip.props("modelValue")).toBe(false);
     expect(wrapper.text()).toContain(
-      "Couldn't save to the server. Check the connection and try again."
+      "Couldn't reach Calvin. Check that it's running and on the same network."
     );
   });
 
@@ -2565,7 +2567,7 @@ describe("ScreensSettings — optimistic control writes (calvin-g25v)", () => {
         .props("modelValue")
     ).toBe("landscape");
     expect(wrapper.text()).toContain(
-      "Couldn't save to the server. Check the connection and try again."
+      "Couldn't reach Calvin. Check that it's running and on the same network."
     );
 
     await flushPromises();
