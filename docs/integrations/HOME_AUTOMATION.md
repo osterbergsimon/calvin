@@ -13,10 +13,10 @@ It uses a limited API key that can switch screens and read their state.
 2. **Create key**, give it a name such as `Homey`, and pick **Turn screens on and off**.
 3. Copy the key: it is shown once.
 
-This key lets home automation switch screens on and off. Beyond that it can only do what anyone
-on your network can do without a key: no settings, no backups, no [MCP](MCP.md), no host actions
-(details in [Limited keys](../configuration/ADMIN_AUTH.md#limited-keys)). Settings shows when it
-was last used, and **Revoke** stops it on the next request.
+For home automation: turns screens on and off. Otherwise it's like having no key: no settings,
+no backups, no [MCP](MCP.md), no host actions (details in
+[Limited keys](../configuration/ADMIN_AUTH.md#limited-keys)). Settings shows when it was last
+used, and **Revoke** stops it on the next request.
 
 ## 2. Find each screen's id
 
@@ -55,8 +55,8 @@ The answer, and `GET` on the same path, is the screen's state:
   schedule it uses the time zone set in Settings; with none set it uses the server's own.
 - `by` is `automation` for any API key (an admin key used by a script too) and `settings` for
   a signed-in admin.
-- `agentHolds: false` means the screen's software is too old to hold: it obeys the command
-  until its next scheduled change. Press **Update** for that screen in Settings.
+- `agentHolds: false` means the screen's software is too old to stay held: it obeys the command
+  until its next scheduled change. Choose **Update** for that screen in Settings › Screens.
   `null` means no screen has checked in since Calvin was updated.
 - `404` for an unknown screen, `422` for a bad body, `401`/`403` for a missing or wrong key,
   `429` with `Retry-After` after 30 changes in a minute from one key.
@@ -83,11 +83,13 @@ condition on `"held":true` is enough to branch.
 
 ## Settings and people
 
-- On the screen's power row, Settings shows "Off, held by home automation" with
-  **Back to schedule**.
+- On the screen's power row, Settings shows "Off, set by home automation. The schedule is
+  paused." with **Back to schedule**.
 - A person's **Turn on now** or **Turn off now** in Settings ends the hold and works as
   always: it lasts until the next scheduled change.
-- A touch on a screen held off behaves as during a scheduled off.
+- A touch on a screen held off can wake it, depending on the display. Calvin does not put it
+  back to sleep by itself: it stays lit until the screen's power is changed, in Settings or
+  from home automation.
 
 ## Security notes
 
