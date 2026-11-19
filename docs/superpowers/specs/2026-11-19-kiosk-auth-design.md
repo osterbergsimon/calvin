@@ -47,7 +47,9 @@ dashboard, whatever happens.
   question 4, answer a).
 - `PATCH /api/kiosks/{id}/overrides` with `showUI` stays open to unpaired callers (research
   question 7, answer a).
-- `GET /api/kiosks/{id}/display-check` stays a public read (research table, row 6: later).
+- `GET /api/kiosks/{id}/display-check` stays a public read (research table, row 6: later). It
+  shows the run id, so after this work the run id is no protection at all. What protects the
+  report on a gated screen is the screen's own secret (section 8).
 - Automatic rotation of a screen's secret (research question 6, answer a). To rotate, unpair
   and pair again.
 - The all-in-one display. It has no kiosk id, and it keeps the loopback check it has today.
@@ -136,8 +138,15 @@ The research compared four ([section 2](../../research/2026-11-18-kiosk-authenti
   for 10 and 30 minutes. A restart loses them, and the agent asks again on its next poll. *(My
   call: it removes a table and a migration, and losing a pending code to a restart costs one more
   minute of waiting.)*
-  - A pending pairing is `{kiosk_id, secret_hash, code, created, expires, peer}`. There are at
-    most 3 per kiosk id; a new one drops the oldest.
+  - A pending pairing is `{kiosk_id, secret_hash, code, created, expires, peer, hostname,
+    by_agent, last_asked}`.
+    - `hostname` comes from the `pair` body. `by_agent` is true when an agent started it with its
+      bearer.
+    - `last_asked` is updated each time its holder calls `POST` or `GET .../pair`.
+    - There are at most 3 per kiosk id. A new one drops the oldest entry that no one has asked
+      about in the last 2 minutes. When all 3 have been asked about lately, the new one gets 429.
+      So a LAN caller cannot push out the code a real screen is showing.
+    - At most 200 are live in all; above that, 429.
   - An install code is `{code_hash, created, expires}`. There are at most 5 live at once, and each
     works once.
 - The household mode is a config key, `kioskPairing`, with the value `"optional"` (also when the
@@ -149,9 +158,13 @@ The research compared four ([section 2](../../research/2026-11-18-kiosk-authenti
 
 ### 3. The kiosk principal and the route policy
 
-- `enforce_route_policy` dispatches on the bearer prefix **before** `_authenticate_bearer`.
+- The prefix check sits **inside `_authenticate_bearer`**. A `clv_kiosk_` bearer makes it
+  return `None` ("no key"), so `enforce_route_policy` and the MCP gateway (which calls
+  `_authenticate_bearer` directly, `mcp_server/gateway.py`) both treat it as no key.
   - A bearer that starts with `clv_kiosk_` is never passed to `ApiKeyStore`, and never counted in
-    `api_key_limiter`.
+    `api_key_limiter`. At the MCP gateway it gets the usual "needs an API key" 401.
+  - An admin cookie sent next to a kiosk bearer is honoured as if the bearer were absent. The
+    agent never sends cookies, so this only matters for tests and odd clients.
   - The prefix is set aside: `ApiKeyStore.create` re-rolls any new API key secret that would start
     with `clv_kiosk_` or `clv_pair_`.
 - The kiosk principal is resolved lazily, through one function,
@@ -266,7 +279,8 @@ GETs. Their handlers do their own checks.
 
 ### 5. The cookie
 
-- `calvin_kiosk` is a stateless, signed cookie, in the same shape as `calvin_admin`:
+- `calvin_kiosk` is a stateless, signed cookie, on the same idea as `calvin_admin` (signed body,
+  no server state) but with its own format:
   `k1.<hex kiosk id>.<fingerprint>.<issued>.<mac>`.
   - The fingerprint is the first 16 hex characters of the secret's hash.
   - The MAC is an HMAC-SHA256 under the admin store's `server_secret`.
@@ -301,10 +315,22 @@ GETs. Their handlers do their own checks.
   - It reports this as `kioskAuth.browser` in the agent's config answer.
   - When the screen is paired and the answer says `"unpaired"` on two polls in a row, the agent
     restarts the browser, at most once every 10 minutes. The unit re-reads the file and the
-    hand-off runs again.
-  - Chromium is restarted the way the crash watchdog does it (`restart_kiosk_unit`), and cog
-    through a new `restart` verb in `calvin-cog-panel.sh`, which the sudoers line already lets the
-    agent run.
+    hand-off runs again. `"unknown"` never triggers a restart.
+- **The browser has never had this secret.** The agent also restarts the browser **once, right
+  after it creates or replaces the secret file**. It knows this itself, so no server signal is
+  needed. This covers:
+  - the first start after an Update (on cog, the Update does not restart the browser unit);
+  - a new secret after Unpair.
+
+  It is what lets a pending screen show its code.
+- **How the browser is restarted.** Both browsers run as `calvin` under `Restart=always`
+  (`calvin-kiosk-remote.service` for Chromium, `calvin-cog.service`). The agent signals the unit's
+  process group, as the crash watchdog already does for Chromium (`restart_kiosk_unit`), and
+  systemd starts it again with the current unit file.
+  - `KIOSK_UNITS` gains `calvin-cog.service`.
+  - No new sudo rule or helper verb is needed, so existing Pis need no reinstall.
+  - A unit that is stopped (cog's `off` stops it) is not restarted. It reads the file when it is
+    next started, so a restart never switches a screen on.
 
 ### 7. What a screen gets, by mode and pairing
 
@@ -361,7 +387,8 @@ What follows from the table:
     (section 6).
   - The screen shows a new code.
 - **A stolen screen**: Unpair it. If it is not coming back, **Remove** it too. Removal deletes
-  the row, and with it the hash.
+  the row, and with it the hash. Then make a fresh backup: an older one would bring the screen
+  back paired (owner question 3).
 - **Pair again** (when a secret might have leaked, but the screen is still yours): Unpair, then
   type the new code.
 - **Reinstall** keeps `/var/lib/calvin/agent`, and with it the secret, as it keeps the id. A bats
@@ -374,7 +401,8 @@ What follows from the table:
 
 - **Existing screens:** Settings › Screens › **Update**, as today. The bundle brings the new agent
   and the new kiosk units together, and `update-kiosk.sh` restarts the changed units. The agent
-  then makes its secret and shows a code, and an admin types it.
+  then makes its secret, restarts the browser once (section 6; this is also what picks up the
+  new cog unit, which the Update does not restart), and shows a code. An admin types it.
   - Signed Pis are strongly recommended. A Pi without the signing key installs whatever answers as
     the server, and that answer could be an agent that sends the secret elsewhere. Pairing does
     not make updates safer; the docs say so.
@@ -423,6 +451,9 @@ What follows from the table:
     server keeps the screens paired.
   - A row that already exists keeps its current pairing, paired or not. A restore never re-pairs a
     screen the owner unpaired after the backup, and never breaks a screen paired since.
+    `_restore_kiosks` therefore updates an existing row column-scoped
+    (`_columns=["hostname", "overrides"]`), not with a whole-row `update()`, so it cannot race a
+    pairing made during the restore.
   - The restore summary says how many screens came back paired.
 - `BACKUP_RESTORE.md` says the file now holds a one-way fingerprint per paired screen, not the
   screen's secret. It cannot be used to pretend to be a screen.
@@ -457,6 +488,105 @@ state must tell them. The sample wording in this page shows intent; the design l
   unpaired asks first and names them; turning it off does not ask.
 - In "Add a screen", get the install command with its one-time code, see that it works once for
   30 minutes, and get a new code.
+
+### 14. Settled after the builder check
+
+A fresh reader went through this design as its builder would. Answers that were already in the
+design are now stated above. The rest were settled here, each marked *(my call)* unless it is
+plainly what the sections above imply. Only the owner can settle the three questions at the end.
+
+**Pairing flow**
+
+- **The agent knows whether it was ever paired** *(my call)*.
+  - It keeps a marker, `/var/lib/calvin/agent/kiosk-paired`, written when it first sees
+    `kioskAuth.state: "paired"`.
+  - It rotates its secret only when the marker exists and the server says `"unpaired"`. It then
+    deletes the marker. A pending screen never rotates, so its code stays put.
+  - Remove followed by the screen's next poll counts as unpaired, so it rotates too.
+- **There is no tombstone for revoked hashes.** A copy of an old secret can start a pending
+  entry, but that entry's code is shown only to whoever holds the copy. An admin approves only the
+  code on the real screen, so the copy cannot get paired.
+- **Pairing a screen that is already paired** *(my call)*. Approving a code for an id that
+  already has a hash replaces the hash, and the answer carries `"replaced": true`. This is the
+  "pair again" path, with no Unpair needed first. The admin still had to read the code off that
+  screen.
+- **Screens with no registry row** (a new screen in required mode, whose unpaired polls write
+  nothing):
+  - `GET /api/kiosks/pairings` (admin) lists the live pending entries, as
+    `{kioskId, hostname, createdAt, byAgent}` with no code and no hash, so Settings can show
+    "waiting to be paired".
+  - Approval creates the row with the entry's hostname, and calls `_adopt_global_settings` as
+    `record_kiosk` does for a new row.
+- **When an agent is present** (`kioskAuth.hasAgent`): `hasAgent` is true when the row has an
+  `agent_version`, or when a live pending entry for the id has `by_agent`.
+  - The server refuses `{"browser": true}` with 409 `screen_has_agent` when `hasAgent` is true.
+  - The page starts browser-only pairing only after three config answers in a row, at least
+    3 minutes, say `hasAgent: false` *(my call)*. That leaves a newly updated agent time to start
+    first.
+- **Remove** drops the id's pending entries too.
+- **No admin password yet.** Nobody could approve a pairing and there is no `server_secret` to
+  sign a cookie. So `POST .../pair` and `POST .../browser-session` answer 409 `setup_required`.
+  The agent tries again on its next poll, and the screen shows no code.
+- **Only the top-level page** reads `#pair=`, starts browser-only pairing or shows the code
+  (`window.top === window`). Previews and iframes never do.
+
+**Who may call what** *(my call)*
+
+- Approving a code and minting install codes need an **admin session**, as key management does.
+  An admin key is refused with 403 `session_required`. A short kiosk-kind session at a wall
+  screen counts; that person knows the password.
+- Unpair (`DELETE .../pairing`) takes any admin, session or admin key.
+- `GET .../screen-power` on a gated screen is open to admin, a `screens.power` limited key and the
+  screen itself. A plain read-scope key gets 403 `insufficient_scope`: it is meant for scripts
+  reading the dashboard, not for presence.
+- `PUT .../screen-power` on a gated, unpaired screen still answers 200 and stores the hold, with
+  `paired: false`. `desiredOn` tells the truth (the screen follows its schedule).
+  `HOME_AUTOMATION.md` says so.
+
+**Errors and wire fields** *(my call)*
+
+| Case | Answer |
+|---|---|
+| Code doesn't match a live entry (wrong, expired, already used) | 404 `pairing_code_invalid` |
+| Too many wrong codes, or too many new pendings | 429 `rate_limited` with `Retry-After` |
+| Install code not live | 409 `install_code_invalid` (the agent then pairs by code) |
+| `{"browser": true}` when an agent is present | 409 `screen_has_agent` |
+| No admin password yet | 409 `setup_required` on `pair` and `browser-session` |
+| Gated `KIOSK_ROUTES` call not from the screen itself | 401 `kiosk_unpaired` |
+| Unpair on an unpaired screen | 200 `{"changed": false}` |
+| Unpair or approve on an unknown id | 404 |
+| A sixth install code | the oldest is dropped |
+
+- Any answer with presence fields removed carries `presenceHidden: true` (per row in the list), so
+  Settings can tell "hidden from you" apart from "no hold".
+- In the list, the hidden fields are `powerHold`, `overrides.screenNow`/`screen_now` and
+  `displayCheckActive`. `lastSeen`, the display-check findings, `agentHolds` and `agentPairs`
+  stay visible.
+  - The list has no kiosk id in its path. A `calvin_kiosk` cookie therefore unlocks only the row
+    its own kiosk id names, and a bearer unlocks no row (the agent never reads the list).
+
+**Caching** *(my call)*
+
+- `GET`/`POST .../pair`, `POST .../browser-session`, `GET /api/kiosks/pairings` and the
+  install-code answer: `Cache-Control: no-store`.
+- The config answer and `GET /api/kiosks`: `Cache-Control: private, no-cache` and
+  `Vary: Cookie, Authorization`, so the ETag still works.
+- `sw.js` never caches the pairing routes (`isUncachedApi`).
+
+**Limits behind a proxy** *(my call)*
+
+- The limits key on `request.client.host`, like `api_key_limiter`.
+- Behind a reverse proxy, `peer_ips` stays empty, so `kioskAuth.browser` stays `"unknown"`, and
+  the agent's own restart after a new secret still covers the hand-off.
+
+**Restore and the install path** *(my call)*
+
+- When a `replace` restore brings a backup without `kioskPairing`, the current value is kept, so a
+  restore never quietly loosens the mode. A backup that names the key wins.
+- The restore summary gains `counts.pairedScreens`.
+- `setup-kiosk.sh` writes `install-pair-code` after `bootstrap_kiosk` has created
+  `/var/lib/calvin/agent`. The code may travel on the command line, as it already does in the
+  `install.sh?pair=` URL: it works once, for 30 minutes.
 
 ## Security
 
@@ -549,15 +679,26 @@ state must tell them. The sample wording in this page shows intent; the design l
 
 ## Open questions for the owner
 
-See the PR body. The builder check found these that only the owner can settle:
+Only the owner can settle these. Each has a default the build follows unless the owner says
+otherwise.
 
-1. **The pairing card on a screen nobody has started pairing.** The design shows the pairing code
-   on every unpaired screen whose agent can pair, from the moment it is updated. Is a permanent
-   pairing code on a screen you have chosen not to pair yet acceptable, or should the card only
-   appear for 10 minutes after someone taps **Pair a screen** in Settings?
-2. **Required by default for fresh installs.** Should a fresh install start in required mode
-   (every screen pairs through the install command anyway), or stay optional until a later
-   release?
-3. **Restoring a screen that was removed.** Under the restore rule, a screen that was removed
-   from Screens after the backup comes back paired. Is that acceptable (the summary names it), or
-   should a restore bring removed screens back unpaired?
+1. **A code on a screen nobody has started pairing.** As designed, every unpaired screen whose
+   agent can pair shows its code over the dashboard from the moment it is updated, for as long as
+   it stays unpaired, in both modes.
+   - (a) Keep it: the code is a standing nudge, and it never covers the dashboard.
+     *(default)*
+   - (b) Show it only for 10 minutes after someone opens **Pair a screen** in Settings. The
+     server would tell unpaired screens that a pairing window is open, so the code shows up to a
+     minute late.
+2. **Required mode for fresh installs.** Every screen of a fresh install pairs through the
+   install command anyway.
+   - (a) Stay optional in this release; decide in a later one. *(default)*
+   - (b) Start fresh installs in required mode now.
+3. **Restoring a screen that was removed.** A restore cannot tell "this server never had the
+   screen" (a fresh server, where pairings must come back) from "the owner removed it". So a
+   screen that was unpaired and then removed comes back paired when an older backup is restored.
+   For a stolen screen, that means the thief's copy works again.
+   - (a) Accept it. The restore summary names the screens that came back paired, and the docs say
+     to make a fresh backup after retiring a stolen screen. *(default)*
+   - (b) Remove keeps a short list of removed screen ids in the household config, and a restore
+     brings those back unpaired. This adds a small piece of state that a backup carries.

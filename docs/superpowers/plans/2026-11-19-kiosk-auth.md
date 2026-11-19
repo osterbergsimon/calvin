@@ -50,11 +50,8 @@ Dependencies:
 - Presence fields: `screenHold`, `screen_hold`, `screenNow`, `screen_now`, `displayCheck`, `display_check`, and the list's `powerHold`.
 - Agent feature flag: `kfeat=hold,pair`.
 - Agent files: `/var/lib/calvin/agent/kiosk-credential` and `/var/lib/calvin/agent/install-pair-code`, both mode 0600, owner `calvin`.
-- Error codes:
-  - `kiosk_unpaired` (401, "This screen isn't paired.");
-  - `pairing_code_invalid` (404);
-  - `install_code_invalid` (409);
-  - `rate_limited` (429).
+- Error codes: the design's section 14 table, verbatim: `pairing_code_invalid` (404), `rate_limited` (429), `install_code_invalid` (409), `screen_has_agent` (409), `setup_required` (409 on `pair`/`browser-session`), `kiosk_unpaired` (401, "This screen isn't paired."), `session_required` (403).
+- Agent marker file: `/var/lib/calvin/agent/kiosk-paired`. The browser is restarted by signal (`restart_kiosk_unit`) for Chromium and cog alike: no new sudo rule.
 - Never a 401 on `GET /api/kiosks/{id}/config`.
 - No secret, install code or pairing code in a log line, in a backup, or in any response except to its own holder.
 - UI: every Settings and kiosk screen follows the design lead's merged `docs(design)` spec (Task 12). The plan fixes behaviour and API, not layout or copy. Copy passes `tests/unit/copy/noDevWords.spec.js`.
@@ -92,10 +89,9 @@ Each part ends with a **dedicated review step**: superpowers:requesting-code-rev
 | `backend/app/services/backup/{exporter,restorer,format}.py` | `pairing` on kiosk rows |
 | `backend/app/services/kiosk_bundle.py` | `render_install_script(..., pair_code=)` |
 | `deploy/kiosk-agent/calvin_display_agent.py` | credential, bearer, pairing loop, browser restart, `kfeat=pair` |
-| `deploy/kiosk-agent/calvin-cog-panel.sh`, `calvin-kiosk-update.sudoers` (if needed) | `restart` verb |
 | `deploy/systemd/calvin-kiosk-remote.service`, `calvin-cog.service` | `#pair=` fragment |
 | `deploy/kiosk-agent/install-kiosk.sh`, `scripts/setup-kiosk.sh`, `scripts/bake-kiosk-firstrun.sh` | `--pair-code`; keep `/var/lib/calvin/agent` |
-| `frontend/src/utils/kioskId.js`, `frontend/src/stores/kioskPairing.js` (new), the kiosk card component (per the design lead's spec) | browser hand-off and card |
+| `frontend/src/utils/kioskId.js`, `frontend/src/stores/kioskPairing.js` (new), the kiosk card component (per the design lead's spec), `frontend/public/sw.js` | browser hand-off and card |
 | `frontend/src/stores/kiosks.js`, `ScreensSettings.vue`, `AddKioskPanel.vue` | Settings per the design lead's spec |
 | docs | `KIOSK_INSTALL.md`, `KIOSK_PROVISIONING.md`, `ADMIN_AUTH.md`, `BACKUP_RESTORE.md`, `integrations/HOME_AUTOMATION.md` |
 
@@ -138,10 +134,11 @@ Each part ends with a **dedicated review step**: superpowers:requesting-code-rev
 **Interfaces — Produces:**
 - `SECRET_PREFIX = "clv_kiosk_"`, `INSTALL_PREFIX = "clv_pair_"`, `CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTVWXYZ"`, `CODE_TTL_S = 600`, `INSTALL_TTL_S = 1800`.
 - `new_secret() -> str`, `is_secret(value) -> bool`, `hash_secret(secret) -> str` (SHA-256 hex), `normalize_code(typed: str) -> str | None`, `format_code(code) -> str` (`"K7Q-4MD"`).
-- `@dataclass Pending(kiosk_id, secret_hash, code, created, expires, peer, hostname)`.
+- `@dataclass Pending(kiosk_id, secret_hash, code, created, expires, peer, hostname, by_agent, last_asked)`.
 - `class PairingStore` with these methods:
-  - `start(kiosk_id, secret_hash, peer, hostname=None, now=None) -> Pending`. It returns the live entry for the same hash unchanged. When a new entry would exceed the per-address limit it raises `RateLimited(wait)`.
-  - `pending_for(kiosk_id, secret_hash, now=None) -> Pending | None`.
+  - `start(kiosk_id, secret_hash, peer, hostname=None, by_agent=True, now=None) -> Pending`. It returns the live entry for the same hash, with `last_asked` refreshed. When a new entry would exceed the per-address limit, the per-id cap (every entry was asked about in the last 120 s) or the global cap of 200, it raises `RateLimited(wait)`.
+  - `pending_for(kiosk_id, secret_hash, now=None) -> Pending | None` (refreshes `last_asked`).
+  - `live(now=None) -> list[Pending]` and `has_agent_pending(kiosk_id, now=None) -> bool`.
   - `take_by_code(code, now=None) -> Pending | None`. It removes every pending entry of that kiosk id, and is atomic: one `threading.Lock`.
   - `drop_kiosk(kiosk_id)`.
   - `mint_install_code(now=None) -> tuple[str, float]`, which keeps only the hash.
@@ -153,7 +150,8 @@ Each part ends with a **dedicated review step**: superpowers:requesting-code-rev
   - Codes use only `CODE_ALPHABET` and are unique among live entries (seeded `secrets` stub forcing a collision → re-rolled).
   - `normalize_code("k7q-4md") == normalize_code("K7Q4MD")`, and a character outside the alphabet → None.
   - The same hash twice returns the same code.
-  - A fourth pending entry for one id drops the oldest.
+  - A fourth pending entry for one id drops the oldest entry not asked about in 120 s. When all three were asked about lately → `RateLimited` (`test_live_code_is_never_evicted`).
+  - The 201st live entry overall → `RateLimited`.
   - The 21st new entry from one address in 10 minutes raises `RateLimited`, but repeats of an existing entry don't count.
   - An entry expires at 600 s.
   - `take_by_code` is single-winner when two threads race (`test_concurrent_approval_single_winner` at the store level), and it drops the other pending entries for that id.
@@ -171,7 +169,8 @@ Each part ends with a **dedicated review step**: superpowers:requesting-code-rev
 **Interfaces — Consumes:** Task 1 and Task 2; Task 4's `issue_kiosk_cookie` (build Task 4 first if you prefer; the order inside Part A is free). **Produces:** the routes in the design's section 4 table, with these bodies:
 - `PairBody{installCode: str | None, browser: bool = False}`
 - `PairState{state: Literal["paired","pending","none"], code: str | None, expiresAt: str | None}`
-- `ApproveBody{code: str}` → `{id, displayName, pairedAt}`
+- `ApproveBody{code: str}` → `{id, displayName, pairedAt, replaced: bool}`
+- `GET /api/kiosks/pairings` (admin) → `{"pending": [{kioskId, hostname, createdAt, byAgent}]}`, with no code and no hash
 - `InstallCode{code, expiresAt, command}`
 
 `render_install_script(server_url, root=None, pair_code: str | None = None)`.
@@ -179,7 +178,11 @@ Each part ends with a **dedicated review step**: superpowers:requesting-code-rev
 - [ ] **Step 1: failing tests**
   - Agent start: a bearer secret → `pending` with a formatted code; the same again → the same code; the server never creates a registry row (`kiosk_exists` false).
   - `GET .../pair` with that bearer → the code. With another pending secret for the same id → that one's own code. Anonymous → `none`, with no code.
-  - Approve: an admin session posts the code → 200, the hash is stored, and the row is created with the pending hostname. A second approve with the same code → 404 `pairing_code_invalid`. Anonymous → 401 `admin_required`. An admin key → 403 (a session is needed, as for key management).
+  - Approve: an admin session posts the code → 200, the hash is stored, and the row is created with the pending hostname and the household settings adopted (`_adopt_global_settings` called). Approving for an already paired id → 200 `replaced: true`. A second approve with the same code → 404 `pairing_code_invalid`. Anonymous → 401 `admin_required`. An admin key → 403 `session_required`.
+  - Error table from the design's section 14, one test per row: `screen_has_agent`, `setup_required` (no admin password), unpair of an unpaired screen → 200 `changed: false`, unknown id → 404.
+  - `GET /api/kiosks/pairings` lists the live pending entries without code or hash; anonymous → 401.
+  - Removing a screen drops its pending entries.
+  - Pairing routes answer `Cache-Control: no-store`.
   - Six wrong codes in a minute → 429 with `Retry-After`.
   - Approving drops the other pending entries for that id.
   - `test_concurrent_approval_single_winner`: two `asyncio.gather` approvals → one 200, one 404, and one hash.
@@ -211,7 +214,7 @@ Each part ends with a **dedicated review step**: superpowers:requesting-code-rev
 
 **Interfaces — Produces (`route_policy.py`):**
 - `KIOSK_ROUTES: frozenset[tuple[str, str]]` = the two pairs in the design's section 3.
-- `bearer_secret` is unchanged. `enforce_route_policy` treats a bearer with `SECRET_PREFIX` as no bearer, so it never goes to `_authenticate_bearer`.
+- `bearer_secret` is unchanged. `_authenticate_bearer` returns `None` for a bearer with `SECRET_PREFIX`, before the limiter or the store, so both `enforce_route_policy` and the MCP gateway see "no key". An admin cookie next to a kiosk bearer is honoured.
 
 `ApiKeyStore.create` re-rolls a secret that starts with `clv_kiosk_` or `clv_pair_`.
 
@@ -226,7 +229,8 @@ Each part ends with a **dedicated review step**: superpowers:requesting-code-rev
   - A kiosk bearer on `POST /api/calendar/sources` → 401 `admin_required` (anonymous), **not** `invalid_api_key`, and `api_key_limiter` has no failure recorded.
   - A kiosk bearer on a public GET → 200.
   - `is_admin()` is false with a kiosk bearer, and with a kiosk cookie and no admin cookie.
-  - The MCP gateway refuses a kiosk bearer: 401, as for no key.
+  - The MCP gateway refuses a kiosk bearer: 401, as for no key, and `api_key_limiter` records nothing (`test_kiosk_bearer_at_mcp_not_counted`).
+  - A kiosk bearer plus a valid admin cookie on an admin route → 200.
   - `test_kiosk_routes_reference_real_routes`, `test_kiosk_routes_not_host_or_permission`.
   - `ApiKeyStore.create` with `secrets.token_urlsafe` stubbed to return `"kiosk_…"` first re-rolls.
 - [ ] **Step 2:** Run the four files → FAIL. **Step 3:** Implement. **Step 4:** PASS.
@@ -254,6 +258,7 @@ Each part ends with a **dedicated review step**: superpowers:requesting-code-rev
 - `is_gated(paired: bool, mode) -> bool`
 - `can_see_presence(*, admin: bool, principal: str | None, kiosk_id: str, paired: bool, mode) -> bool`: true when the caller is admin, or is that screen, or the screen is not gated
 - `ScreenPowerView.paired: bool`
+- `presenceHidden: true` on any answer or list row whose presence fields were removed
 - The `kioskAuth` object in the config answer
 
 - [ ] **Step 1: failing tests**
@@ -266,7 +271,10 @@ Each part ends with a **dedicated review step**: superpowers:requesting-code-rev
   - `GET .../screen-power` on a gated screen: anonymous → 401 `admin_required`; a `screens.power` limited key → 200; the screen itself → 200.
   - `desiredOn` for a gated, unpaired screen with a hold off and a schedule that says on → true; `paired` is false.
   - `kioskAuth.state` is `"paired"` only for the screen itself. `hasAgent` follows `agent_version`. `browser` is absent for anyone but the screen itself.
-  - The config ETag differs between the anonymous and the paired answer.
+  - The config ETag differs between the anonymous and the paired answer. The config and list answers carry `Cache-Control: private, no-cache` and `Vary: Cookie, Authorization`.
+  - `presenceHidden: true` exactly when something was removed. In the list, a `calvin_kiosk` cookie unlocks only its own row.
+  - The list keeps `lastSeen`, findings, `agentHolds` and `agentPairs` for anonymous callers, and hides `powerHold`, `overrides.screenNow` and `displayCheckActive` on gated rows.
+  - `GET .../screen-power` on a gated screen with a plain read key → 403 `insufficient_scope`. `PUT` on a gated, unpaired screen → 200 with `paired: false`.
   - Setting `kioskPairing` through a kiosk's overrides layer does not change `pairing_mode()`.
 - [ ] **Step 2:** Run → FAIL. **Step 3:** Implement. Project first, then strip, so `project_hold` stays as is. **Step 4:** PASS. **Step 5:** Snapshot and `gen:api`.
 - [ ] **Step 6:** Commit `feat(backend): show presence only to the screen itself once gated (calvin-0xns)`.
@@ -326,6 +334,8 @@ Each part ends with a **dedicated review step**: superpowers:requesting-code-rev
   - `test_restore_keeps_current_pairing`: the row is paired with hash B and the backup holds hash A → B stays.
   - The row is unpaired and the backup holds A → it stays unpaired.
   - An older backup (no `pairing`) → the screens are unpaired, with no error.
+  - An existing row is updated with `_columns=["hostname", "overrides"]` only (spy on `update`).
+  - A `replace` restore of a backup without `kioskPairing` keeps the current `"required"`; a backup with `"optional"` sets it.
   - A malformed `credentialHash` (not 64 hex) → ignored with a warning.
   - The restore summary reports `pairedScreens: N`.
 - [ ] **Step 2-4:** FAIL → implement → PASS.
@@ -351,6 +361,7 @@ Each part ends with a **dedicated review step**: superpowers:requesting-code-rev
 - `AGENT_FEATURES = ("hold", "pair")`
 - `load_or_create_secret(path=CREDENTIAL_FILE) -> str | None`. It writes atomically with mode 0600, and returns None when the directory is not writable (the agent then runs as an old agent would).
 - `rotate_secret(path) -> str | None`
+- `PAIRED_MARKER = os.path.join(RUNTIME_STATE_DIR, "kiosk-paired")`
 - `class Pairing` with `on_config(cfg, now)` and `step(backend_url, opener, now)`. `state` is one of `"unknown"`, `"pairing"`, `"paired"` or `"unsupported"`.
 - `auth_headers() -> dict`: empty while the bearer is suspended.
 - `post_pair(backend_url, secret, install_code=None, opener=None) -> dict | None`
@@ -363,10 +374,12 @@ Each part ends with a **dedicated review step**: superpowers:requesting-code-rev
   - A 401 with `invalid_api_key` on any of them → the bearer is suspended for 3600 s and the request is repeated once without it.
   - Pairing starts only after a config answer with `kioskAuth`.
   - `state == "unpaired"` → `post_pair` at most once per poll. With the install-code file → it is sent once, then the file is removed after `paired` or `install_code_invalid`.
-  - `test_unpaired_answer_rotates_secret_once`: an agent that had seen `paired` gets `unpaired` → `rotate_secret` is called once and pairing restarts. A second `unpaired` → no second rotation until it is paired again.
+  - `test_unpaired_answer_rotates_secret_once`: an agent that had seen `paired` (marker written) gets `unpaired` → `rotate_secret` is called once, the marker is removed, and pairing restarts. A second `unpaired` → no second rotation until it is paired again. A pending agent (no marker) never rotates.
+  - Creating or rotating the secret restarts the browser once (`test_new_secret_restarts_browser_once`). A stopped unit is not restarted.
+  - `409 setup_required` and `409 screen_has_agent` → try again on the next poll, with no rotation.
   - An answer it doesn't understand, or a network error → no change, try again next poll.
   - `test_browser_unpaired_twice_restarts_once_per_cooldown`: `browser: "unpaired"` on two polls in a row while paired → a restart. Two more within 600 s → no restart. `unknown` never restarts.
-  - The restart uses `restart_kiosk_unit` for Chromium and `sudo -n calvin-cog-panel.sh restart` for cog (stubbed runner).
+  - The restart uses `restart_kiosk_unit` for both browsers. `KIOSK_UNITS` gains `calvin-cog.service`, and an inactive unit is skipped (stubbed `kiosk_unit_state`). No `sudo` is called.
   - No log line contains the secret (capture `log`).
 - [ ] **Step 2:** `lane-heavy python3 -m pytest -q deploy/kiosk-agent/test_display_agent.py` → FAIL. **Step 3:** Implement. **Step 4:** PASS.
 - [ ] **Step 5:** Commit `feat(kiosk): display agent pairs with its own secret (calvin-0xns)`.
@@ -374,7 +387,7 @@ Each part ends with a **dedicated review step**: superpowers:requesting-code-rev
 ### Task 10: ⚠ Units, cog helper, installer and bake
 
 **Files:**
-- Modify `deploy/systemd/calvin-kiosk-remote.service`, `deploy/systemd/calvin-cog.service`, `deploy/kiosk-agent/calvin-cog-panel.sh` (verb `restart`), `calvin-kiosk-update.sudoers` (only if the helper's sudoers line does not already allow any verb), `deploy/kiosk-agent/install-kiosk.sh` (`--pair-code`, and the baked `__PAIR_CODE__` placeholder), `scripts/setup-kiosk.sh` (`--pair-code` writes `install-pair-code` 0600 `calvin`; never deletes `/var/lib/calvin/agent`) and `scripts/bake-kiosk-firstrun.sh` (`--pair-code`).
+- Modify `deploy/systemd/calvin-kiosk-remote.service`, `deploy/systemd/calvin-cog.service`, `deploy/kiosk-agent/install-kiosk.sh` (`--pair-code`, and the baked `__PAIR_CODE__` placeholder), `scripts/setup-kiosk.sh` (`--pair-code` writes `install-pair-code` 0600 `calvin`; never deletes `/var/lib/calvin/agent`) and `scripts/bake-kiosk-firstrun.sh` (`--pair-code`).
 - Tests: `scripts/tests/test_kiosk_units.sh`, `test_install_kiosk.sh`, `test_kiosk_id_persists.sh`, `test_bake_kiosk_firstrun_args.sh` and `test_update_kiosk_cog.sh` (new cases).
 
 - [ ] **Step 1: failing tests (bats)**
@@ -383,7 +396,8 @@ Each part ends with a **dedicated review step**: superpowers:requesting-code-rev
   - `setup-kiosk.sh --pair-code clv_pair_…` writes the file with mode 0600 and owner `calvin`. A malformed code → exit non-zero, nothing written.
   - A reinstall keeps an existing `kiosk-credential` byte for byte.
   - `install-kiosk.sh` passes `--pair-code` through. The baked placeholder is replaced only with a valid code.
-  - `calvin-cog-panel.sh restart` restarts `calvin-cog.service` (stubbed `systemctl`). Any other argument after `restart` → usage error.
+  - `setup-kiosk.sh` writes `install-pair-code` only after `bootstrap_kiosk` (order test with stubbed steps).
+  - No sudoers file changes (pin: the installed sudoers fragments are byte-identical to `develop`).
   - The bake script accepts `--pair-code` and refuses a malformed one.
 - [ ] **Step 2:** `cd scripts && lane-heavy bats tests/` → the new cases FAIL. **Step 3:** Implement. **Step 4:** PASS.
 - [ ] **Step 5:** Commit `feat(kiosk): hand the pairing secret to the kiosk browser (calvin-0xns)`.
@@ -394,14 +408,14 @@ Each part ends with a **dedicated review step**: superpowers:requesting-code-rev
 - Modify `backend/app/services/kiosk_bundle.py` (only if a new file joins the bundle; the units and the helper are already in it).
 - Test `tests/unit/test_kiosk_bundle.py`.
 
-- [ ] **Step 1:** A test that the bundle manifest lists `calvin-cog-panel.sh`, `calvin-kiosk-remote.service` and `calvin-cog.service`, with a restart unit for each unit file (pin).
+- [ ] **Step 1:** A test that the bundle manifest lists `calvin-kiosk-remote.service` and `calvin-cog.service` (pin). The agent's one-time browser restart, not the Update, applies the cog unit's new start URL (design section 6).
 - [ ] **Step 2-4:** FAIL or already PASS → implement any gap → PASS.
 - [ ] **Step 5:** Commit if anything changed.
 
 ### Part C review
 
 - [ ] `cd scripts && lane-heavy bats tests/`, the agent tests, and the backend bundle tests.
-- [ ] superpowers:requesting-code-review on the Part C diff. Checklist: Tasks 9 and 10, shell quoting of every value read from a file, the sudoers surface, and Review Focus lines 2 and 3. The review checks that nothing runs `scripts/setup*.sh` or `update-kiosk.sh` for real.
+- [ ] superpowers:requesting-code-review on the Part C diff. Checklist: Tasks 9 and 10, shell quoting of every value read from a file, that no sudo rule changed, and Review Focus lines 2 and 3. The review checks that nothing runs `scripts/setup*.sh` or `update-kiosk.sh` for real.
 - [ ] Open PR 3 as a draft.
 
 ## Part D: UI spec by the design lead (design gate)
@@ -427,7 +441,7 @@ Each part ends with a **dedicated review step**: superpowers:requesting-code-rev
 ### Task 13: ⚠ Fragment hand-off and the pairing card
 
 **Files:**
-- Modify `frontend/src/utils/kioskId.js` and `frontend/src/main.js`.
+- Modify `frontend/src/utils/kioskId.js`, `frontend/src/main.js` and `frontend/public/sw.js`.
 - Create `frontend/src/stores/kioskPairing.js` and the card component that Task 12's spec names.
 - Tests: vitest `frontend/tests/unit/utils/kioskId.pairing.spec.js` (new) and `frontend/tests/unit/stores/kioskPairing.spec.js` (new); Playwright `frontend/tests/e2e/kiosk-pairing.spec.js` (new, chromium project, `E2E_PORT` set).
 
@@ -443,6 +457,8 @@ Each part ends with a **dedicated review step**: superpowers:requesting-code-rev
   - A browser-only screen (`hasAgent: false`, `state: "unpaired"`) calls `POST .../pair {"browser": true}` once. With `hasAgent: true` it never does.
   - With no `?kiosk=`, nothing happens.
   - Against an old server (`browser-session` 401/404), it fails quietly: the dashboard renders and the fragment is still gone.
+  - Browser-only pairing starts only after three config answers in a row, at least 3 minutes apart in total, with `hasAgent: false`. Inside an iframe (`window.top !== window`) nothing happens.
+  - `sw.js` does not cache `/pair`, `/browser-session` or `/pairings` (unit test on `isUncachedApi`).
   - Playwright: open `/?kiosk=kitchen&khost=k#pair=clv_kiosk_<43>` with routes intercepted. Then:
     - no request URL and no `Referer` header contains `clv_kiosk_`;
     - `page.url()` has no `#pair`;
@@ -468,7 +484,8 @@ Each part ends with a **dedicated review step**: superpowers:requesting-code-rev
 - Tests: `frontend/tests/unit/components/ScreensSettings.pairing.spec.js` (new), `frontend/tests/unit/stores/kiosks.spec.js`, and the phone e2e mock (`tests/e2e/phone/fixtures/api-mock.js`) for the new routes.
 
 - [ ] **Step 1: failing tests**
-  - Each state from the design's section 7 renders the spec's copy for: paired, not paired, needs update, and required-and-unpaired.
+  - Each state from the design's section 7 renders the spec's copy for: paired, not paired, needs update, required-and-unpaired, and waiting to be paired (from `GET /api/kiosks/pairings`).
+  - A row with `presenceHidden: true` is never shown as "no hold".
   - The banner counts only screens seen in the last 7 days.
   - Pair a screen posts the normalized code and shows the returned `displayName`. 404 and 429 show the spec's two messages.
   - Unpair asks for confirmation, then calls `DELETE`.
