@@ -1,6 +1,9 @@
 <template>
   <div v-if="!isHidden" class="plugin-field">
-    <label :for="fieldId">{{ label }}</label>
+    <!-- A group (multi-select-scan) can't be named by `for`, so its visible
+         label is a span the chip group points at with aria-labelledby. -->
+    <label v-if="ui?.component !== 'multi-select-scan'" :for="fieldId">{{ label }}</label>
+    <span v-else :id="`${fieldId}-label`" class="field-label">{{ label }}</span>
 
     <!-- Directory input (no browse button - directory browser removed) -->
     <div v-if="ui && ui.component === 'directory'" class="directory-input">
@@ -69,6 +72,7 @@
           variant="secondary"
           :aria-disabled="multiScanning ? 'true' : undefined"
           :aria-busy="multiScanning ? 'true' : undefined"
+          :aria-describedby="hintId"
           @click="runMultiScan"
         >
           {{ multiScanning ? "Scanning…" : "Scan" }}
@@ -79,6 +83,8 @@
         :model-value="selectedIds"
         :options="multiOptions"
         :aria-label="label"
+        :aria-labelledby="`${fieldId}-label`"
+        :aria-describedby="hintId"
         @update:model-value="emitSelectedIds"
       />
       <div class="scan-multi__live" role="status" aria-live="polite">
@@ -145,7 +151,7 @@
     />
 
     <!-- The schema description is the hint line under the field -->
-    <span v-if="descriptionText" class="help-text">{{ descriptionText }}</span>
+    <span v-if="descriptionText" :id="hintId" class="help-text">{{ descriptionText }}</span>
 
     <!-- Extra author help text and links -->
     <span v-if="ui && (ui.help_text || ui.help_link)" class="help-text">
@@ -221,6 +227,8 @@ const isBoolean = computed(
 const fieldId = computed(() =>
   `plugin-field-${props.pluginId}-${props.fieldKey}`.replace(/[^a-zA-Z0-9_-]/g, "-")
 );
+// The hint line's id, so a control can point at it with aria-describedby.
+const hintId = computed(() => (descriptionText.value ? `${fieldId.value}-hint` : undefined));
 
 // `<input type="number">` defaults to step=1, which rejects decimals (e.g.
 // geographic coordinates) as a stepMismatch on form submit. Derive step from
@@ -396,7 +404,8 @@ async function runScan() {
   margin-bottom: 1rem;
 }
 
-.plugin-field label {
+.plugin-field label,
+.plugin-field .field-label {
   display: block;
   margin-bottom: 0.5rem;
   font-size: var(--text-body);

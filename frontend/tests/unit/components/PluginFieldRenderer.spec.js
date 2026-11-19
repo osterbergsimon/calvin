@@ -86,6 +86,26 @@ describe("PluginFieldRenderer multi-select-scan field", () => {
     expect(wrapper.find('[role="group"]').attributes("aria-label")).toBe("Devices");
   });
 
+  it("names the chip group by the visible label and describes it with the hint", () => {
+    const schema = {
+      ...SCHEMA,
+      description: "Choose Scan, then pick the devices to show.",
+    };
+    const wrapper = mountField("id-1", { schema });
+
+    const group = wrapper.find('[role="group"]');
+    const labelId = group.attributes("aria-labelledby");
+    expect(labelId).toBeTruthy();
+    expect(wrapper.find(`[id="${labelId}"]`).text()).toBe("Devices");
+
+    const hintId = group.attributes("aria-describedby");
+    expect(hintId).toBeTruthy();
+    expect(wrapper.find(`[id="${hintId}"]`).text()).toBe(
+      "Choose Scan, then pick the devices to show."
+    );
+    expect(scanButton(wrapper).attributes("aria-describedby")).toBe(hintId);
+  });
+
   it("scan posts the form config and instance id", async () => {
     scanWithConfig.mockResolvedValue({ options: [] });
     const wrapper = mountField("", { instanceId: "inst-1" });
