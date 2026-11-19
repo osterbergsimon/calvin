@@ -1,6 +1,6 @@
 """The screen-power route and the held on/off in the kiosk config (calvin-2ifv)."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -35,6 +35,19 @@ def _limited_key(client: TestClient, name: str = "Homey") -> str:
 
 def _listed(client: TestClient, kiosk_id: str = KIOSK) -> dict:
     return next(k for k in client.get("/api/kiosks").json()["kiosks"] if k["id"] == kiosk_id)
+
+
+def _client_choice(power: str, offset_s: float) -> dict:
+    """A "Screen now" as a phone would stamp it: browser clock, ISO-8601 with ms."""
+    return {"power": power, "setAt": (datetime.now(UTC) + timedelta(seconds=offset_s)).isoformat()}
+
+
+def _assert_restamped_now(stored: dict, sent: dict) -> None:
+    """The choice was kept, and its setAt now carries the server's clock, not the phone's."""
+    assert stored["setAt"] != sent["setAt"]
+    assert stored["setAt"].endswith("Z")
+    stamped = datetime.fromisoformat(stored["setAt"].replace("Z", "+00:00"))
+    assert abs((datetime.now(UTC) - stamped).total_seconds()) < 10
 
 
 @pytest.mark.integration
@@ -238,12 +251,68 @@ def test_a_fresh_screen_now_after_the_change_is_kept(test_client: TestClient):
     _register(test_client)
     test_client.put(URL, json={"power": "on"})
     test_client.put(URL, json={"power": "schedule"})
-    fresh = {"power": "off", "setAt": datetime.now(UTC).isoformat()}
+    fresh = _client_choice("off", offset_s=0)
     response = test_client.put(OVERRIDES_URL, json={"overrides": {"screenNow": fresh}})
     assert response.status_code == 200, response.text
-    assert test_client.get(OVERRIDES_URL).json()["overrides"]["screenNow"] == fresh
+    stored = test_client.get(OVERRIDES_URL).json()["overrides"]["screenNow"]
+    assert stored["power"] == "off"
+    _assert_restamped_now(stored, fresh)
     assert test_client.get(URL).json()["desiredOn"] is False
-    assert test_client.get(f"/api/kiosks/{KIOSK}/config").json()["screenNow"] == fresh
+    assert test_client.get(f"/api/kiosks/{KIOSK}/config").json()["screenNow"] == stored
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("offset_s", [-5, 5])
+def test_put_keeps_a_fresh_choice_when_the_client_clock_is_off(
+    test_client: TestClient, offset_s: int
+):
+    """The page stamps setAt with the browser clock; the server judges with its own.
+
+    Ending a hold writes the tombstone on the server, and the page saves the new
+    choice milliseconds later. A phone a few seconds behind (or ahead) must not
+    have that press silently dropped because its clock disagrees (calvin-ldeu).
+    """
+    _register(test_client)
+    test_client.put(URL, json={"power": "on"})
+    test_client.put(URL, json={"power": "schedule"})
+    choice = _client_choice("off", offset_s=offset_s)
+    response = test_client.put(OVERRIDES_URL, json={"overrides": {"screenNow": choice}})
+    assert response.status_code == 200, response.text
+    stored = response.json()["overrides"]["screenNow"]
+    assert stored["power"] == "off"
+    _assert_restamped_now(stored, choice)
+    assert test_client.get(URL).json()["desiredOn"] is False
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("offset_s", [-5, 5])
+def test_patch_keeps_a_fresh_choice_when_the_client_clock_is_off(
+    test_client: TestClient, offset_s: int
+):
+    """The screen's own partial write (PATCH) gets the same clock tolerance."""
+    _register(test_client)
+    test_client.put(URL, json={"power": "on"})
+    test_client.put(URL, json={"power": "schedule"})
+    choice = _client_choice("off", offset_s=offset_s)
+    response = test_client.patch(OVERRIDES_URL, json={"overrides": {"screenNow": choice}})
+    assert response.status_code == 200, response.text
+    stored = response.json()["overrides"]["screenNow"]
+    assert stored["power"] == "off"
+    _assert_restamped_now(stored, choice)
+    assert test_client.get(URL).json()["desiredOn"] is False
+
+
+@pytest.mark.integration
+def test_a_choice_beyond_the_tolerance_in_the_future_is_not_restamped(test_client: TestClient):
+    """Far ahead is not "fresh now": no re-stamp, and the old rule still applies."""
+    _register(test_client)
+    test_client.put(URL, json={"power": "on"})
+    test_client.put(URL, json={"power": "schedule"})
+    ahead = _client_choice("off", offset_s=3600)
+    response = test_client.put(OVERRIDES_URL, json={"overrides": {"screenNow": ahead}})
+    assert response.status_code == 200, response.text
+    # Strictly newer than the change: kept exactly as sent.
+    assert response.json()["overrides"]["screenNow"] == ahead
 
 
 @pytest.mark.integration
@@ -264,10 +333,10 @@ def test_patch_keeps_a_fresh_screen_now(test_client: TestClient):
     _register(test_client)
     test_client.put(URL, json={"power": "on"})
     test_client.put(URL, json={"power": "schedule"})
-    fresh = {"power": "on", "setAt": datetime.now(UTC).isoformat()}
+    fresh = _client_choice("on", offset_s=0)
     response = test_client.patch(OVERRIDES_URL, json={"overrides": {"screenNow": fresh}})
     assert response.status_code == 200, response.text
-    assert response.json()["overrides"]["screenNow"] == fresh
+    _assert_restamped_now(response.json()["overrides"]["screenNow"], fresh)
 
 
 @pytest.mark.integration
