@@ -5397,3 +5397,104 @@ def test_the_drop_is_written_before_the_blocking_report(tmp_path):
     runner._calibration_fault("read", 19, 19, ["Under-voltage detected!"])
     kinds = [k for k, _ in order]
     assert kinds.index("write") < kinds.index("report")
+
+
+# -- screen-power hold (calvin-2ifv) -----------------------------------------
+# A hold from home automation or Settings stays until it changes: no expiry at
+# a schedule boundary. It wins over "Screen now" and the schedule.
+
+
+def test_held_off_stays_off_across_the_on_boundary():
+    cfg = _cfg(screen_hold={"power": "off", "setAt": "2026-07-11T20:00:00Z"})
+    assert agent.desired_on(cfg, _local(hour=23)) is False
+    # 06:00 is the next "on" boundary; a hold ignores it.
+    assert agent.desired_on(cfg, _local(day=12, hour=6, minute=1)) is False
+    assert agent.desired_on(cfg, _local(day=12, hour=12)) is False
+
+
+def test_held_on_stays_on_during_the_off_window():
+    cfg = _cfg(screenHold={"power": "on", "setAt": "2026-07-11T07:00:00Z"})
+    assert agent.desired_on(cfg, _local(hour=23)) is True
+    assert agent.desired_on(cfg, _local(day=12, hour=3)) is True
+
+
+def test_hold_wins_over_screen_now():
+    cfg = _cfg(
+        screen_hold={"power": "off", "setAt": "2026-07-11T07:00:00Z"},
+        screen_now={"power": "on", "setAt": "2026-07-11T07:00:00Z"},
+    )
+    assert agent.desired_on(cfg, _local(hour=9)) is False
+
+
+def test_hold_without_a_schedule():
+    cfg = _cfg(
+        display_schedule_enabled=False,
+        screen_hold={"power": "off", "setAt": "2026-07-11T07:00:00Z"},
+    )
+    assert agent.desired_on(cfg, _local(hour=9)) is False
+
+
+def test_malformed_hold_falls_through():
+    for bad in ({"power": "dim"}, "off", ["off"], {"setAt": "2026-07-11T07:00:00Z"}):
+        cfg = _cfg(screen_hold=bad)
+        assert agent.screen_hold(cfg) is None
+        assert agent.desired_on(cfg, _local(hour=9)) is True  # the schedule
+    cfg = _cfg(
+        screen_hold={"power": "dim"},
+        screen_now={"power": "off", "setAt": "2026-07-11T06:00:00Z"},
+    )
+    assert agent.desired_on(cfg, _local(hour=9)) is False  # then "Screen now"
+
+
+def test_hold_needs_no_set_at():
+    """A hold never expires, so its setAt is not needed to obey it."""
+    assert agent.screen_hold(_cfg(screen_hold={"power": "off"})) is False
+
+
+def test_old_backend_projection_still_works_for_a_new_agent():
+    """A newer backend also projects the hold as screenNow; a new agent obeys the hold."""
+    cfg = _cfg(
+        screen_hold={"power": "off", "setAt": "2026-07-11T07:00:00Z"},
+        screen_now={"power": "off", "setAt": "2026-07-11T07:00:00Z"},
+    )
+    assert agent.desired_on(cfg, _local(day=12, hour=9)) is False
+
+
+def test_projected_screen_now_alone_is_obeyed_until_the_next_boundary():
+    """What an older agent sees: the hold as screenNow, ending at the next boundary."""
+    cfg = _cfg(screen_now={"power": "off", "setAt": "2026-07-11T07:00:00Z"})
+    assert agent.desired_on(cfg, _local(hour=21)) is False
+    assert agent.desired_on(cfg, _local(day=12, hour=7)) is True
+
+
+def test_config_url_appends_features():
+    url = agent._config_url("http://s:8000", "k1", "pi", kfeat="hold")
+    assert "kfeat=hold" in url
+    assert "kfeat" not in agent._config_url("http://s:8000", "k1", "pi")
+
+
+def test_fetch_config_reports_it_can_hold(monkeypatch):
+    monkeypatch.setenv("CALVIN_KIOSK_ID", "k1")
+    monkeypatch.setenv("CALVIN_KIOSK_HOSTNAME", "pi")
+    monkeypatch.setattr(agent, "running_version", lambda: "v9")
+    monkeypatch.setattr(agent, "touch_ready", lambda: None)
+    monkeypatch.setattr(agent, "wifi_power_save_state", lambda: "off")
+    seen = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            return b"{}"
+
+    def fake_urlopen(url, timeout=None):
+        seen["url"] = url
+        return FakeResponse()
+
+    monkeypatch.setattr(agent.urllib.request, "urlopen", fake_urlopen)
+    agent.fetch_config("http://s:8000")
+    assert "kfeat=hold" in seen["url"]

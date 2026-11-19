@@ -154,7 +154,7 @@
             :icon="item.scope === 'host' ? mdiAlert : null"
             data-test="api-key-scope"
           >
-            {{ scopeChip(item.scope) }}
+            {{ scopeChip(item) }}
           </Tag>
           <Button variant="danger" size="sm" data-test="api-key-revoke" @click="askRevoke(item)">
             Revoke
@@ -195,7 +195,17 @@ import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 
 const HOST_UNAVAILABLE = "Not available: this Calvin doesn't control its machine.";
+// A limited key (calvin-2ifv) is stored as a read key with permissions, so
+// its option maps to scope "read" plus the permission list on submit.
+const PERMISSION_LABELS = { "screens.power": "Turn screens on and off" };
 const scopeOptions = [
+  {
+    value: "screens",
+    label: "Turn screens on and off",
+    description:
+      "Lets home automation switch screens on and off. Beyond that it can only do what anyone on your network can do without a key.",
+    request: { scope: "read", permissions: ["screens.power"] },
+  },
   {
     value: "read",
     label: "Read",
@@ -266,8 +276,16 @@ const keyMeta = item => {
     .filter(Boolean)
     .join(" · ");
 };
-const scopeChip = value =>
-  value === "host" ? "Host control" : (scopeOptions.find(o => o.value === value)?.label ?? value);
+const scopeChip = item => {
+  if (item.limited) {
+    const labels = (item.permissions ?? []).map(p => PERMISSION_LABELS[p]).filter(Boolean);
+    return labels.length ? labels.join(", ") : "Limited";
+  }
+  const value = item.scope;
+  return value === "host"
+    ? "Host control"
+    : (scopeOptions.find(o => o.value === value)?.label ?? value);
+};
 const isDisabled = option => option.value === "host" && hostUnavailable.value;
 const selectScope = option => {
   if (!isDisabled(option)) scope.value = option.value;
@@ -329,7 +347,10 @@ async function submit() {
   creating.value = true;
   createError.value = "";
   try {
-    const data = await store.createKey(trimmed, scope.value);
+    const option = scopeOptions.find(o => o.value === scope.value);
+    const data = option?.request
+      ? await store.createKey(trimmed, option.request.scope, option.request.permissions)
+      : await store.createKey(trimmed, scope.value);
     secret.value = data.secret;
     createdKey.value = data.key;
     copyState.value = "idle";

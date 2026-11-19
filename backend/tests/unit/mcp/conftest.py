@@ -29,9 +29,9 @@ def secrets(key_store):
     }
 
 
-def fake_ctx(scope: str | None):
+def fake_ctx(scope: str | None, **extra: object):
     """What a tool sees: a request whose state holds the authenticated key."""
-    key = None if scope is None else {"id": "k", "name": "k", "scope": scope}
+    key = None if scope is None else {"id": "k", "name": "k", "scope": scope, **extra}
     state = SimpleNamespace(api_key=key)
     return SimpleNamespace(request_context=SimpleNamespace(request=SimpleNamespace(state=state)))
 

@@ -17,7 +17,7 @@ from app.security.admin_auth import (
     cookie_max_age,
     get_admin_store,
 )
-from app.security.api_keys import SCOPE_RANK, get_api_key_store
+from app.security.api_keys import PERMISSIONS, SCOPE_RANK, get_api_key_store, is_limited
 
 UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
@@ -86,6 +86,20 @@ HOST_ROUTES = frozenset(
         ("POST", "/api/system/reboot"),
     }
 )
+
+# What each API key permission opens (calvin-2ifv). Checked for limited keys
+# only, in the bearer branch, before the "needs admin" rule; a permission opens
+# exactly its own (method, path) pairs and nothing else. A test pins the set and
+# keeps every entry a real route, never one in PUBLIC_WRITES or HOST_ROUTES.
+# The GET is public anyway; it is listed to document what the key is for.
+PERMISSION_ROUTES: dict[str, frozenset[tuple[str, str]]] = {
+    "screens.power": frozenset(
+        {
+            ("PUT", "/api/kiosks/{kiosk_id}/screen-power"),
+            ("GET", "/api/kiosks/{kiosk_id}/screen-power"),
+        }
+    ),
+}
 
 # Share-link guest routes (calvin-mwqo). The ``{token}`` in the path is the
 # only credential: the policy resolves it to its link before the handler runs
@@ -194,8 +208,32 @@ def is_admin(request: Request) -> bool:
     """True for an admin session, or for an API key of ``admin`` scope or above."""
     key = request_api_key(request)
     if key is not None:
-        return SCOPE_RANK[key["scope"]] >= SCOPE_RANK["admin"]
+        return key_rank(key) >= SCOPE_RANK["admin"]
     return get_admin_store().verify_cookie(request.cookies.get(COOKIE_NAME))
+
+
+def key_rank(key: dict) -> int:
+    """A key's rank; a limited key counts as ``read`` whatever its file entry says."""
+    if is_limited(key):
+        return SCOPE_RANK["read"]
+    return SCOPE_RANK[key["scope"]]
+
+
+def permission_routes(key: dict) -> frozenset[tuple[str, str]]:
+    """The (method, path) pairs a limited key's permissions open."""
+    if not is_limited(key):
+        return frozenset()
+    opened: set[tuple[str, str]] = set()
+    for name in key.get("permissions") or ():
+        opened |= PERMISSION_ROUTES.get(name, frozenset())
+    return frozenset(opened)
+
+
+def limited_key_message(key: dict) -> str:
+    labels = [PERMISSIONS[name] for name in key.get("permissions") or () if name in PERMISSIONS]
+    if not labels:
+        return "This API key is limited and can't do that."
+    return f"This API key is limited to: {', '.join(labels)}."
 
 
 def admin_error(store_configured: bool) -> HTTPException:
@@ -316,8 +354,10 @@ async def enforce_route_policy(request: Request, response: Response) -> None:
     key = _authenticate_bearer(request)
     if key is not None:
         request.state.api_key = key
-        rank = SCOPE_RANK[key["scope"]]
+        rank = key_rank(key)
         route_id = (method, path)
+        if route_id in permission_routes(key):
+            return
         # A valid key never gets less than an anonymous caller: viewer writes
         # stay open to every scope (host-acting ones still hit
         # ``require_host_control`` in the handler).

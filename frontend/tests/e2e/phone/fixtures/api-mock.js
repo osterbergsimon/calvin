@@ -368,6 +368,10 @@ export async function installApiMock(page, options = {}) {
     // Bodies of PUT/PATCH /api/kiosks/{id}/overrides, so a test can prove the
     // exact keys a screen page or the dashboard toggle sent.
     overridesRequests: [],
+    // Screens held on or off through the screen-power call (calvin-2ifv), and
+    // the PUT bodies, so a test can prove when a hold was ended.
+    screenPowerByKiosk: { ...(options.screenPower || {}) },
+    screenPowerRequests: [],
     // Flip to true to simulate a server that stopped answering every route.
     down: false,
     requests: [],
@@ -701,6 +705,28 @@ export async function installApiMock(page, options = {}) {
         return json(route, { id, overrides: state.overridesByKiosk[id] });
       }
       return json(route, { id, overrides: state.overridesByKiosk[id] || {} });
+    }
+    const screenPower = path.match(/^\/api\/kiosks\/([^/]+)\/screen-power$/);
+    if (screenPower) {
+      const id = decodeURIComponent(screenPower[1]);
+      if (method === "PUT") {
+        const { power } = request.postDataJSON() || {};
+        state.screenPowerRequests.push(power);
+        if (power === "schedule") delete state.screenPowerByKiosk[id];
+        else
+          state.screenPowerByKiosk[id] = { power, setAt: new Date().toISOString(), by: "settings" };
+      }
+      const hold = state.screenPowerByKiosk[id] || null;
+      return json(route, {
+        id,
+        power: hold ? hold.power : "schedule",
+        held: Boolean(hold),
+        setAt: hold?.setAt ?? null,
+        by: hold?.by ?? null,
+        desiredOn: hold ? hold.power === "on" : true,
+        online: true,
+        agentHolds: true,
+      });
     }
     if (/^\/api\/kiosks\/[^/]+\/config$/.test(path)) {
       // The real endpoint returns the household config with the kiosk's

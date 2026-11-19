@@ -196,6 +196,32 @@ Scopes form a ladder, `host` ⊇ `admin` ⊇ `read`:
 | `admin` | Everything a signed-in admin may do, except the host-acting routes below. |
 | `host` | `admin`, plus the host-acting routes that anonymous viewers can't call: `POST /api/system/update`, `/reboot`, `/restart-backend`, `/restart-frontend`, `/reload-ui`, `/display/timeout/configure`. |
 
+### Limited keys
+
+A key can instead be limited to named permissions. Today there is one:
+
+| Permission | Shown as | Opens |
+|---|---|---|
+| `screens.power` | Turn screens on and off | `PUT` and `GET /api/kiosks/{kiosk_id}/screen-power` |
+
+A limited key gets what an anonymous caller gets (public `GET`s and the viewer
+writes) plus exactly the routes its permissions open. It never gets the
+admin-only reads, any other unsafe method, the host-acting routes or the
+[MCP server](../integrations/MCP.md) (`403 insufficient_scope`, "This API key is
+limited to: Turn screens on and off."). Make one with
+`POST /api/auth/keys {"name": "Homey", "scope": "read", "permissions": ["screens.power"]}`
+(any other scope with `permissions`, an empty list or an unknown name is a
+`422`), or pick **Turn screens on and off** in Settings. The key list shows
+`permissions` and `limited` for every key. See
+[Home automation](../integrations/HOME_AUTOMATION.md) for the screen-power call.
+
+A limited key is stored as a `read` key with a `permissions` list in
+`api-keys.json`, and keys without the field behave exactly as before. If you
+roll back to a Calvin release from before limited keys, the file still loads:
+the limited key becomes an ordinary read key that can no longer switch screens,
+and every other key keeps working. A permission name a newer Calvin wrote and
+this one doesn't know is ignored for that key, never removed from the file.
+
 A `host` key does not bypass `CALVIN_HOST_CONTROL`: with it off, host routes
 answer `409 host_control_disabled` for everyone, keys included, and creating a
 `host` key is refused with `403 host_control_disabled`. A key never gets less than an anonymous caller (display power on/off stay open
@@ -215,7 +241,8 @@ Rules:
   The secret (`clv_` + 43 URL-safe characters) is shown only in that response.
   `409` for a duplicate name (case-insensitive), `422` for an unknown scope or a
   name that is empty or over 40 characters. `GET` returns
-  `{"keys": [{id, name, scope, prefix, createdAt, lastUsedAt}]}`, never the secret.
+  `{"keys": [{id, name, scope, prefix, createdAt, lastUsedAt, permissions, limited}]}`,
+  never the secret.
 - Revoking (`DELETE`, `204`) takes effect on the very next request.
 - **Changing the admin password does not revoke keys.** Revoke them one by one.
 - Bearer requests skip the cookie Origin/CSRF check (a header can't be forged

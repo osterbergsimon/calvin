@@ -1166,7 +1166,12 @@ export interface paths {
      *
      *     ``vw``/``vh`` are the kiosk's CSS viewport (``window.innerWidth/innerHeight``,
      *     reported at load and on resize) so the layout editor can preview a screen at
-     *     its real aspect ratio (CLV-36).
+     *     its real aspect ratio (CLV-36). ``kfeat`` is what the display agent
+     *     understands, comma-separated (``hold``: it obeys ``screenHold``).
+     *
+     *     A held screen power (calvin-2ifv) is projected as ``screenHold`` and as
+     *     ``screenNow``, so an agent too old to hold still obeys it until the next
+     *     scheduled change. The stored layer is not changed.
      *
      *     Only a real poll is recorded (registers a new kiosk and bumps last-seen): one
      *     that carries ``khost`` (the kiosk browser) or ``kagent`` (the display agent).
@@ -1358,6 +1363,34 @@ export interface paths {
      *     signed in. Any other key is a 403 for that caller.
      */
     patch: operations["patch_kiosk_overrides_api_kiosks__kiosk_id__overrides_patch"];
+    trace?: never;
+  };
+  "/api/kiosks/{kiosk_id}/screen-power": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Screen Power
+     * @description A screen's power: held on or off, or following its schedule.
+     */
+    get: operations["get_screen_power_api_kiosks__kiosk_id__screen_power_get"];
+    /**
+     * Put Screen Power
+     * @description Hold a screen on or off until changed, or send it back to its schedule.
+     *
+     *     Open to an admin session, an admin key, and a limited key with the
+     *     ``screens.power`` permission (``PERMISSION_ROUTES``). A request that changes
+     *     nothing writes nothing and does not count toward the change limit.
+     */
+    put: operations["put_screen_power_api_kiosks__kiosk_id__screen_power_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   "/api/kiosks/{kiosk_id}/screen-sleep": {
@@ -3053,6 +3086,8 @@ export interface components {
     CreateKeyBody: {
       /** Name */
       name: string;
+      /** Permissions */
+      permissions?: "screens.power"[] | null;
       /**
        * Scope
        * @enum {string}
@@ -3350,6 +3385,36 @@ export interface components {
       instance_id?: string;
     } & {
       [key: string]: unknown;
+    };
+    /** ScreenPowerBody */
+    ScreenPowerBody: {
+      /**
+       * Power
+       * @enum {string}
+       */
+      power: "on" | "off" | "schedule";
+    };
+    /** ScreenPowerView */
+    ScreenPowerView: {
+      /** Agentholds */
+      agentHolds: boolean | null;
+      /** By */
+      by: ("automation" | "settings") | null;
+      /** Desiredon */
+      desiredOn: boolean;
+      /** Held */
+      held: boolean;
+      /** Id */
+      id: string;
+      /** Online */
+      online: boolean;
+      /**
+       * Power
+       * @enum {string}
+       */
+      power: "on" | "off" | "schedule";
+      /** Setat */
+      setAt: string | null;
     };
     /** SealedModeBody */
     SealedModeBody: {
@@ -5172,6 +5237,7 @@ export interface operations {
         kmsg?: string | null;
         kstack?: string | null;
         kwifi?: string | null;
+        kfeat?: string | null;
         vw?: number | null;
         vh?: number | null;
       };
@@ -5563,6 +5629,72 @@ export interface operations {
         };
         content: {
           "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_screen_power_api_kiosks__kiosk_id__screen_power_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ScreenPowerView"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  put_screen_power_api_kiosks__kiosk_id__screen_power_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ScreenPowerBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ScreenPowerView"];
         };
       };
       /** @description Validation Error */

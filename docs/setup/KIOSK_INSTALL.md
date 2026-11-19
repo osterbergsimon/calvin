@@ -510,6 +510,27 @@ server, verifies it, swaps it in, and rolls back if it doesn't come up healthy. 
 [Kiosk agent self-update](KIOSK_PROVISIONING.md#kiosk-agent-self-update). To pick up a new
 Calvin version, update the server container; the kiosk follows when you press Update.
 
+## Screens held on or off by home automation
+
+Home automation (or Settings) can hold a screen on or off with the
+[screen-power call](../integrations/HOME_AUTOMATION.md). A hold stays until it is
+changed, even across the screen's schedule. The display agent learns about it on
+its regular config poll, so a change shows within about a minute.
+
+The agent reports what it understands with `kfeat=hold` on that poll, and the
+server answers with `screenHold`. Both directions stay compatible:
+
+| | Agent from before holds | Agent that holds |
+|---|---|---|
+| **Server from before holds** | as before | sends `kfeat`, which the server ignores; as before |
+| **Server with holds** | obeys the hold as a "Screen now" choice, so it follows the next scheduled change | obeys `screenHold` until it changes |
+
+**Settings › Screens** shows "This screen needs a software update to hold" for a
+screen whose agent can't hold yet. Press **Update** for that screen (see
+[Updating a kiosk later](#updating-a-kiosk-later)). A touch on a screen held off
+behaves as during a scheduled off: depending on the display stack it may wake
+the panel until the next change.
+
 ## Troubleshooting
 
 - **The installer can't reach the server:** check the URL from the Pi with

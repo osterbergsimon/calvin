@@ -131,6 +131,28 @@ def _first_boundary_after(cfg, moment):
     return min(candidates)
 
 
+# What this agent understands, reported on its config poll as ``kfeat`` so the
+# server can tell which screens can hold a screen-power choice (calvin-2ifv).
+AGENT_FEATURES = ("hold",)
+
+
+def screen_hold(cfg):
+    """True/False from a held screen power, or None when there is none.
+
+    Home automation or Settings sets a hold through the server's screen-power
+    route; it stays until it is changed, so unlike "Screen now" it never ends
+    at a schedule boundary. A malformed hold is ignored. A server too old to
+    send ``screenHold`` sends nothing, and the agent behaves as before.
+    """
+    hold = cfg_get(cfg, "screen_hold", "screenHold")
+    if not isinstance(hold, dict):
+        return None
+    power = str(hold.get("power") or "").lower()
+    if power not in ("on", "off"):
+        return None
+    return power == "on"
+
+
 def _screen_now(cfg):
     override = cfg_get(cfg, "screen_now", "screenNow")
     return override if isinstance(override, dict) else None
@@ -177,7 +199,13 @@ def screen_power_override(cfg, now):
 
 
 def desired_on(cfg, now):
-    """Return True if the display should be ON at `now` (a datetime)."""
+    """Return True if the display should be ON at `now` (a datetime).
+
+    A hold wins, then "Screen now" until its boundary, then the schedule.
+    """
+    held = screen_hold(cfg)
+    if held is not None:
+        return held
     override = screen_power_override(cfg, now)
     if override is not None:
         return override
@@ -2515,7 +2543,15 @@ def wifi_power_save_state(
 
 
 def _config_url(
-    backend_url, kiosk_id, host, kagent=None, kstat=None, kmsg=None, kstack=None, kwifi=None
+    backend_url,
+    kiosk_id,
+    host,
+    kagent=None,
+    kstat=None,
+    kmsg=None,
+    kstack=None,
+    kwifi=None,
+    kfeat=None,
 ):
     """Effective-config URL: per-kiosk endpoint when a kiosk id is set, else global."""
     base = backend_url.rstrip("/")
@@ -2533,6 +2569,8 @@ def _config_url(
             params["kstack"] = kstack
         if kwifi:
             params["kwifi"] = kwifi
+        if kfeat:
+            params["kfeat"] = kfeat
         q = urllib.parse.urlencode(params, quote_via=urllib.parse.quote)
         return f"{base}/api/kiosks/{kiosk_id}/config" + (f"?{q}" if q else "")
     return base + "/api/config"
@@ -2554,6 +2592,7 @@ def fetch_config(backend_url, kstat=None, kmsg=None, timeout=HTTP_TIMEOUT):
         # "none" tells the server there is no Wi-Fi (any more): a kiosk moved to
         # Ethernet must not keep showing a stale Wi-Fi state.
         kwifi=wifi_power_save_state() or "none",
+        kfeat=",".join(AGENT_FEATURES),
     )
     with urllib.request.urlopen(url, timeout=timeout) as r:
         cfg = json.load(r)

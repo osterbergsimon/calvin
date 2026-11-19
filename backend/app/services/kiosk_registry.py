@@ -102,6 +102,45 @@ def _normalized_wifi_power_save(value: str | None) -> str | None:
     return state if state in WIFI_POWER_SAVE_STATES else None
 
 
+# Features the display agent can report on its config poll (``kfeat``,
+# calvin-2ifv). "hold": it obeys ``screenHold`` until it changes. An agent poll
+# without the flag stores "" (cannot hold); never polled since reads as unknown.
+HOLD_FEATURE = "hold"
+AGENT_FEATURES: tuple[str, ...] = (HOLD_FEATURE,)
+
+
+def _normalized_agent_features(value: str | None) -> str:
+    """The known features in ``value`` (comma-separated), sorted; "" for none."""
+    if not isinstance(value, str) or len(value) > 255:
+        return ""
+    found = {part.strip().lower() for part in value.split(",")}
+    return ",".join(sorted(found & set(AGENT_FEATURES)))
+
+
+def agent_holds(agent_features: str | None) -> bool | None:
+    """True/False once an agent reported; None when no agent has polled since."""
+    if agent_features is None:
+        return None
+    return HOLD_FEATURE in agent_features.split(",")
+
+
+# A hold is {power, setAt, by}. ``by`` is the kind of writer, never a key name:
+# it reaches the public kiosk list.
+HOLD_POWERS: tuple[str, ...] = ("on", "off")
+HOLD_WRITERS: tuple[str, ...] = ("automation", "settings")
+_SCREEN_NOW_KEYS = ("screenNow", "screen_now")
+
+
+def _valid_hold(raw: object) -> dict | None:
+    """A stored hold in its public shape, or None when absent or malformed."""
+    if not isinstance(raw, dict):
+        return None
+    power, set_at, by = raw.get("power"), raw.get("setAt"), raw.get("by")
+    if power not in HOLD_POWERS or not isinstance(set_at, str) or by not in HOLD_WRITERS:
+        return None
+    return {"power": power, "setAt": set_at, "by": by}
+
+
 # How many addresses are remembered per kiosk, and for how long. A few cover a
 # DHCP change or a Wi-Fi/Ethernet switch; the cap stops one caller filling the
 # column, and the lifetime keeps a stale lease from naming the wrong kiosk. A
@@ -196,7 +235,7 @@ _HEARTBEAT_COLUMNS = [
     "display_stack",
     "wifi_power_save",
     "peer_ips",
-    "overrides",
+    "agent_features",
 ]
 
 
@@ -212,8 +251,13 @@ async def record_kiosk(
     display_stack: str | None = None,
     wifi_power_save: str | None = None,
     peer_ip: str | None = None,
+    agent_features: str | None = None,
 ) -> None:
-    """Upsert a kiosk's registry row. No-op when kiosk_id is empty/None."""
+    """Upsert a kiosk's registry row. No-op when kiosk_id is empty/None.
+
+    ``agent_features`` is stored only on an agent poll (one with
+    ``agent_version``): the kiosk browser's own poll must not erase it.
+    """
     if not kiosk_id:
         return
     if not _KIOSK_ID_RE.fullmatch(kiosk_id):
@@ -227,6 +271,7 @@ async def record_kiosk(
     viewport = _normalized_viewport(viewport)
     display_stack = _normalized_display_stack(display_stack)
     wifi_power_save = _normalized_wifi_power_save(wifi_power_save)
+    features = _normalized_agent_features(agent_features) if agent_version is not None else None
 
     now = utcnow()
     existing = await KioskDB.objects.get_or_none(id=kiosk_id)
@@ -243,6 +288,7 @@ async def record_kiosk(
                 display_stack=display_stack,
                 wifi_power_save=wifi_power_save,
                 peer_ips={peer_ip: _now()} if peer_ip else None,
+                agent_features=features,
             )
             logger.info(f"Registered new kiosk: {kiosk_id!r} (hostname={hostname!r})")
             await _adopt_global_settings()
@@ -259,6 +305,7 @@ async def record_kiosk(
                 return
 
     changed = False
+    clear_flag = False
     if hostname and existing.hostname != hostname:
         existing.hostname = hostname
         changed = True
@@ -285,6 +332,9 @@ async def record_kiosk(
     if wifi_power_save is not None and existing.wifi_power_save != wifi_power_save:
         existing.wifi_power_save = wifi_power_save
         changed = True
+    if features is not None and existing.agent_features != features:
+        existing.agent_features = features
+        changed = True
     # Auto-clear the update flag only once the agent confirms it runs the AVAILABLE
     # (target) version — clearing on any reported version would cancel a just-issued
     # request before the agent ever sees it.
@@ -298,6 +348,7 @@ async def record_kiosk(
         if ov.pop(_UPDATE_FLAG_KEY, None) is not None:
             existing.overrides = ov
             changed = True
+            clear_flag = True
     if (
         not changed
         and existing.last_seen is not None
@@ -307,7 +358,10 @@ async def record_kiosk(
     existing.last_seen = now
     # Never the display-check columns: the kiosk's own poll rewrites its row about
     # every 1.5 s during a check and must not put back a stale copy of the run.
-    await existing.update(_columns=_HEARTBEAT_COLUMNS)
+    # The layer only when the update flag was cleared: otherwise a poll could
+    # put back a screenNow that a hold change just removed (calvin-2ifv).
+    columns = [*_HEARTBEAT_COLUMNS, "overrides"] if clear_flag else _HEARTBEAT_COLUMNS
+    await existing.update(_columns=columns)
 
 
 def _to_utc_iso(dt: datetime | None) -> str | None:
@@ -348,6 +402,8 @@ async def list_kiosks() -> list[dict]:
             "displayCheckActive": bool(
                 (display_check.view_of(row.display_check) or {}).get("active")
             ),
+            "powerHold": _valid_hold(row.power_hold),
+            "agentHolds": agent_holds(row.agent_features),
         }
         for row in rows
     ]
@@ -746,3 +802,104 @@ async def merge_into_overrides(kiosk_id: str, partial: dict) -> dict | None:
         # be overwritten by this snapshot.
         await existing.update(_columns=["overrides"])
     return merged
+
+
+# -- screen power hold (calvin-2ifv) ----------------------------------------
+
+
+async def get_power_hold(kiosk_id: str) -> dict | None:
+    """The screen's hold ``{power, setAt, by}``, or None (none, malformed or unknown)."""
+    if not valid_kiosk_id(kiosk_id):
+        return None
+    row = await KioskDB.objects.get_or_none(id=kiosk_id)
+    return _valid_hold(row.power_hold) if row is not None else None
+
+
+def _without_screen_now(overrides: dict | None) -> dict | None:
+    """The layer minus any ``screenNow``; None when nothing needed removing."""
+    layer = dict(overrides or {})
+    if not any(key in layer for key in _SCREEN_NOW_KEYS):
+        return None
+    for key in _SCREEN_NOW_KEYS:
+        layer.pop(key, None)
+    return layer
+
+
+async def power_status(kiosk_id: str) -> dict | None:
+    """What the screen-power route needs about a known screen, or None.
+
+    ``{"hold", "lastSeen", "agentHolds", "overrides"}``; ``overrides`` is the raw
+    (sanitized) layer.
+    """
+    if not valid_kiosk_id(kiosk_id):
+        return None
+    row = await KioskDB.objects.get_or_none(id=kiosk_id)
+    if row is None:
+        return None
+    return {
+        "hold": _valid_hold(row.power_hold),
+        "lastSeen": as_utc(row.last_seen) if row.last_seen is not None else None,
+        "agentHolds": agent_holds(row.agent_features),
+        "overrides": sanitize_overrides(row.overrides, kiosk_id=kiosk_id),
+    }
+
+
+def without_screen_now(overrides: dict) -> dict:
+    """The layer minus any ``screenNow`` (a hold replaces it, calvin-2ifv)."""
+    return {k: v for k, v in overrides.items() if k not in _SCREEN_NOW_KEYS}
+
+
+@retry_on_db_locked()
+async def set_power_hold(
+    kiosk_id: str, power: str, by: str, now: datetime | None = None
+) -> dict | None:
+    """Hold a known screen on or off until changed; None for an unknown screen.
+
+    Removes any ``screenNow`` from the layer as well, so an old manual choice
+    cannot come back when the hold ends. Only these two columns are written.
+    """
+    if power not in HOLD_POWERS or by not in HOLD_WRITERS:
+        raise ValueError("power must be on/off and by automation/settings")
+    if not valid_kiosk_id(kiosk_id):
+        return None
+    row = await KioskDB.objects.get_or_none(id=kiosk_id)
+    if row is None:
+        return None
+    moment = as_utc(now) if now is not None else utcnow()
+    hold = {
+        "power": power,
+        "setAt": moment.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "by": by,
+    }
+    row.power_hold = hold
+    columns = ["power_hold"]
+    layer = _without_screen_now(row.overrides)
+    if layer is not None:
+        row.overrides = layer
+        columns.append("overrides")
+    await row.update(_columns=columns)
+    return hold
+
+
+@retry_on_db_locked()
+async def clear_power_hold(kiosk_id: str) -> bool | None:
+    """Back to the schedule: clear the hold and any ``screenNow``.
+
+    Returns whether anything changed; None for an unknown screen.
+    """
+    if not valid_kiosk_id(kiosk_id):
+        return None
+    row = await KioskDB.objects.get_or_none(id=kiosk_id)
+    if row is None:
+        return None
+    columns = []
+    if row.power_hold is not None:
+        row.power_hold = None
+        columns.append("power_hold")
+    layer = _without_screen_now(row.overrides)
+    if layer is not None:
+        row.overrides = layer
+        columns.append("overrides")
+    if columns:
+        await row.update(_columns=columns)
+    return bool(columns)

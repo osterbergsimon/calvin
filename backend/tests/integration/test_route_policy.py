@@ -191,3 +191,73 @@ def test_post_scan_logged_out_is_admin_required(test_client):
     )
     assert response.status_code == 401
     assert _error_code(response) == "admin_required"
+
+
+# -- API key permissions (calvin-2ifv) --------------------------------------
+
+
+def test_permission_routes_reference_real_routes():
+    from app.security.route_policy import PERMISSION_ROUTES
+
+    index = _policy_route_index()
+    missing = sorted(
+        entry for routes in PERMISSION_ROUTES.values() for entry in routes if entry not in index
+    )
+    assert missing == []
+
+
+def test_permission_routes_are_never_public_or_host_routes():
+    from app.security.route_policy import HOST_ROUTES, PERMISSION_ROUTES
+
+    for routes in PERMISSION_ROUTES.values():
+        assert not routes & PUBLIC_WRITES
+        assert not routes & HOST_ROUTES
+        assert not routes & GUEST_ROUTES
+
+
+def test_screens_power_opens_exactly_the_screen_power_route():
+    """Pin: widening what the home automation key can do must be a deliberate change."""
+    from app.security.api_keys import PERMISSIONS
+    from app.security.route_policy import PERMISSION_ROUTES
+
+    assert set(PERMISSION_ROUTES) == set(PERMISSIONS) == {"screens.power"}
+    assert PERMISSION_ROUTES["screens.power"] == {
+        ("PUT", "/api/kiosks/{kiosk_id}/screen-power"),
+        ("GET", "/api/kiosks/{kiosk_id}/screen-power"),
+    }
+
+
+def test_screen_power_put_is_not_a_public_write(test_client):
+    assert ("PUT", "/api/kiosks/{kiosk_id}/screen-power") not in PUBLIC_WRITES
+    response = test_client.put("/api/kiosks/kitchen/screen-power", json={"power": "off"})
+    assert response.status_code == 401
+    assert _error_code(response) == "admin_required"
+
+
+def test_limited_key_refused_on_every_other_unsafe_route(test_client):
+    from app.security.route_policy import PERMISSION_ROUTES
+
+    response = test_client.post("/api/auth/login", json={"password": "test-admin-password"})
+    assert response.status_code == 200
+    created = test_client.post(
+        "/api/auth/keys",
+        json={"name": "Homey", "scope": "read", "permissions": ["screens.power"]},
+    )
+    assert created.status_code == 201, created.text
+    headers = {"Authorization": f"Bearer {created.json()['secret']}"}
+    test_client.cookies.clear()
+    opened = PERMISSION_ROUTES["screens.power"]
+    reached: list[tuple[str, str, int]] = []
+    for route in test_client.app.routes:
+        if not isinstance(route, APIRoute):
+            continue
+        for method in sorted(route.methods & UNSAFE_METHODS):
+            route_id = (method, route.path_format)
+            if route_id in PUBLIC_WRITES or route_id in GUEST_ROUTES or route_id in opened:
+                continue
+            response = test_client.request(
+                method, _fill(route.path_format), json={}, headers=headers
+            )
+            if response.status_code != 403 or _error_code(response) != "insufficient_scope":
+                reached.append((*route_id, response.status_code))
+    assert reached == []

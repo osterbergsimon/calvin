@@ -58,6 +58,17 @@ async def test_valid_key_initializes(gateway, secrets):
     assert response.json()["result"]["serverInfo"]["name"] == "Calvin"
 
 
+async def test_limited_key_refused_at_gateway(gateway, key_store):
+    """A limited key gets nothing beyond an anonymous caller, and MCP is more (calvin-2ifv)."""
+    _, secret = key_store.create("Homey", "read", permissions=["screens.power"])
+    async with client_for(gateway, secret) as client:
+        response = await client.post("/api/mcp", json=INIT, headers=HEADERS)
+    assert response.status_code == 403
+    error = response.json()["error"]
+    assert error["code"] == "insufficient_scope"
+    assert "Turn screens on and off" in error["message"]
+
+
 async def test_repeated_bad_keys_are_rate_limited(gateway):
     async with client_for(gateway, "clv_" + "y" * 43) as client:
         codes = [
@@ -119,6 +130,21 @@ async def test_scope_matrix_rejects_above_scope_before_any_work(name, key_scope,
     func = getattr(tools, name)
     with pytest.raises(tools.ToolError, match=f"{needed} scope"):
         await func(ctx=fake_ctx(key_scope), **MINIMAL_ARGS.get(name, {}))
+
+
+async def test_a_hand_edited_limited_key_stays_at_read(monkeypatch):
+    """A limited key counts as read even when its file entry claims host (calvin-2ifv)."""
+
+    def boom(*args, **kwargs):  # any service call before the scope check is a bug
+        raise AssertionError("tool did work before checking scope")
+
+    monkeypatch.setattr("app.utils.host_control.host_control_enabled", boom)
+    monkeypatch.setattr("app.services.display_power_service.display_power_service", boom)
+    with pytest.raises(tools.ToolError, match="host scope"):
+        await tools.display_power(
+            ctx=fake_ctx("host", limited=True, permissions=["screens.power"]),
+            state="off",
+        )
 
 
 @pytest.mark.parametrize("name", sorted(EXPECTED))

@@ -25,9 +25,13 @@ export const useApiKeysStore = defineStore("apiKeys", () => {
     }
   }
 
-  /** POST and return `{ key, secret }`. The list is only updated by `addKey`. */
-  async function createKey(name, scope) {
-    const { data } = await api.post("/auth/keys", { name, scope });
+  /**
+   * POST and return `{ key, secret }`. The list is only updated by `addKey`.
+   * `permissions` makes a limited key (always scope "read", calvin-2ifv).
+   */
+  async function createKey(name, scope, permissions) {
+    const body = permissions ? { name, scope, permissions } : { name, scope };
+    const { data } = await api.post("/auth/keys", body);
     return data;
   }
 

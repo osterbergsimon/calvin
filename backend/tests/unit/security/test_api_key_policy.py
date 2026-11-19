@@ -20,6 +20,8 @@ PASSWORD = "test-admin-password"
 ADMIN_READ_PATH = "/api/backup/files"  # in ADMIN_READS
 HOST_PATH = "/api/system/reboot"  # in HOST_ROUTES only
 DISPLAY_PATH = "/api/system/display/power/on"  # in HOST_ROUTES and PUBLIC_WRITES
+SCREEN_POWER_PATH = "/api/kiosks/{kiosk_id}/screen-power"  # in PERMISSION_ROUTES
+SCREEN_POWER = "/api/kiosks/kitchen/screen-power"
 
 
 @pytest.fixture
@@ -68,6 +70,14 @@ def client(tmp_path, monkeypatch):
 
         if not is_admin(request) and not body.keys() <= CONFIG_DISPLAY_KEYS:
             raise admin_error(True)
+        return {"ok": True}
+
+    @app.put(SCREEN_POWER_PATH)  # stand-in for the screen-power route (calvin-2ifv)
+    async def screen_power_put(kiosk_id: str):
+        return {"ok": True}
+
+    @app.get(SCREEN_POWER_PATH)
+    async def screen_power_get(kiosk_id: str):
         return {"ok": True}
 
     @app.post(HOST_PATH)
@@ -288,7 +298,17 @@ def test_create_list_revoke_contract(client):
     assert body["secret"].startswith("clv_")
     assert body["key"]["name"] == "Home Assistant"
     assert body["key"]["prefix"] == body["secret"][:8]
-    assert set(body["key"]) == {"id", "name", "scope", "prefix", "createdAt", "lastUsedAt"}
+    assert set(body["key"]) == {
+        "id",
+        "name",
+        "scope",
+        "prefix",
+        "createdAt",
+        "lastUsedAt",
+        "permissions",
+        "limited",
+    }
+    assert body["key"]["limited"] is False
 
     listed = client.get("/api/auth/keys")
     assert listed.status_code == 200
@@ -386,3 +406,127 @@ def test_host_routes_are_real_unsafe_or_stream_free_system_routes():
     assert ("POST", "/api/system/reboot") in HOST_ROUTES
     assert ("POST", "/api/system/restart-backend") in HOST_ROUTES
     assert ADMIN_READ_PATH in ADMIN_READS
+
+
+# -- limited keys (calvin-2ifv) ---------------------------------------------
+
+
+def _make_limited_key(client: TestClient, name: str = "Homey") -> str:
+    _session(client)
+    response = client.post(
+        "/api/auth/keys",
+        json={"name": name, "scope": "read", "permissions": ["screens.power"]},
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["key"]["limited"] is True
+    assert response.json()["key"]["permissions"] == ["screens.power"]
+    client.cookies.clear()
+    return response.json()["secret"]
+
+
+LIMITED_MATRIX = [
+    (("GET", "/api/public"), 200),
+    (("GET", ADMIN_READ_PATH), 403),
+    (("GET", "/api/backup/export"), 403),
+    (("POST", "/api/calendar/sources"), 403),
+    (("POST", "/api/images/next"), 200),
+    (("POST", DISPLAY_PATH), 200),  # what an anonymous caller gets
+    (("POST", HOST_PATH), 403),
+    (("PUT", SCREEN_POWER), 200),
+    (("GET", SCREEN_POWER), 200),
+]
+
+
+@pytest.mark.parametrize(("request_line", "expected"), LIMITED_MATRIX)
+def test_limited_key_matrix(client, request_line, expected):
+    secret = _make_limited_key(client)
+    method, path = request_line
+    response = client.request(method, path, headers=_bearer(secret))
+    assert response.status_code == expected, response.text
+    if expected == 403:
+        assert response.json()["detail"]["code"] == "insufficient_scope"
+
+
+def test_screen_power_put_needs_the_permission(client):
+    secret = _make_key(client, "read")
+    response = client.put(SCREEN_POWER, headers=_bearer(secret))
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "insufficient_scope"
+    anonymous = client.put(SCREEN_POWER)
+    assert anonymous.status_code == 401
+    assert anonymous.json()["detail"]["code"] == "admin_required"
+    admin = _make_key_named(client, "admin", "admin-key")
+    assert client.put(SCREEN_POWER, headers=_bearer(admin)).status_code == 200
+    _session(client)
+    assert client.put(SCREEN_POWER).status_code == 200
+
+
+def test_limited_key_never_admin_even_if_the_file_says_so(client):
+    secret = _make_limited_key(client)
+    store = get_api_key_store()
+    import json
+
+    data = json.loads(store.path.read_text())
+    data["keys"][0]["scope"] = "host"  # hand-edited
+    store.path.write_text(json.dumps(data))
+    headers = _bearer(secret)
+    assert client.post("/api/calendar/sources", headers=headers).status_code == 403
+    assert client.get(ADMIN_READ_PATH, headers=headers).status_code == 403
+    assert client.post(HOST_PATH, headers=headers).status_code == 403
+    # is_admin() is false for it: the display-keys-only config write applies.
+    assert client.post("/api/config", json={"gitBranch": "x"}, headers=headers).status_code in (
+        401,
+        403,
+    )
+    assert client.put(SCREEN_POWER, headers=headers).status_code == 200
+
+
+def test_limited_key_cannot_manage_keys(client):
+    secret = _make_limited_key(client)
+    headers = _bearer(secret)
+    assert client.get("/api/auth/keys", headers=headers).status_code == 403
+    created = client.post(
+        "/api/auth/keys",
+        json={"name": "n", "scope": "read", "permissions": ["screens.power"]},
+        headers=headers,
+    )
+    assert created.status_code == 403  # refused by the policy before the session check
+
+
+def test_screen_power_cookie_cross_site_refused(client):
+    _session(client)
+    hostile = {"Origin": "https://evil.example", "Sec-Fetch-Site": "cross-site"}
+    assert client.put(SCREEN_POWER, headers=hostile).status_code == 403
+
+
+def test_screen_power_foreign_host_refused(client):
+    secret = _make_limited_key(client)
+    response = client.put(SCREEN_POWER, headers={**_bearer(secret), "Host": "evil.example.com"})
+    assert response.status_code == 400
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"name": "x", "scope": "admin", "permissions": ["screens.power"]},
+        {"name": "x", "scope": "host", "permissions": ["screens.power"]},
+        {"name": "x", "scope": "read", "permissions": []},
+        {"name": "x", "scope": "read", "permissions": ["photos.upload"]},
+    ],
+)
+def test_create_limited_key_validation(client, body):
+    _session(client)
+    assert client.post("/api/auth/keys", json=body).status_code == 422
+    assert client.get("/api/auth/keys").json() == {"keys": []}
+
+
+def test_limited_key_creation_is_logged_without_the_secret(client):
+    sink: list[str] = []
+    handler = logger.add(lambda message: sink.append(str(message)), level="DEBUG")
+    try:
+        secret = _make_limited_key(client)
+    finally:
+        logger.remove(handler)
+    joined = "\n".join(sink)
+    assert "Homey" in joined and "screens.power" in joined
+    assert secret not in joined

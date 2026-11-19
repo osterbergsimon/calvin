@@ -63,6 +63,8 @@ async def test_list_kiosks_shape(test_db):
         "wifiPowerSave",
         "displayCheck",
         "displayCheckActive",
+        "powerHold",
+        "agentHolds",
     }
     assert isinstance(kiosks[0]["lastSeen"], str)  # ISO-8601
 

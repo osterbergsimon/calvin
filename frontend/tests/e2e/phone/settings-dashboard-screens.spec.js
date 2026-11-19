@@ -200,4 +200,31 @@ test.describe("phone: Screens", () => {
     expect(api.unmatched).toEqual([]);
     expect(consoleErrors).toEqual([]);
   });
+  test("a screen held by home automation goes back to its schedule", async ({
+    page,
+    consoleErrors,
+  }) => {
+    const hold = { power: "off", setAt: "2026-11-18T21:00:00Z", by: "automation" };
+    const api = await installApiMock(page, {
+      kioskExtras: { hallway: { powerHold: hold, agentHolds: true } },
+      screenPower: { hallway: hold },
+    });
+    await gotoSettings(page);
+    await expectSettingsReady(page);
+    await selectCategory(page, "Screens");
+    await page.locator('[data-test="screen-card"]').first().click();
+    await expect(page.locator('[data-test="screens-detail"]')).toBeVisible();
+    await openSection(page, "screen-power");
+
+    await expect(page.locator('[data-test="screen-now-state"]')).toHaveText(
+      "Off, held by home automation"
+    );
+    await page.getByRole("button", { name: "Back to schedule" }).click();
+    await expect.poll(() => api.screenPowerRequests).toEqual(["schedule"]);
+    await expect(page.locator('[data-test="screen-now-state"]')).toHaveText("On now");
+    expect(api.overridesRequests).toEqual([]);
+    expect(api.hostActions).toEqual([]);
+    expect(api.unmatched).toEqual([]);
+    expect(consoleErrors).toEqual([]);
+  });
 });

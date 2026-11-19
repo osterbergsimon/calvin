@@ -192,3 +192,9 @@ class KioskDB(ormar.Model):
     display_check_findings: dict | None = ormar.JSON(
         nullable=True
     )  # what finished runs found, kept across later runs (calvin-29ws)
+    power_hold: dict | None = ormar.JSON(
+        nullable=True
+    )  # held screen power {power, setAt, by}; never in the override layer or backups (calvin-2ifv)
+    agent_features: str | None = ormar.String(
+        max_length=64, nullable=True
+    )  # comma-separated features the display agent reports (kfeat), "" for none (calvin-2ifv)
