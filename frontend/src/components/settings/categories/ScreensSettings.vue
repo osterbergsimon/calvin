@@ -520,14 +520,14 @@
           </template>
           <Button
             data-test="screen-now-on"
-            :disabled="powerBusy || desiredOnNow"
+            :aria-disabled="powerBusy || desiredOnNow ? 'true' : undefined"
             @click="setScreenNow('on')"
           >
             Turn on now
           </Button>
           <Button
             data-test="screen-now-off"
-            :disabled="powerBusy || !desiredOnNow"
+            :aria-disabled="powerBusy || !desiredOnNow ? 'true' : undefined"
             @click="setScreenNow('off')"
           >
             Turn off now
@@ -1413,7 +1413,9 @@ const untilCopy = computed(() => {
 });
 
 async function setScreenNow(power) {
-  if (powerBusy.value) return;
+  // aria-disabled keeps the button in the keyboard order, so the tap still
+  // arrives: do nothing while a pair of calls runs, or when it is already so.
+  if (powerBusy.value || (power === "on") === desiredOnNow.value) return;
   powerBusy.value = true;
   clear(powerMsg);
   try {

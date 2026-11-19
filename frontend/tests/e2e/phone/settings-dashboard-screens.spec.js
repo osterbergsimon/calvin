@@ -177,9 +177,10 @@ test.describe("phone: Screens", () => {
 
     // Either choice can be the one that is available, depending on the wall
     // clock the CI runs at. Pick the enabled one so the test is time-agnostic.
+    // Both stay in the page and the focus order (aria-disabled, not disabled).
     const offButton = page.locator('[data-test="screen-now-off"]');
     const onButton = page.locator('[data-test="screen-now-on"]');
-    const turningOff = await offButton.isEnabled();
+    const turningOff = (await offButton.getAttribute("aria-disabled")) !== "true";
     await (turningOff ? offButton : onButton).click();
     const power = turningOff ? "off" : "on";
     const state = turningOff ? "Off now" : "On now";

@@ -116,12 +116,13 @@ defineProps({
   outline-offset: 2px;
 }
 
-.btn:disabled {
+.btn:disabled,
+.btn[aria-disabled="true"] {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.btn:not(:disabled):hover {
+.btn:not(:disabled):not([aria-disabled="true"]):hover {
   background: color-mix(in srgb, var(--ink) 4%, var(--bg-2));
 }
 
@@ -143,7 +144,7 @@ defineProps({
   border-color: var(--focus);
 }
 
-.btn--primary:not(:disabled):hover {
+.btn--primary:not(:disabled):not([aria-disabled="true"]):hover {
   background: color-mix(in srgb, var(--focus) 88%, var(--ink));
   border-color: color-mix(in srgb, var(--focus) 88%, var(--ink));
 }
@@ -154,7 +155,7 @@ defineProps({
   border-color: transparent;
 }
 
-.btn--ghost:not(:disabled):hover {
+.btn--ghost:not(:disabled):not([aria-disabled="true"]):hover {
   color: var(--ink);
   background: color-mix(in srgb, var(--ink) 4%, transparent);
 }
@@ -165,7 +166,7 @@ defineProps({
   border-color: var(--line);
 }
 
-.btn--danger:not(:disabled):hover {
+.btn--danger:not(:disabled):not([aria-disabled="true"]):hover {
   border-color: var(--err);
 }
 
@@ -181,7 +182,7 @@ defineProps({
   text-underline-offset: 3px;
 }
 
-.btn--link:not(:disabled):hover {
+.btn--link:not(:disabled):not([aria-disabled="true"]):hover {
   color: var(--focus-text);
   background: transparent;
 }

@@ -42,7 +42,7 @@ const kiosk = (over = {}) => ({
   ...over,
 });
 
-function mountScreens({ kiosks = [kiosk()], overrides = {} } = {}) {
+function mountScreens({ kiosks = [kiosk()], overrides = {}, attachTo = undefined } = {}) {
   setActivePinia(createPinia());
   delete window.matchMedia;
   const store = useKiosksStore();
@@ -65,7 +65,7 @@ function mountScreens({ kiosks = [kiosk()], overrides = {} } = {}) {
     if (target) target.powerHold = null;
     return { id, power, held: false, setAt: null, by: null, desiredOn: true };
   });
-  const wrapper = mount(ScreensSettings, { props: { config: config() } });
+  const wrapper = mount(ScreensSettings, { props: { config: config() }, attachTo });
   return { wrapper, store };
 }
 
@@ -86,8 +86,8 @@ describe("ScreensSettings — a held screen", () => {
     );
     expect(wrapper.find("[data-test='screen-now-until']").exists()).toBe(false);
     expect(text(wrapper, "screen-now-follow")).toBe("Back to schedule");
-    expect(wrapper.find("[data-test='screen-now-off']").attributes("disabled")).toBeDefined();
-    expect(wrapper.find("[data-test='screen-now-on']").attributes("disabled")).toBeUndefined();
+    expect(wrapper.find("[data-test='screen-now-off']").attributes("aria-disabled")).toBe("true");
+    expect(wrapper.find("[data-test='screen-now-on']").attributes("aria-disabled")).toBeUndefined();
     expect(wrapper.find("[data-test='screen-now-old-agent']").exists()).toBe(false);
   });
 
@@ -225,7 +225,7 @@ describe("ScreensSettings — a held screen", () => {
     );
   });
 
-  it("disables both buttons while the hold ends and the choice saves", async () => {
+  it("marks both buttons unavailable while the hold ends and the choice saves", async () => {
     const { wrapper, store } = mountScreens({ kiosks: [kiosk({ powerHold: HOLD })] });
     let release;
     store.setScreenPower = vi.fn(
@@ -237,8 +237,8 @@ describe("ScreensSettings — a held screen", () => {
     await open(wrapper);
     await wrapper.find("[data-test='screen-now-on']").trigger("click");
     await flushPromisesNow();
-    expect(wrapper.find("[data-test='screen-now-on']").attributes("disabled")).toBeDefined();
-    expect(wrapper.find("[data-test='screen-now-off']").attributes("disabled")).toBeDefined();
+    expect(wrapper.find("[data-test='screen-now-on']").attributes("aria-disabled")).toBe("true");
+    expect(wrapper.find("[data-test='screen-now-off']").attributes("aria-disabled")).toBe("true");
     // A second tap while the calls run sends nothing.
     await wrapper.find("[data-test='screen-now-on']").trigger("click");
     await flushPromisesNow();
@@ -254,6 +254,36 @@ describe("ScreensSettings — a held screen", () => {
     await flushPromises();
     expect(store.setScreenPower).toHaveBeenCalledTimes(1);
     expect(store.saveOverrides).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps focus on the power button that was pressed", async () => {
+    const { wrapper, store } = mountScreens({ attachTo: document.body });
+    try {
+      await open(wrapper);
+      const offButton = wrapper.find("[data-test='screen-now-off']");
+      offButton.element.focus();
+      expect(document.activeElement).toBe(offButton.element);
+
+      await offButton.trigger("click");
+      await flushPromises();
+
+      expect(store.saveOverrides).toHaveBeenCalledTimes(1);
+      // aria-disabled, not disabled: the button stays in the focus order, so
+      // the person keeps their place when the row redraws.
+      const sameButton = wrapper.find("[data-test='screen-now-off']");
+      expect(document.activeElement).toBe(sameButton.element);
+      expect(sameButton.attributes("aria-disabled")).toBe("true");
+      expect(
+        wrapper.find("[data-test='screen-now-on']").attributes("aria-disabled")
+      ).toBeUndefined();
+
+      // A tap on the unavailable choice sends nothing.
+      await sameButton.trigger("click");
+      await flushPromises();
+      expect(store.saveOverrides).toHaveBeenCalledTimes(1);
+    } finally {
+      wrapper.unmount();
+    }
   });
 
   it("explains a screen whose software is too old to hold", async () => {

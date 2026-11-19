@@ -998,8 +998,10 @@ describe("ScreensSettings — Power", () => {
 
       expect(wrapper.find("[data-test='screen-now-state']").text()).toBe("Off now");
       expect(wrapper.find("[data-test='screen-now-until']").text()).toBe("Off until 22:00");
-      expect(wrapper.find("[data-test='screen-now-off']").attributes("disabled")).toBeDefined();
-      expect(wrapper.find("[data-test='screen-now-on']").attributes("disabled")).toBeUndefined();
+      expect(wrapper.find("[data-test='screen-now-off']").attributes("aria-disabled")).toBe("true");
+      expect(
+        wrapper.find("[data-test='screen-now-on']").attributes("aria-disabled")
+      ).toBeUndefined();
       // One action, one name: a manual choice goes back the same way a hold does.
       expect(wrapper.find("[data-test='screen-now-follow']").text()).toBe("Back to schedule");
 
@@ -1209,7 +1211,9 @@ describe("ScreensSettings — save messages name the real wait", () => {
     // schedule, the schedule rows and the physical orientation all ride it.
     const onButton = wrapper.find("[data-test='screen-now-on']");
     const offButton = wrapper.find("[data-test='screen-now-off']");
-    await (onButton.attributes("disabled") === undefined ? onButton : offButton).trigger("click");
+    await (onButton.attributes("aria-disabled") === undefined ? onButton : offButton).trigger(
+      "click"
+    );
     await flushPromises();
     expect(savedIn(wrapper, "screen-power")).toBe("Saved. This screen updates within a minute.");
 
