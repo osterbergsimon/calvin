@@ -83,7 +83,9 @@ describe("PluginFieldRenderer multi-select-scan field", () => {
     const wrapper = mountField("id-1, id-2,,");
     expect(chips(wrapper).map(c => c.text())).toEqual(["id-1", "id-2"]);
     expect(chips(wrapper).map(c => c.attributes("aria-pressed"))).toEqual(["true", "true"]);
-    expect(wrapper.find('[role="group"]').attributes("aria-label")).toBe("Devices");
+    const group = wrapper.find('[role="group"]');
+    expect(group.attributes("aria-label")).toBeUndefined();
+    expect(wrapper.find(`[id="${group.attributes("aria-labelledby")}"]`).text()).toBe("Devices");
   });
 
   it("names the chip group by the visible label and describes it with the hint", () => {
@@ -182,15 +184,12 @@ describe("PluginFieldRenderer multi-select-scan field", () => {
     expect(wrapper.emitted("update")).toBeUndefined();
   });
 
-  it("a failed scan on mount keeps the saved ids selected", async () => {
+  it("a failed scan on mount keeps the saved ids selected and their plain labels", async () => {
     scanWithConfig.mockRejectedValue(new Error("Network Error"));
     const wrapper = mountField("a,b", { instanceId: "inst-1" });
     await flushPromises();
 
-    expect(chips(wrapper).map(c => c.text())).toEqual([
-      "Not found by the last scan",
-      "Not found by the last scan",
-    ]);
+    expect(chips(wrapper).map(c => c.text())).toEqual(["a", "b"]);
     expect(chips(wrapper).map(c => c.attributes("aria-pressed"))).toEqual(["true", "true"]);
     expect(wrapper.emitted("update")).toBeUndefined();
     expect(wrapper.find(".inline-note").text()).toBe(
@@ -198,12 +197,37 @@ describe("PluginFieldRenderer multi-select-scan field", () => {
     );
   });
 
+  it("an error answer on mount keeps the saved ids' plain labels", async () => {
+    scanWithConfig.mockResolvedValue({ options: [], error: "Couldn't reach the hub." });
+    const wrapper = mountField("a,b", { instanceId: "inst-1" });
+    await flushPromises();
+
+    expect(chips(wrapper).map(c => c.text())).toEqual(["a", "b"]);
+    expect(chips(wrapper).map(c => c.attributes("aria-pressed"))).toEqual(["true", "true"]);
+    expect(wrapper.find(".inline-note").text()).toBe("Couldn't reach the hub.");
+  });
+
+  it("does not scan on mount for a text field, even while editing an instance", () => {
+    for (const fieldKey of ["url", "api_key"]) {
+      mount(PluginFieldRenderer, {
+        props: {
+          pluginId: "mealie",
+          fieldKey,
+          schema: { type: "string", label: fieldKey, ui: { component: "input" } },
+          value: "",
+          instanceId: "inst-1",
+        },
+      });
+    }
+    expect(scanWithConfig).not.toHaveBeenCalled();
+  });
+
   it("does not scan on mount for a new instance", () => {
     mountField("a");
     expect(scanWithConfig).not.toHaveBeenCalled();
   });
 
-  it("scan error shows an InlineNote and keeps the selection", async () => {
+  it("scan error shows an InlineNote and keeps the selection with its plain label", async () => {
     scanWithConfig.mockRejectedValue(new Error("Network Error"));
     const wrapper = mountField("id-1");
     await scanButton(wrapper).trigger("click");
@@ -211,7 +235,7 @@ describe("PluginFieldRenderer multi-select-scan field", () => {
     expect(wrapper.find(".inline-note").text()).toBe(
       "Couldn't scan. Check the settings above, then try again."
     );
-    expect(chips(wrapper).map(c => c.text())).toEqual(["Not found by the last scan"]);
+    expect(chips(wrapper).map(c => c.text())).toEqual(["id-1"]);
     expect(wrapper.emitted("update")).toBeUndefined();
   });
 

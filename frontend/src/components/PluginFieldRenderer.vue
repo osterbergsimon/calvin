@@ -82,7 +82,6 @@
         v-if="multiOptions.length"
         :model-value="selectedIds"
         :options="multiOptions"
-        :aria-label="label"
         :aria-labelledby="`${fieldId}-label`"
         :aria-describedby="hintId"
         @update:model-value="emitSelectedIds"
@@ -307,9 +306,10 @@ const selectedIds = computed(() => {
 const multiScanned = ref([]);
 const multiScanning = ref(false);
 const multiScanNote = ref("");
-// Whether a scan has run. Before the first one, a saved id is all we have to
-// show; afterwards an id the scan did not find is called out by name.
-const multiScanAttempted = ref(false);
+// Whether a scan has succeeded. Before one, a saved id is all we have to show;
+// afterwards an id the scan did not find is called out by name. A failed scan
+// proves nothing, so it leaves the saved ids' own labels alone.
+const multiScanSucceeded = ref(false);
 
 // Scanned options first; saved ids the scan did not find stay listed (and
 // selected) under plain words, so nothing chosen is dropped without the admin
@@ -321,7 +321,7 @@ const multiOptions = computed(() => {
     .filter(id => !known.has(id))
     .map(id => ({
       value: id,
-      label: multiScanAttempted.value ? "Not found by the last scan" : id,
+      label: multiScanSucceeded.value ? "Not found by the last scan" : id,
     }));
   return [...scanned, ...missing];
 });
@@ -343,7 +343,6 @@ let multiNoteStamp = 0;
 async function runMultiScan() {
   if (multiScanning.value) return;
   multiScanning.value = true;
-  multiScanAttempted.value = true;
   setMultiScanNote("");
   try {
     const res = await scanWithConfig(
@@ -354,6 +353,9 @@ async function runMultiScan() {
     );
     const options = Array.isArray(res?.options) ? res.options : [];
     multiScanned.value = options.filter(option => option && option.value != null);
+    // Only a clean answer may relabel saved ids as missing: a thrown request or
+    // an error answer says nothing about the devices that are already saved.
+    if (!res?.error) multiScanSucceeded.value = true;
     if (!multiScanned.value.length) {
       setMultiScanNote(res?.error || "Nothing found to choose from.");
     }
@@ -368,10 +370,11 @@ async function runMultiScan() {
   }
 }
 
-// Editing an existing instance: scan once so saved ids show their names. A
-// failed scan changes nothing, so the saved ids stay selected.
+// Editing an existing instance: the device picker scans once so saved ids show
+// their names. Only that field scans — every other field has nothing to scan.
+// A failed scan changes nothing, so the saved ids stay selected.
 onMounted(() => {
-  if (props.instanceId) runMultiScan();
+  if (props.instanceId && ui.value?.component === "multi-select-scan") runMultiScan();
 });
 
 async function runScan() {
