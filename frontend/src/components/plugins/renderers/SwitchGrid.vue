@@ -183,11 +183,25 @@ function errorCode(error) {
 function failureWords(error) {
   const status = error?.response?.status;
   const code = errorCode(error);
+  // The plugin writes these words for the screen; pass them through (B1).
+  if (code === "plugin_action_failed") {
+    const message = pluginMessage(error);
+    if (message) return message;
+  }
   if (code === "action_busy") return BUSY;
   if (code === "rate_limited" || status === 429) return RATE_LIMITED;
   if (code === "plugin_action_timeout" || status === 504) return TIMED_OUT;
-  if (NOT_USABLE_CODES.has(code) || status === 422) return NOT_USABLE;
+  if (NOT_USABLE_CODES.has(code) || status === 422 || status === 404 || status === 409) {
+    return NOT_USABLE;
+  }
   return props.schema.unreachable_text || "Couldn't reach it.";
+}
+
+// The action route sends the plugin's own message in `detail.message` for both
+// a failed action and a refused one. Only a non-empty string is usable.
+function pluginMessage(error) {
+  const message = error?.response?.data?.detail?.message;
+  return typeof message === "string" && message.trim() ? message : "";
 }
 
 async function tap(item) {
@@ -210,7 +224,7 @@ async function tap(item) {
   } catch (error) {
     if (error?.response?.status === 403 && errorCode(error) === "plugin_action_refused") {
       refused.add(id);
-      setNote(`${item.label}: ${REFUSED}`);
+      setNote(`${item.label}: ${pluginMessage(error) || REFUSED}`);
     } else {
       setNote(`${item.label}: ${failureWords(error)}`);
     }

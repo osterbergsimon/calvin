@@ -37,9 +37,9 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-function httpError(status, code, headers = {}) {
+function httpError(status, code, headers = {}, message = "") {
   const error = new Error(`Request failed with status code ${status}`);
-  error.response = { status, data: { detail: { code, message: "x" } }, headers };
+  error.response = { status, data: { detail: { code, message } }, headers };
   return error;
 }
 
@@ -287,11 +287,38 @@ describe("SwitchGrid", () => {
     expect(note(w).text()).toBe("Lamp A: Couldn't reach Homey");
   });
 
+  it("shows the plugin's own error words for plugin_action_failed", async () => {
+    const error = new Error("Request failed with status code 502");
+    error.response = {
+      status: 502,
+      data: {
+        detail: { code: "plugin_action_failed", message: "Homey refused the API key." },
+      },
+    };
+    const w = mountGrid({ runAction: vi.fn(() => Promise.reject(error)) });
+    await tile(w, "Lamp A").trigger("click");
+    await flushPromises();
+    expect(tile(w, "Lamp A").text()).toContain("Off");
+    expect(note(w).text()).toBe("Lamp A: Homey refused the API key.");
+  });
+
+  it("falls back to the reach note when plugin_action_failed has no message", async () => {
+    const error = new Error("Request failed with status code 502");
+    error.response = {
+      status: 502,
+      data: { detail: { code: "plugin_action_failed", message: "" } },
+    };
+    const w = mountGrid({ runAction: vi.fn(() => Promise.reject(error)) });
+    await tile(w, "Lamp A").trigger("click");
+    await flushPromises();
+    expect(note(w).text()).toBe("Lamp A: Couldn't reach it.");
+  });
+
   // Every code the action route returns maps to plain words (Part 1 contract).
   it.each([
-    [404, "plugin_not_found", "Couldn't reach it."],
-    [409, "plugin_disabled", "Couldn't reach it."],
-    [409, "plugin_stopped", "Couldn't reach it."],
+    [404, "plugin_not_found", "This switch can't be used right now."],
+    [409, "plugin_disabled", "This switch can't be used right now."],
+    [409, "plugin_stopped", "This switch can't be used right now."],
     [404, "unknown_action", "This switch can't be used right now."],
     [422, "invalid_action_params", "This switch can't be used right now."],
     [422, "invalid_action_body", "This switch can't be used right now."],
@@ -311,7 +338,7 @@ describe("SwitchGrid", () => {
   });
 
   it("403 plugin_action_refused shows refusal and turns the tile unavailable", async () => {
-    const runAction = vi.fn(() => Promise.reject(httpError(403, "plugin_action_refused")));
+    const runAction = vi.fn(() => Promise.reject(httpError(403, "plugin_action_refused", {}, "")));
     const w = mountGrid({ runAction });
     await tile(w, "Lamp A").trigger("click");
     await flushPromises();
@@ -329,6 +356,24 @@ describe("SwitchGrid", () => {
     await w.setProps({ data: { items: ITEMS.map(i => ({ ...i })) } });
     expect(tile(w, "Lamp A").attributes("aria-disabled")).toBeUndefined();
     expect(tile(w, "Lamp A").text()).toContain("Off");
+  });
+
+  it("403 plugin_action_refused shows the plugin's own words when it sends one", async () => {
+    const error = new Error("Request failed with status code 403");
+    error.response = {
+      status: 403,
+      data: {
+        detail: { code: "plugin_action_refused", message: "Homey refused the API key." },
+      },
+    };
+    const w = mountGrid({ runAction: vi.fn(() => Promise.reject(error)) });
+    await tile(w, "Lamp A").trigger("click");
+    await flushPromises();
+
+    const a = tile(w, "Lamp A");
+    expect(a.attributes("aria-disabled")).toBe("true");
+    expect(a.text()).toContain("Can't be switched from here");
+    expect(note(w).text()).toBe("Lamp A: Homey refused the API key.");
   });
 
   it("a 403 without the refusal code is a reach failure", async () => {
