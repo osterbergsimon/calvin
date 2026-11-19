@@ -183,11 +183,25 @@ function errorCode(error) {
 function failureWords(error) {
   const status = error?.response?.status;
   const code = errorCode(error);
+  // The plugin writes these words for the screen; pass them through (B1).
+  if (code === "plugin_action_failed") {
+    const message = pluginMessage(error);
+    if (message) return message;
+  }
   if (code === "action_busy") return BUSY;
   if (code === "rate_limited" || status === 429) return RATE_LIMITED;
   if (code === "plugin_action_timeout" || status === 504) return TIMED_OUT;
-  if (NOT_USABLE_CODES.has(code) || status === 422) return NOT_USABLE;
+  if (NOT_USABLE_CODES.has(code) || status === 422 || status === 404 || status === 409) {
+    return NOT_USABLE;
+  }
   return props.schema.unreachable_text || "Couldn't reach it.";
+}
+
+// The action route sends the plugin's own message in `detail.message` for both
+// a failed action and a refused one. Only a non-empty string is usable.
+function pluginMessage(error) {
+  const message = error?.response?.data?.detail?.message;
+  return typeof message === "string" && message.trim() ? message : "";
 }
 
 async function tap(item) {
@@ -210,7 +224,7 @@ async function tap(item) {
   } catch (error) {
     if (error?.response?.status === 403 && errorCode(error) === "plugin_action_refused") {
       refused.add(id);
-      setNote(`${item.label}: ${REFUSED}`);
+      setNote(`${item.label}: ${pluginMessage(error) || REFUSED}`);
     } else {
       setNote(`${item.label}: ${failureWords(error)}`);
     }
@@ -294,12 +308,19 @@ onBeforeUnmount(() => clearTimeout(noteTimer));
 }
 
 .switch-tile--unavailable {
-  opacity: 0.5;
   cursor: not-allowed;
 }
 
 .switch-tile--unavailable:hover {
   background: var(--bg-2);
+}
+
+/* "Not responding" is a status people read from across the room, not a
+   disabled control: no opacity (it took the words to 2.1:1). --ink-3 gives
+   5.2:1 light and 4.5:1 Backlit. */
+.switch-tile--unavailable .switch-tile__label,
+.switch-tile--unavailable .switch-tile__state {
+  color: var(--ink-3);
 }
 
 .switch-tile__top {
@@ -349,5 +370,18 @@ onBeforeUnmount(() => clearTimeout(noteTimer));
 
 .switch-tile--unavailable .switch-tile__lamp {
   border-style: dotted;
+}
+
+/* Windows High Contrast flattens the on background and lamp fill; a thicker
+   border and a CanvasText lamp keep "on" visible next to "off". The words
+   already carry the state. */
+@media (forced-colors: active) {
+  .switch-tile--on {
+    border-width: 3px;
+  }
+
+  .switch-tile--on .switch-tile__lamp {
+    background: CanvasText;
+  }
 }
 </style>

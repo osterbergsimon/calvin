@@ -1,6 +1,9 @@
 <template>
   <div v-if="!isHidden" class="plugin-field">
-    <label :for="fieldId">{{ label }}</label>
+    <!-- A group (multi-select-scan) can't be named by `for`, so its visible
+         label is a span the chip group points at with aria-labelledby. -->
+    <label v-if="ui?.component !== 'multi-select-scan'" :for="fieldId">{{ label }}</label>
+    <span v-else :id="`${fieldId}-label`" class="field-label">{{ label }}</span>
 
     <!-- Directory input (no browse button - directory browser removed) -->
     <div v-if="ui && ui.component === 'directory'" class="directory-input">
@@ -69,6 +72,7 @@
           variant="secondary"
           :aria-disabled="multiScanning ? 'true' : undefined"
           :aria-busy="multiScanning ? 'true' : undefined"
+          :aria-describedby="hintId"
           @click="runMultiScan"
         >
           {{ multiScanning ? "Scanning…" : "Scan" }}
@@ -78,7 +82,8 @@
         v-if="multiOptions.length"
         :model-value="selectedIds"
         :options="multiOptions"
-        :aria-label="label"
+        :aria-labelledby="`${fieldId}-label`"
+        :aria-describedby="hintId"
         @update:model-value="emitSelectedIds"
       />
       <div class="scan-multi__live" role="status" aria-live="polite">
@@ -145,7 +150,7 @@
     />
 
     <!-- The schema description is the hint line under the field -->
-    <span v-if="descriptionText" class="help-text">{{ descriptionText }}</span>
+    <span v-if="descriptionText" :id="hintId" class="help-text">{{ descriptionText }}</span>
 
     <!-- Extra author help text and links -->
     <span v-if="ui && (ui.help_text || ui.help_link)" class="help-text">
@@ -163,7 +168,7 @@
 
 <script setup>
 import ExternalLink from "@/components/ui/ExternalLink.vue";
-import { computed, nextTick, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import axios from "axios";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import Button from "@/components/ui/Button.vue";
@@ -221,6 +226,8 @@ const isBoolean = computed(
 const fieldId = computed(() =>
   `plugin-field-${props.pluginId}-${props.fieldKey}`.replace(/[^a-zA-Z0-9_-]/g, "-")
 );
+// The hint line's id, so a control can point at it with aria-describedby.
+const hintId = computed(() => (descriptionText.value ? `${fieldId.value}-hint` : undefined));
 
 // `<input type="number">` defaults to step=1, which rejects decimals (e.g.
 // geographic coordinates) as a stepMismatch on form submit. Derive step from
@@ -299,15 +306,23 @@ const selectedIds = computed(() => {
 const multiScanned = ref([]);
 const multiScanning = ref(false);
 const multiScanNote = ref("");
+// Whether a scan has succeeded. Before one, a saved id is all we have to show;
+// afterwards an id the scan did not find is called out by name. A failed scan
+// proves nothing, so it leaves the saved ids' own labels alone.
+const multiScanSucceeded = ref(false);
 
-// Scanned options first; saved ids the scan did not find stay listed under
-// their id, so nothing chosen is dropped without the admin seeing it.
+// Scanned options first; saved ids the scan did not find stay listed (and
+// selected) under plain words, so nothing chosen is dropped without the admin
+// seeing it.
 const multiOptions = computed(() => {
   const scanned = multiScanned.value.map(toOption);
   const known = new Set(scanned.map(option => option.value));
   const missing = selectedIds.value
     .filter(id => !known.has(id))
-    .map(id => ({ value: id, label: id }));
+    .map(id => ({
+      value: id,
+      label: multiScanSucceeded.value ? "Not found by the last scan" : id,
+    }));
   return [...scanned, ...missing];
 });
 
@@ -338,19 +353,29 @@ async function runMultiScan() {
     );
     const options = Array.isArray(res?.options) ? res.options : [];
     multiScanned.value = options.filter(option => option && option.value != null);
+    // Only a clean answer may relabel saved ids as missing: a thrown request or
+    // an error answer says nothing about the devices that are already saved.
+    if (!res?.error) multiScanSucceeded.value = true;
     if (!multiScanned.value.length) {
       setMultiScanNote(res?.error || "Nothing found to choose from.");
     }
   } catch (err) {
     setMultiScanNote(
       err?.response?.status === 400
-        ? "Type the key again before scanning: the saved one isn't reused here."
+        ? "You changed the address, so type the key again before scanning."
         : "Couldn't scan. Check the settings above, then try again."
     );
   } finally {
     multiScanning.value = false;
   }
 }
+
+// Editing an existing instance: the device picker scans once so saved ids show
+// their names. Only that field scans — every other field has nothing to scan.
+// A failed scan changes nothing, so the saved ids stay selected.
+onMounted(() => {
+  if (props.instanceId && ui.value?.component === "multi-select-scan") runMultiScan();
+});
 
 async function runScan() {
   scanning.value = true;
@@ -382,7 +407,8 @@ async function runScan() {
   margin-bottom: 1rem;
 }
 
-.plugin-field label {
+.plugin-field label,
+.plugin-field .field-label {
   display: block;
   margin-bottom: 0.5rem;
   font-size: var(--text-body);

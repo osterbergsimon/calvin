@@ -70,7 +70,7 @@ describe("PluginFieldRenderer multi-select-scan field", () => {
         schema: SCHEMA,
         value,
         formConfig: FORM,
-        instanceId: "inst-1",
+        instanceId: undefined,
         ...extra,
       },
     });
@@ -83,12 +83,35 @@ describe("PluginFieldRenderer multi-select-scan field", () => {
     const wrapper = mountField("id-1, id-2,,");
     expect(chips(wrapper).map(c => c.text())).toEqual(["id-1", "id-2"]);
     expect(chips(wrapper).map(c => c.attributes("aria-pressed"))).toEqual(["true", "true"]);
-    expect(wrapper.find('[role="group"]').attributes("aria-label")).toBe("Devices");
+    const group = wrapper.find('[role="group"]');
+    expect(group.attributes("aria-label")).toBeUndefined();
+    expect(wrapper.find(`[id="${group.attributes("aria-labelledby")}"]`).text()).toBe("Devices");
+  });
+
+  it("names the chip group by the visible label and describes it with the hint", () => {
+    const schema = {
+      ...SCHEMA,
+      description: "Choose Scan, then pick the devices to show.",
+    };
+    const wrapper = mountField("id-1", { schema });
+
+    const group = wrapper.find('[role="group"]');
+    const labelId = group.attributes("aria-labelledby");
+    expect(labelId).toBeTruthy();
+    expect(wrapper.find(`[id="${labelId}"]`).text()).toBe("Devices");
+
+    const hintId = group.attributes("aria-describedby");
+    expect(hintId).toBeTruthy();
+    expect(wrapper.find(`[id="${hintId}"]`).text()).toBe(
+      "Choose Scan, then pick the devices to show."
+    );
+    expect(scanButton(wrapper).attributes("aria-describedby")).toBe(hintId);
   });
 
   it("scan posts the form config and instance id", async () => {
     scanWithConfig.mockResolvedValue({ options: [] });
-    const wrapper = mountField();
+    const wrapper = mountField("", { instanceId: "inst-1" });
+    await flushPromises();
     await scanButton(wrapper).trigger("click");
     expect(scanWithConfig).toHaveBeenCalledWith("homey", "devices", FORM, "inst-1");
   });
@@ -134,16 +157,77 @@ describe("PluginFieldRenderer multi-select-scan field", () => {
     expect(lastEmit(wrapper)).toBe("b");
   });
 
-  it("keeps saved ids a scan did not find, labelled with the id", async () => {
+  it("keeps saved ids a scan did not find, labelled as not found by the last scan", async () => {
     scanWithConfig.mockResolvedValue({ options: [{ value: "a", label: "Lamp A" }] });
     const wrapper = mountField("gone-1,a");
     await scanButton(wrapper).trigger("click");
     await flushPromises();
-    expect(chips(wrapper).map(c => c.text())).toEqual(["Lamp A", "gone-1"]);
+    expect(chips(wrapper).map(c => c.text())).toEqual(["Lamp A", "Not found by the last scan"]);
     expect(chips(wrapper).map(c => c.attributes("aria-pressed"))).toEqual(["true", "true"]);
   });
 
-  it("scan error shows an InlineNote and keeps the selection", async () => {
+  it("editing an existing instance scans once on mount and shows saved device names", async () => {
+    scanWithConfig.mockResolvedValue({
+      options: [{ value: "a", label: "Lamp A (Kitchen)" }],
+    });
+    const wrapper = mountField("a,gone-1", { instanceId: "inst-1" });
+    await flushPromises();
+
+    expect(scanWithConfig).toHaveBeenCalledTimes(1);
+    expect(scanWithConfig).toHaveBeenCalledWith("homey", "devices", FORM, "inst-1");
+    expect(chips(wrapper).map(c => c.text())).toEqual([
+      "Lamp A (Kitchen)",
+      "Not found by the last scan",
+    ]);
+    expect(chips(wrapper).map(c => c.attributes("aria-pressed"))).toEqual(["true", "true"]);
+    // Nothing is dropped or re-emitted just because the scan settled.
+    expect(wrapper.emitted("update")).toBeUndefined();
+  });
+
+  it("a failed scan on mount keeps the saved ids selected and their plain labels", async () => {
+    scanWithConfig.mockRejectedValue(new Error("Network Error"));
+    const wrapper = mountField("a,b", { instanceId: "inst-1" });
+    await flushPromises();
+
+    expect(chips(wrapper).map(c => c.text())).toEqual(["a", "b"]);
+    expect(chips(wrapper).map(c => c.attributes("aria-pressed"))).toEqual(["true", "true"]);
+    expect(wrapper.emitted("update")).toBeUndefined();
+    expect(wrapper.find(".inline-note").text()).toBe(
+      "Couldn't scan. Check the settings above, then try again."
+    );
+  });
+
+  it("an error answer on mount keeps the saved ids' plain labels", async () => {
+    scanWithConfig.mockResolvedValue({ options: [], error: "Couldn't reach the hub." });
+    const wrapper = mountField("a,b", { instanceId: "inst-1" });
+    await flushPromises();
+
+    expect(chips(wrapper).map(c => c.text())).toEqual(["a", "b"]);
+    expect(chips(wrapper).map(c => c.attributes("aria-pressed"))).toEqual(["true", "true"]);
+    expect(wrapper.find(".inline-note").text()).toBe("Couldn't reach the hub.");
+  });
+
+  it("does not scan on mount for a text field, even while editing an instance", () => {
+    for (const fieldKey of ["url", "api_key"]) {
+      mount(PluginFieldRenderer, {
+        props: {
+          pluginId: "mealie",
+          fieldKey,
+          schema: { type: "string", label: fieldKey, ui: { component: "input" } },
+          value: "",
+          instanceId: "inst-1",
+        },
+      });
+    }
+    expect(scanWithConfig).not.toHaveBeenCalled();
+  });
+
+  it("does not scan on mount for a new instance", () => {
+    mountField("a");
+    expect(scanWithConfig).not.toHaveBeenCalled();
+  });
+
+  it("scan error shows an InlineNote and keeps the selection with its plain label", async () => {
     scanWithConfig.mockRejectedValue(new Error("Network Error"));
     const wrapper = mountField("id-1");
     await scanButton(wrapper).trigger("click");
@@ -177,7 +261,7 @@ describe("PluginFieldRenderer multi-select-scan field", () => {
     await scanButton(wrapper).trigger("click");
     await flushPromises();
     expect(wrapper.find(".inline-note").text()).toBe(
-      "Type the key again before scanning: the saved one isn't reused here."
+      "You changed the address, so type the key again before scanning."
     );
   });
 
