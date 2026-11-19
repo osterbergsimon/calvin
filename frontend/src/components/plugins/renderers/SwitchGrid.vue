@@ -21,13 +21,15 @@
           :aria-pressed="pressed(item)"
           :aria-busy="pending.has(item.id) ? 'true' : undefined"
           :aria-disabled="inert(item) ? 'true' : undefined"
+          :aria-labelledby="labelId(item)"
+          :aria-describedby="describedBy(item)"
           @click="tap(item)"
         >
           <span class="switch-tile__top">
-            <span class="switch-tile__label">{{ item.label }}</span>
+            <span :id="labelId(item)" class="switch-tile__label">{{ item.label }}</span>
             <span class="switch-tile__lamp" aria-hidden="true" />
           </span>
-          <span class="switch-tile__state">{{ stateWords(item) }}</span>
+          <span :id="stateId(item)" class="switch-tile__state">{{ stateWords(item) }}</span>
         </button>
       </div>
     </section>
@@ -47,7 +49,7 @@
 // before and says why in one polite live region. Pending and unavailable tiles
 // are aria-disabled, never `disabled`, so a focused tile keeps focus when its
 // state flips (doctrine §5, focus never lost).
-import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, reactive, ref, useId, watch } from "vue";
 import { resolvePath } from "../../../utils/jsonPath";
 import EmptyState from "../../ui/EmptyState.vue";
 import InlineNote from "../../ui/InlineNote.vue";
@@ -158,6 +160,20 @@ function stateWords(item) {
   if (pending.has(item.id)) return PENDING_WORDS[pending.get(item.id)];
   if (refused.has(item.id)) return REFUSED;
   return WORDS[shown(item)];
+}
+
+// Per-tile ids for `aria-labelledby`/`aria-describedby`. `useId` keeps two
+// grids on one page apart; a module counter would not.
+const instanceId = useId();
+const labelId = item => `sw-${instanceId}-${item.id}-label`;
+const stateId = item => `sw-${instanceId}-${item.id}-state`;
+
+// The name is the label alone; plain on/off already comes from aria-pressed.
+// Anything else (pending, not responding, refused) has no aria-pressed, so it
+// is attached as a description and still heard.
+function describedBy(item) {
+  const words = stateWords(item);
+  return words === WORDS.on || words === WORDS.off ? undefined : stateId(item);
 }
 
 // The same words twice in a row (two 429s) must be announced twice: clear the
@@ -308,12 +324,19 @@ onBeforeUnmount(() => clearTimeout(noteTimer));
 }
 
 .switch-tile--unavailable {
-  opacity: 0.5;
   cursor: not-allowed;
 }
 
 .switch-tile--unavailable:hover {
   background: var(--bg-2);
+}
+
+/* "Not responding" is a status people read from across the room, not a
+   disabled control: no opacity (it took the words to 2.1:1). --ink-3 gives
+   5.2:1 light and 4.5:1 Backlit. */
+.switch-tile--unavailable .switch-tile__label,
+.switch-tile--unavailable .switch-tile__state {
+  color: var(--ink-3);
 }
 
 .switch-tile__top {
@@ -363,5 +386,18 @@ onBeforeUnmount(() => clearTimeout(noteTimer));
 
 .switch-tile--unavailable .switch-tile__lamp {
   border-style: dotted;
+}
+
+/* Windows High Contrast flattens the on background and lamp fill; a thicker
+   border and a CanvasText lamp keep "on" visible next to "off". The words
+   already carry the state. */
+@media (forced-colors: active) {
+  .switch-tile--on {
+    border-width: 3px;
+  }
+
+  .switch-tile--on .switch-tile__lamp {
+    background: CanvasText;
+  }
 }
 </style>

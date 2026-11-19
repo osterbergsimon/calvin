@@ -6,8 +6,17 @@
  * action answers. Every error the action route can return maps to plain words.
  */
 import { describe, it, expect, afterEach, vi } from "vitest";
+import { h } from "vue";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { mount, flushPromises } from "@vue/test-utils";
 import SwitchGrid from "@/components/plugins/renderers/SwitchGrid.vue";
+
+const SOURCE = readFileSync(
+  resolve(__dirname, "../../../../src/components/plugins/renderers/SwitchGrid.vue"),
+  "utf-8"
+);
+const STYLE = SOURCE.slice(SOURCE.indexOf("<style"), SOURCE.indexOf("</style>"));
 
 const ITEMS = [
   {
@@ -85,6 +94,53 @@ describe("SwitchGrid", () => {
     expect(c.text()).toContain("Not responding");
     // Never the disabled attribute: a focused tile keeps focus when it flips.
     expect(c.attributes("disabled")).toBeUndefined();
+  });
+
+  it("names a tile by its label only, so the state is not read twice", () => {
+    const w = mountGrid();
+    const a = tile(w, "Lamp A");
+    const labelId = a.attributes("aria-labelledby");
+    expect(labelId).toBeTruthy();
+    expect(w.find(`[id="${labelId}"]`).text()).toBe("Lamp A");
+    // Plain on/off is already in aria-pressed, so it is not described again.
+    expect(a.attributes("aria-describedby")).toBeUndefined();
+    expect(tile(w, "Lamp B").attributes("aria-describedby")).toBeUndefined();
+  });
+
+  it("describes a state aria-pressed cannot carry", async () => {
+    const pending = deferred();
+    const w = mountGrid({ runAction: vi.fn(() => pending.promise) });
+    await tile(w, "Lamp A").trigger("click");
+    let a = tile(w, "Lamp A");
+    let stateId = a.attributes("aria-describedby");
+    expect(w.find(`[id="${stateId}"]`).text()).toBe("Turning on…");
+
+    const c = tile(w, "Plug C");
+    expect(w.find(`[id="${c.attributes("aria-describedby")}"]`).text()).toBe("Not responding");
+
+    pending.reject(httpError(403, "plugin_action_refused", {}, ""));
+    await flushPromises();
+    a = tile(w, "Lamp A");
+    expect(w.find(`[id="${a.attributes("aria-describedby")}"]`).text()).toBe(
+      "Can't be switched from here"
+    );
+  });
+
+  it("gives two grids on one page different tile ids", () => {
+    const Pair = {
+      render() {
+        return h("div", [
+          h(SwitchGrid, { schema: { kind: "switch-grid" }, data: { items: ITEMS } }),
+          h(SwitchGrid, { schema: { kind: "switch-grid" }, data: { items: ITEMS } }),
+        ]);
+      },
+    };
+    const w = mount(Pair);
+    wrapper = w;
+    const buttons = w.findAll("button.switch-tile");
+    expect(buttons[0].attributes("aria-labelledby")).not.toBe(
+      buttons[3].attributes("aria-labelledby")
+    );
   });
 
   it("groups tiles under their group heading in first-seen order", () => {
@@ -452,5 +508,24 @@ describe("SwitchGrid", () => {
   it("drops items without an id or label", () => {
     const w = mountGrid({ items: [{ state: "on" }, null, "x", ITEMS[0]] });
     expect(w.findAll("button.switch-tile")).toHaveLength(1);
+  });
+
+  it("keeps the not-responding words at full strength, not dimmed", () => {
+    expect(STYLE).not.toMatch(/\.switch-tile--unavailable\s*\{[^}]*opacity/s);
+    expect(STYLE).toMatch(/\.switch-tile--unavailable\s*\{[^}]*cursor:\s*not-allowed/s);
+    expect(STYLE).toMatch(
+      /\.switch-tile--unavailable\s+\.switch-tile__label\s*,\s*\.switch-tile--unavailable\s+\.switch-tile__state\s*\{[^}]*color:\s*var\(--ink-3\)/s
+    );
+    expect(STYLE).toMatch(
+      /\.switch-tile--unavailable\s+\.switch-tile__lamp\s*\{[^}]*border-style:\s*dotted/s
+    );
+  });
+
+  it("keeps on/off legible in forced-colours mode", () => {
+    expect(STYLE).toMatch(/@media\s*\(forced-colors:\s*active\)\s*\{/);
+    expect(STYLE).toMatch(/\.switch-tile--on\s*\{[^}]*border-width:\s*3px/s);
+    expect(STYLE).toMatch(
+      /\.switch-tile--on\s+\.switch-tile__lamp\s*\{[^}]*background:\s*CanvasText/s
+    );
   });
 });
