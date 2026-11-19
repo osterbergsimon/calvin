@@ -2605,7 +2605,7 @@ def _ramp_cfg(**over):
     return base
 
 
-def _controller(ddc=None, fault=None, clock=None):
+def _controller(ddc=None, fault=None, clock=None, log_fn=None):
     clock = clock or FakeClock()
     applied = []
     controller = agent.BrightnessController(
@@ -2616,6 +2616,7 @@ def _controller(ddc=None, fault=None, clock=None):
         applier=lambda on: applied.append(on) or "cog",
         connected=lambda: True,
         cog=lambda: True,
+        log_fn=log_fn,
     )
     return controller, clock, applied
 
@@ -5465,6 +5466,120 @@ def test_projected_screen_now_alone_is_obeyed_until_the_next_boundary():
     cfg = _cfg(screen_now={"power": "off", "setAt": "2026-07-11T07:00:00Z"})
     assert agent.desired_on(cfg, _local(hour=21)) is False
     assert agent.desired_on(cfg, _local(day=12, hour=7)) is True
+
+
+# calvin-dcfs: a touch can wake a held-off panel without the agent seeing it
+# (X11 input undoes a forced DPMS off). The agent re-asserts the hold after the
+# screen's idle time, so the panel sleeps again instead of staying lit.
+def test_held_off_sleeps_again_after_its_idle_time():
+    controller, clock, applied = _controller()
+    cfg = _cfg(
+        screen_hold={"power": "off"},
+        display_timeout_enabled=True,
+        display_timeout=300,
+    )
+    # 23:00, the panel is on; the hold turns it off.
+    assert controller.reconcile(cfg, _local(hour=23), True) is False
+    assert applied == [False]
+
+    # A touch wakes the panel (the agent cannot see that). Within the screen's
+    # idle time the panel is left alone, so the touch is usable.
+    assert controller.reconcile(cfg, _local(hour=23, minute=4), False) is False
+    assert applied == [False]
+
+    # The idle time has passed: the hold puts it back to sleep.
+    assert controller.reconcile(cfg, _local(hour=23, minute=5), False) is False
+    assert applied == [False, False]
+    assert controller.panel_off is True
+
+
+def test_held_off_with_no_touch_never_applies_on():
+    controller, clock, applied = _controller()
+    cfg = _cfg(
+        screen_hold={"power": "off"},
+        display_timeout_enabled=True,
+        display_timeout=300,
+    )
+    assert controller.reconcile(cfg, _local(hour=23), True) is False
+    for minute in (1, 4, 5, 20, 40):
+        assert controller.reconcile(cfg, _local(hour=23, minute=minute), False) is False
+    assert True not in applied
+    assert controller.panel_off is True
+
+
+def test_held_off_without_an_idle_time_checks_about_once_a_minute():
+    controller, clock, applied = _controller()
+    cfg = _cfg(screen_hold={"power": "off"})
+    assert controller.reconcile(cfg, _local(hour=23), True) is False
+    assert controller.reconcile(cfg, _local(hour=23, minute=1), False) is False
+    assert applied == [False, False]
+
+
+def test_a_held_off_reassert_logs_once_per_hold():
+    logged = []
+    controller, clock, applied = _controller(log_fn=logged.append)
+    cfg = _cfg(
+        screen_hold={"power": "off"},
+        display_timeout_enabled=True,
+        display_timeout=60,
+    )
+    assert controller.reconcile(cfg, _local(hour=23), True) is False
+    # Two re-asserts an idle interval apart: one line, not one per interval.
+    assert controller.reconcile(cfg, _local(hour=23, minute=1), False) is False
+    assert controller.reconcile(cfg, _local(hour=23, minute=2), False) is False
+    reasserts = [line for line in logged if "held off" in line]
+    assert reasserts == ["held off: re-asserting off"]
+    assert applied == [False, False, False]
+
+    # The hold ends and a new one starts: the new hold logs its first re-assert.
+    no_hold = _cfg(display_schedule_enabled=False)
+    assert controller.reconcile(no_hold, _local(hour=23, minute=3), False) is True
+    assert controller.reconcile(cfg, _local(hour=23, minute=4), True) is False
+    assert controller.reconcile(cfg, _local(hour=23, minute=5), False) is False
+    reasserts = [line for line in logged if "held off" in line]
+    assert reasserts == ["held off: re-asserting off"] * 2
+
+
+def test_a_held_on_screen_is_never_reasserted_off():
+    controller, clock, applied = _controller()
+    cfg = _cfg(
+        screen_hold={"power": "on"},
+        display_timeout_enabled=True,
+        display_timeout=300,
+    )
+    assert controller.reconcile(cfg, _local(hour=23, minute=6), False) is True
+    assert controller.reconcile(cfg, _local(hour=23, minute=7), True) is True
+    assert controller.reconcile(cfg, _local(day=12, hour=0), True) is True
+    assert applied == [True]
+    assert controller.panel_off is False
+
+
+def test_a_scheduled_off_keeps_its_existing_behaviour():
+    controller, clock, applied = _controller()
+    cfg = _cfg(display_timeout_enabled=True, display_timeout=300)
+    assert controller.reconcile(cfg, _local(hour=23), True) is False
+    # No hold: the agent still writes only on the change (unchanged).
+    assert controller.reconcile(cfg, _local(hour=23, minute=5), False) is False
+    assert controller.reconcile(cfg, _local(hour=23, minute=10), False) is False
+    assert applied == [False]
+
+
+def test_hold_resleep_uses_the_screen_idle_time():
+    assert (
+        agent.hold_resleep_seconds(
+            _cfg(display_timeout_enabled=True, display_timeout=900)
+        )
+        == 900
+    )
+    # "Never", or no idle time set: about one poll.
+    assert agent.HOLD_RESLEEP_SECONDS == agent.DEFAULT_REFRESH_SECONDS
+    assert agent.hold_resleep_seconds(_cfg()) == agent.HOLD_RESLEEP_SECONDS
+    assert (
+        agent.hold_resleep_seconds(
+            _cfg(display_timeout_enabled=False, display_timeout=900)
+        )
+        == agent.HOLD_RESLEEP_SECONDS
+    )
 
 
 def test_config_url_appends_features():
