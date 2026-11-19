@@ -1,6 +1,7 @@
 """The kiosk power hold and the agent feature report (calvin-2ifv)."""
 
 import json
+from datetime import UTC, datetime
 
 import pytest
 
@@ -10,6 +11,7 @@ from app.services.kiosk_registry import (
     clear_power_hold,
     get_overrides,
     get_power_hold,
+    power_state,
     set_overrides,
     set_power_hold,
 )
@@ -17,6 +19,10 @@ from app.services.kiosk_registry import (
 pytestmark = [pytest.mark.asyncio, pytest.mark.unit]
 
 KIOSK = "kitchen"
+
+
+def _at(hour: int) -> datetime:
+    return datetime(2026, 11, 18, hour, tzinfo=UTC)
 
 
 async def _register(kiosk_id: str = KIOSK) -> None:
@@ -127,6 +133,40 @@ async def test_malformed_stored_hold_reads_as_none(test_db):
     await row.update(_columns=["power_hold"])
     assert await get_power_hold(KIOSK) is None
     assert (await _listed())["powerHold"] is None
+    assert (await power_state(KIOSK))[0] is None
+
+
+async def test_clearing_a_hold_leaves_a_tombstone_that_is_not_a_hold(test_db):
+    """The column keeps the change time, but no reader sees a hold (calvin-ldeu)."""
+    await _register()
+    await set_power_hold(KIOSK, "off", "automation", now=_at(10))
+    assert await clear_power_hold(KIOSK, now=_at(11)) is True
+    row = await KioskDB.objects.get(id=KIOSK)
+    assert row.power_hold == {"power": None, "setAt": "2026-11-18T11:00:00Z"}
+    assert await get_power_hold(KIOSK) is None
+    assert (await _listed())["powerHold"] is None
+    hold, changed_at = await power_state(KIOSK)
+    assert hold is None and changed_at == _at(11)
+    # Nothing left to clear: the next "schedule" keeps the change time.
+    assert await clear_power_hold(KIOSK, now=_at(12)) is False
+    assert (await power_state(KIOSK))[1] == _at(11)
+
+
+async def test_power_state_reports_a_live_hold_and_its_time(test_db):
+    await _register()
+    assert await power_state(KIOSK) == (None, None)
+    hold = await set_power_hold(KIOSK, "on", "automation", now=_at(10))
+    assert await power_state(KIOSK) == (hold, _at(10))
+
+
+async def test_schedule_after_a_lone_screen_now_records_the_change(test_db):
+    """Removing a plain "Screen now" (no hold) is a power change too (calvin-ldeu)."""
+    await _register()
+    await set_overrides(KIOSK, {"screenNow": {"power": "on", "setAt": "2026-11-18T09:00:00Z"}})
+    assert await clear_power_hold(KIOSK, now=_at(11)) is True
+    assert await get_overrides(KIOSK) == {}
+    hold, changed_at = await power_state(KIOSK)
+    assert hold is None and changed_at == _at(11)
 
 
 async def test_heartbeat_never_writes_back_the_layer(test_db, monkeypatch):

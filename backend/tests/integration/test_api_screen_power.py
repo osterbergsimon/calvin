@@ -1,11 +1,14 @@
 """The screen-power route and the held on/off in the kiosk config (calvin-2ifv)."""
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from fastapi.testclient import TestClient
 from loguru import logger
 
 KIOSK = "kitchen"
 URL = f"/api/kiosks/{KIOSK}/screen-power"
+OVERRIDES_URL = f"/api/kiosks/{KIOSK}/overrides"
 
 
 @pytest.fixture(autouse=True)
@@ -32,6 +35,19 @@ def _limited_key(client: TestClient, name: str = "Homey") -> str:
 
 def _listed(client: TestClient, kiosk_id: str = KIOSK) -> dict:
     return next(k for k in client.get("/api/kiosks").json()["kiosks"] if k["id"] == kiosk_id)
+
+
+def _client_choice(power: str, offset_s: float) -> dict:
+    """A "Screen now" as a phone would stamp it: browser clock, ISO-8601 with ms."""
+    return {"power": power, "setAt": (datetime.now(UTC) + timedelta(seconds=offset_s)).isoformat()}
+
+
+def _assert_restamped_now(stored: dict, sent: dict) -> None:
+    """The choice was kept, and its setAt now carries the server's clock, not the phone's."""
+    assert stored["setAt"] != sent["setAt"]
+    assert stored["setAt"].endswith("Z")
+    stamped = datetime.fromisoformat(stored["setAt"].replace("Z", "+00:00"))
+    assert abs((datetime.now(UTC) - stamped).total_seconds()) < 10
 
 
 @pytest.mark.integration
@@ -201,6 +217,163 @@ def test_stale_settings_save_cannot_bring_back_screen_now(test_client: TestClien
     layer = test_client.get(f"/api/kiosks/{KIOSK}/overrides").json()["overrides"]
     assert layer == {"displayName": "Kitchen"}
     assert test_client.get(URL).json()["power"] == "off"
+
+
+@pytest.mark.integration
+def test_a_screen_now_older_than_the_last_power_change_is_dropped(test_client: TestClient):
+    """The stale-page probe from the PR #369 review (calvin-ldeu).
+
+    A page that missed a whole hold (set and cleared between two of its
+    kiosk-list refreshes) must not put its old manual choice back.
+    """
+    _register(test_client)
+    stale = {
+        "displayName": "Kitchen",
+        "screenNow": {"power": "off", "setAt": "2026-01-01T00:00:00Z"},
+    }
+    assert test_client.put(OVERRIDES_URL, json={"overrides": stale}).status_code == 200
+    # Home automation holds the screen on, then sends it back to its schedule,
+    # both between two kiosk-list refreshes, so the page never sees the hold.
+    assert test_client.put(URL, json={"power": "on"}).status_code == 200
+    assert test_client.put(URL, json={"power": "schedule"}).status_code == 200
+    assert test_client.get(URL).json()["held"] is False
+    # The person saves an unrelated field; the page resends its whole layer.
+    assert test_client.put(OVERRIDES_URL, json={"overrides": stale}).status_code == 200
+    layer = test_client.get(OVERRIDES_URL).json()["overrides"]
+    assert layer == {"displayName": "Kitchen"}
+    view = test_client.get(URL).json()
+    assert view["power"] == "schedule" and view["desiredOn"] is True
+
+
+@pytest.mark.integration
+def test_a_fresh_screen_now_after_the_change_is_kept(test_client: TestClient):
+    """A person's own "Turn off now" after a hold ended still works (PUT)."""
+    _register(test_client)
+    test_client.put(URL, json={"power": "on"})
+    test_client.put(URL, json={"power": "schedule"})
+    fresh = _client_choice("off", offset_s=0)
+    response = test_client.put(OVERRIDES_URL, json={"overrides": {"screenNow": fresh}})
+    assert response.status_code == 200, response.text
+    stored = test_client.get(OVERRIDES_URL).json()["overrides"]["screenNow"]
+    assert stored["power"] == "off"
+    _assert_restamped_now(stored, fresh)
+    assert test_client.get(URL).json()["desiredOn"] is False
+    assert test_client.get(f"/api/kiosks/{KIOSK}/config").json()["screenNow"] == stored
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("offset_s", [-5, 5])
+def test_put_keeps_a_fresh_choice_when_the_client_clock_is_off(
+    test_client: TestClient, offset_s: int
+):
+    """The page stamps setAt with the browser clock; the server judges with its own.
+
+    Ending a hold writes the tombstone on the server, and the page saves the new
+    choice milliseconds later. A phone a few seconds behind (or ahead) must not
+    have that press silently dropped because its clock disagrees (calvin-ldeu).
+    """
+    _register(test_client)
+    test_client.put(URL, json={"power": "on"})
+    test_client.put(URL, json={"power": "schedule"})
+    choice = _client_choice("off", offset_s=offset_s)
+    response = test_client.put(OVERRIDES_URL, json={"overrides": {"screenNow": choice}})
+    assert response.status_code == 200, response.text
+    stored = response.json()["overrides"]["screenNow"]
+    assert stored["power"] == "off"
+    _assert_restamped_now(stored, choice)
+    assert test_client.get(URL).json()["desiredOn"] is False
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("offset_s", [-5, 5])
+def test_patch_keeps_a_fresh_choice_when_the_client_clock_is_off(
+    test_client: TestClient, offset_s: int
+):
+    """The screen's own partial write (PATCH) gets the same clock tolerance."""
+    _register(test_client)
+    test_client.put(URL, json={"power": "on"})
+    test_client.put(URL, json={"power": "schedule"})
+    choice = _client_choice("off", offset_s=offset_s)
+    response = test_client.patch(OVERRIDES_URL, json={"overrides": {"screenNow": choice}})
+    assert response.status_code == 200, response.text
+    stored = response.json()["overrides"]["screenNow"]
+    assert stored["power"] == "off"
+    _assert_restamped_now(stored, choice)
+    assert test_client.get(URL).json()["desiredOn"] is False
+
+
+@pytest.mark.integration
+def test_a_choice_beyond_the_tolerance_in_the_future_is_not_restamped(test_client: TestClient):
+    """Far ahead is not "fresh now": no re-stamp, and the old rule still applies."""
+    _register(test_client)
+    test_client.put(URL, json={"power": "on"})
+    test_client.put(URL, json={"power": "schedule"})
+    ahead = _client_choice("off", offset_s=3600)
+    response = test_client.put(OVERRIDES_URL, json={"overrides": {"screenNow": ahead}})
+    assert response.status_code == 200, response.text
+    # Strictly newer than the change: kept exactly as sent.
+    assert response.json()["overrides"]["screenNow"] == ahead
+
+
+@pytest.mark.integration
+def test_patch_drops_a_superseded_screen_now(test_client: TestClient):
+    """A screen's own partial write (PATCH) is guarded the same way."""
+    _register(test_client)
+    test_client.put(URL, json={"power": "on"})
+    test_client.put(URL, json={"power": "schedule"})
+    stale = {"power": "off", "setAt": "2026-01-01T00:00:00Z"}
+    response = test_client.patch(OVERRIDES_URL, json={"overrides": {"screenNow": stale}})
+    assert response.status_code == 200, response.text
+    assert "screenNow" not in response.json()["overrides"]
+    assert "screenNow" not in test_client.get(OVERRIDES_URL).json()["overrides"]
+
+
+@pytest.mark.integration
+def test_patch_keeps_a_fresh_screen_now(test_client: TestClient):
+    _register(test_client)
+    test_client.put(URL, json={"power": "on"})
+    test_client.put(URL, json={"power": "schedule"})
+    fresh = _client_choice("on", offset_s=0)
+    response = test_client.patch(OVERRIDES_URL, json={"overrides": {"screenNow": fresh}})
+    assert response.status_code == 200, response.text
+    _assert_restamped_now(response.json()["overrides"]["screenNow"], fresh)
+
+
+@pytest.mark.integration
+def test_back_to_schedule_also_supersedes_a_lone_screen_now(test_client: TestClient):
+    """Ending a plain "Screen now" (no hold) is a power change too."""
+    _register(test_client)
+    manual = {"power": "on", "setAt": "2026-01-01T00:00:00Z"}
+    test_client.put(OVERRIDES_URL, json={"overrides": {"screenNow": manual}})
+    test_client.put(URL, json={"power": "schedule"})
+    assert "screenNow" not in test_client.get(OVERRIDES_URL).json()["overrides"]
+    # A page that still carries the removed choice cannot put it back.
+    test_client.put(OVERRIDES_URL, json={"overrides": {"screenNow": manual}})
+    assert "screenNow" not in test_client.get(OVERRIDES_URL).json()["overrides"]
+
+
+@pytest.mark.integration
+def test_a_cleared_hold_leaves_nothing_for_readers_or_agents(test_client: TestClient):
+    """The tombstone that keeps the guard is never a hold and never a config key."""
+    _register(test_client, query="kagent=v1")  # an agent that cannot hold
+    test_client.put(URL, json={"power": "off"})
+    assert test_client.put(URL, json={"power": "schedule"}).status_code == 200
+
+    listed = _listed(test_client)
+    assert listed["powerHold"] is None
+    for key in ("screenNow", "screen_now"):
+        assert key not in listed["overrides"], key
+    view = test_client.get(URL).json()
+    assert (view["power"], view["held"], view["setAt"], view["by"]) == (
+        "schedule",
+        False,
+        None,
+        None,
+    )
+    config = test_client.get(f"/api/kiosks/{KIOSK}/config").json()
+    for key in ("screenHold", "screen_hold", "screenNow", "screen_now"):
+        assert key not in config, key
+    assert view["desiredOn"] is True
 
 
 @pytest.mark.integration
