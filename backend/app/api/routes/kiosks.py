@@ -68,20 +68,27 @@ async def put_kiosk_overrides(kiosk_id: str, body: OverridesBody):
     _valid_id_or_400(kiosk_id)
     _check_floor_under_limit(merge_overrides(await build_global_config(), body.overrides))
     _checked_overrides(body.overrides)
-    layer = await _without_screen_now_while_held(kiosk_id, body.overrides)
+    layer = await _without_superseded_screen_now(kiosk_id, body.overrides)
     await set_overrides(kiosk_id, layer)
     return {"id": kiosk_id, "overrides": layer}
 
 
-async def _without_screen_now_while_held(kiosk_id: str, layer: dict) -> dict:
-    """While a screen is held, no layer write may bring back ``screenNow``.
+async def _without_superseded_screen_now(kiosk_id: str, layer: dict) -> dict:
+    """No layer write may bring back a screen choice a power change replaced.
 
-    A Settings page opened before the hold still carries the old manual choice
-    and sends it with any save; the hold replaced it (calvin-2ifv).
+    A hold replaces the manual choice, and ending one does too: both remove
+    ``screenNow`` from the layer. A Settings page opened before the change still
+    carries the old choice and sends it with any save, and its kiosk-list
+    refresh can miss a hold that was set and cleared between two polls, so
+    "while held" alone is not enough (calvin-2ifv review, calvin-ldeu). The
+    server keeps the time of the last power change, so a ``screenNow`` set after
+    it -- a person's own fresh choice -- is kept.
     """
-    if await kiosk_registry.get_power_hold(kiosk_id) is None:
-        return layer
-    return kiosk_registry.without_screen_now(layer)
+    hold, changed_at = await kiosk_registry.power_state(kiosk_id)
+    if hold is not None:
+        # The hold wins while it lasts; it is projected on the next poll.
+        return kiosk_registry.without_screen_now(layer)
+    return screen_power.drop_superseded_screen_now(layer, changed_at)
 
 
 @router.delete("/kiosks/{kiosk_id}")
@@ -175,7 +182,7 @@ async def patch_kiosk_overrides(kiosk_id: str, body: OverridesBody, request: Req
         layer = {**stored, **body.overrides}
         _check_floor_under_limit(merge_overrides(await build_global_config(), layer))
     _checked_overrides(body.overrides)
-    partial = await _without_screen_now_while_held(kiosk_id, body.overrides)
+    partial = await _without_superseded_screen_now(kiosk_id, body.overrides)
     merged = await merge_into_overrides(kiosk_id, partial)
     if merged is None:
         raise HTTPException(status_code=404, detail="Unknown kiosk")

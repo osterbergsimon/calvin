@@ -10,6 +10,8 @@ Pure helpers for the screen-power route and the kiosk config poll:
 - :func:`project_hold` puts a hold into a config response: ``screenHold`` for an
   agent that can hold, and ``screenNow`` so an older agent still obeys it until
   the next scheduled change.
+- :func:`drop_superseded_screen_now` keeps a stale Settings page from sending an
+  old manual choice back after a power change replaced it (calvin-ldeu).
 - :class:`ChangeLimiter` caps how often one caller may change screens.
 """
 
@@ -124,6 +126,33 @@ def now_in(cfg: dict) -> datetime:
         except (ZoneInfoNotFoundError, ValueError):
             pass
     return datetime.now().astimezone()
+
+
+def _screen_now_is_fresh(value: object, changed_at: datetime) -> bool:
+    """True when this ``screenNow`` was set strictly after ``changed_at``."""
+    if not isinstance(value, dict):
+        return False
+    set_at = _parse_instant(value.get("setAt"))
+    return set_at is not None and set_at > changed_at
+
+
+def drop_superseded_screen_now(layer: dict, changed_at: datetime | None) -> dict:
+    """The layer minus any ``screenNow`` that a screen-power change superseded.
+
+    A manual "Screen now" is set at a moment (``setAt``), and a hold set or
+    cleared later replaced it: both remove ``screenNow`` from the layer. A page
+    that did not see that change still carries the old choice and sends it back
+    with any save, so only a ``screenNow`` strictly newer than the change is a
+    person's fresh choice (calvin-ldeu). ``None`` means no change is known and
+    nothing is dropped. Returns a new dict.
+    """
+    if changed_at is None:
+        return layer
+    kept = dict(layer)
+    for key in _NOW_KEYS:
+        if key in kept and not _screen_now_is_fresh(kept[key], changed_at):
+            kept.pop(key)
+    return kept
 
 
 def strip_holds(merged: dict) -> None:

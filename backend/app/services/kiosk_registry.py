@@ -130,6 +130,32 @@ HOLD_POWERS: tuple[str, ...] = ("on", "off")
 HOLD_WRITERS: tuple[str, ...] = ("automation", "settings")
 _SCREEN_NOW_KEYS = ("screenNow", "screen_now")
 
+# Ending a hold leaves a tombstone {power: None, setAt} in the column instead of
+# NULL: the time of the last power change, kept so a stale Settings page cannot
+# put back a manual choice the hold replaced (calvin-ldeu). A tombstone is never
+# a hold (``_valid_hold`` requires a power), so the kiosk list, the config
+# projection and every agent read exactly as they did before it existed. The
+# column is not exported in a backup either way.
+
+
+def _set_at_text(moment: datetime) -> str:
+    """The wire form of a hold/change time: UTC ISO-8601, seconds, trailing ``Z``."""
+    return as_utc(moment).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _change_time(raw: object) -> datetime | None:
+    """When the hold column last changed (a live hold or a tombstone), if valid."""
+    if not isinstance(raw, dict):
+        return None
+    set_at = raw.get("setAt")
+    if not isinstance(set_at, str):
+        return None
+    try:
+        moment = datetime.fromisoformat(set_at.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return as_utc(moment)
+
 
 def _valid_hold(raw: object) -> dict | None:
     """A stored hold in its public shape, or None when absent or malformed."""
@@ -815,6 +841,21 @@ async def get_power_hold(kiosk_id: str) -> dict | None:
     return _valid_hold(row.power_hold) if row is not None else None
 
 
+async def power_state(kiosk_id: str) -> tuple[dict | None, datetime | None]:
+    """The live hold and when screen power last changed, from one row read.
+
+    ``changedAt`` is the hold's ``setAt``, or the tombstone a cleared hold left,
+    so it survives the hold ending (calvin-ldeu). ``(None, None)`` for a row that
+    never had a screen-power change, and for an unknown or malformed id.
+    """
+    if not valid_kiosk_id(kiosk_id):
+        return (None, None)
+    row = await KioskDB.objects.get_or_none(id=kiosk_id)
+    if row is None:
+        return (None, None)
+    return (_valid_hold(row.power_hold), _change_time(row.power_hold))
+
+
 def _without_screen_now(overrides: dict | None) -> dict | None:
     """The layer minus any ``screenNow``; None when nothing needed removing."""
     layer = dict(overrides or {})
@@ -868,7 +909,7 @@ async def set_power_hold(
     moment = as_utc(now) if now is not None else utcnow()
     hold = {
         "power": power,
-        "setAt": moment.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "setAt": _set_at_text(moment),
         "by": by,
     }
     row.power_hold = hold
@@ -882,8 +923,13 @@ async def set_power_hold(
 
 
 @retry_on_db_locked()
-async def clear_power_hold(kiosk_id: str) -> bool | None:
+async def clear_power_hold(kiosk_id: str, now: datetime | None = None) -> bool | None:
     """Back to the schedule: clear the hold and any ``screenNow``.
+
+    Leaves a ``{power: None, setAt}`` tombstone in the hold column with the time
+    of this change, so a Settings page that missed the hold cannot put its old
+    manual choice back (calvin-ldeu). That includes ending a plain ``screenNow``
+    with no hold: removing it is a power change too.
 
     Returns whether anything changed; None for an unknown screen.
     """
@@ -892,11 +938,13 @@ async def clear_power_hold(kiosk_id: str) -> bool | None:
     row = await KioskDB.objects.get_or_none(id=kiosk_id)
     if row is None:
         return None
-    columns = []
-    if row.power_hold is not None:
-        row.power_hold = None
-        columns.append("power_hold")
+    hold = _valid_hold(row.power_hold)
     layer = _without_screen_now(row.overrides)
+    columns = []
+    if hold is not None or layer is not None:
+        moment = as_utc(now) if now is not None else utcnow()
+        row.power_hold = {"power": None, "setAt": _set_at_text(moment)}
+        columns.append("power_hold")
     if layer is not None:
         row.overrides = layer
         columns.append("overrides")
