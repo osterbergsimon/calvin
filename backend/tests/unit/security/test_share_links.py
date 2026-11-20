@@ -7,6 +7,7 @@ import stat
 import pytest
 
 from app.security.share_links import (
+    PENDING_CLAIM_TTL,
     DuplicateLinkName,
     InvalidFolder,
     ShareLinkStore,
@@ -197,6 +198,36 @@ def test_pending_uploads_are_claimed_once(store):
     # One time only: a second claim (from any device) finds nothing.
     assert store.claim_uploads(link["id"], "claim-1", device="phone-2") == 0
     assert store.uploads_for(link["id"], device="phone-2") == []
+
+
+def test_unclaimed_pending_uploads_expire(store):
+    link, _ = store.create("Grandma", "Guests")
+    store.record_upload(
+        link["id"], "Guests/a.jpg", "img-a", device="pending:claim-1", now=1000, size=100
+    )
+    # Still inside the window: counted, and claimable.
+    assert store.get(link["id"], now=1000 + PENDING_CLAIM_TTL - 1)["uploadCount"] == 1
+    assert store.get(link["id"], now=1000 + PENDING_CLAIM_TTL - 1)["uploadBytes"] == 100
+
+    expired = 1000 + PENDING_CLAIM_TTL
+    # Past it: it stops counting even before the file is rewritten.
+    assert store.get(link["id"], now=expired)["uploadCount"] == 0
+    assert store.get(link["id"], now=expired)["uploadBytes"] == 0
+    assert store.list(now=expired)[0]["uploadCount"] == 0
+    # And it can no longer be claimed.
+    assert store.claim_uploads(link["id"], "claim-1", device="phone-1", now=expired) == 0
+    # The next write drops it from the file for good.
+    store.record_upload(link["id"], "Guests/b.jpg", "img-b", device="phone-1", now=expired)
+    data = json.loads(store.path.read_text())
+    assert [u["image_id"] for u in data["links"][0]["uploads"]] == ["img-b"]
+
+
+def test_old_uploads_on_a_device_never_expire(store):
+    link, _ = store.create("Grandma", "Guests")
+    store.record_upload(link["id"], "Guests/a.jpg", "img-a", device="phone-1", now=1000)
+    later = 1000 + 10 * PENDING_CLAIM_TTL
+    assert [u["imageId"] for u in store.uploads_for(link["id"], device="phone-1")] == ["img-a"]
+    assert store.get(link["id"], now=later)["uploadCount"] == 1
 
 
 def test_a_device_id_is_not_a_claim(store):
