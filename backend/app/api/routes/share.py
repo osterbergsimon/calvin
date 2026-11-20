@@ -32,7 +32,7 @@ from typing import Any
 from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
 from app.security.admin_auth import guest_token_limiter
 from app.security.guest_gate import share_page
@@ -352,8 +352,12 @@ class CreateLinkBody(BaseModel):
 
 
 class UpdateLinkBody(BaseModel):
+    # A bad PATCH must fail loudly: a string "true" is not a boolean, and an
+    # unknown key is refused rather than silently ignored.
+    model_config = ConfigDict(extra="forbid")
+
     name: str | None = Field(default=None, min_length=1, max_length=MAX_NAME_LEN)
-    guests_see_all: bool | None = None
+    guests_see_all: StrictBool | None = None
 
 
 def _clean_name(raw: str) -> str:

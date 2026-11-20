@@ -175,6 +175,20 @@ def test_folders_lists_share_folders_only(admin, image_dir):
     assert admin.get("/api/share/folders").json() == {"folders": ["Party"]}
 
 
+def test_update_body_is_strict(admin):
+    link, token = _make_link(admin)
+    url = f"/api/share/links/{link['id']}"
+    # A string is not a boolean.
+    assert admin.patch(url, json={"guests_see_all": "true"}).status_code == 422
+    # An unknown key is refused instead of ignored.
+    assert admin.patch(url, json={"guests_see_all": False, "extra": 1}).status_code == 422
+    # A valid body still works.
+    response = admin.patch(url, json={"guests_see_all": False})
+    assert response.status_code == 200
+    assert response.json()["link"]["guestsSeeAll"] is False
+    assert admin.patch(url, json={"name": "Nana", "guests_see_all": True}).status_code == 200
+
+
 def test_rename(admin, guest):
     link, token = _make_link(admin)
     response = admin.patch(f"/api/share/links/{link['id']}", json={"name": "Nana"})
