@@ -50,7 +50,8 @@ or opening the link at another address (`calvin.local` instead of the IP
 address) starts afresh. The installed app shares the cookie of the browser it
 was installed from. Photos shared from the gallery stay with the phone even
 when Android sends the share without the cookie: the page that opens after
-the share claims them.
+the share claims them. A share that nobody claims within an hour is dropped
+and stops counting against the link's photo limit.
 
 Calvin scales each photo down for display (longest side 2560 px), turns it
 upright and removes the GPS location from its EXIF data. Only JPEG, PNG, WebP
@@ -105,7 +106,8 @@ this link** (only that link's photos go; anything else in the folder stays).
   directory private (both files are mode 0600) and revoke every link if a copy
   leaks. Deleting both files revokes every link. Links are not part of a
   backup.
-- The secret part of the address is removed from Calvin's logs. A reverse
+- The secret part of the address and any one-time claim id are removed from
+  Calvin's logs. A reverse
   proxy in front of Calvin keeps its own access log, which **does** record the
   full address: turn that log off for these paths, or treat the log file as
   secret.
@@ -114,9 +116,10 @@ this link** (only that link's photos go; anything else in the folder stays).
   a reverse proxy every guest seems to come from the proxy, so set
   `CALVIN_TRUSTED_PROXIES` to the proxy's address; Calvin then counts each
   guest by the `X-Forwarded-For` address the proxy sends.
-- Each link accepts at most 100 photos per 10 minutes from one device, its
-  photo limit and 2 GB in total. Calvin refuses guest photos when less than
-  512 MB of disk space is left.
+- Each link accepts at most 100 photos per 10 minutes from one IP address
+  (the limit is per link and address, not per phone), plus its photo limit and
+  2 GB in total. Calvin refuses guest photos when less than 512 MB of disk
+  space is left.
 - An upload from the guest page (one photo per request) may be at most 26 MB,
   and one Android share (all the shared photos at once) at most 256 MB; larger
   requests are refused before Calvin reads them. A request from another website to the share target is
