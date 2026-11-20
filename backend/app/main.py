@@ -5,8 +5,10 @@ import logging
 import os
 import sys
 import time
+from collections.abc import Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 from fastapi.responses import JSONResponse  # noqa: E402
 
@@ -626,25 +628,51 @@ async def fastapi_http_exception_handler(request: Request, exc: HTTPException):
     )
 
 
+# A request can carry thousands of extra keys, and pydantic reports one error
+# per key. The answer and the log line stay bounded (calvin-6tp4).
+MAX_VALIDATION_ERRORS = 10
+MAX_VALIDATION_LOC_PART = 64
+MAX_VALIDATION_MSG = 200
+
+
+def _bounded_validation_errors(errors: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The first few errors, with each string ``loc`` part and ``msg`` trimmed.
+
+    Only ``type``, ``loc`` and ``msg`` survive: the request body and each
+    error's ``input``/``ctx`` can carry passwords, and ``ctx`` may hold
+    exception objects that aren't JSON-serialisable (audit S9). Ints in
+    ``loc`` (list indexes) are kept as they are.
+    """
+    bounded: list[dict[str, Any]] = []
+    for error in errors[:MAX_VALIDATION_ERRORS]:
+        loc = error.get("loc")
+        if isinstance(loc, (list, tuple)):
+            loc = [
+                part[:MAX_VALIDATION_LOC_PART] if isinstance(part, str) else part for part in loc
+            ]
+        msg = error.get("msg")
+        if isinstance(msg, str):
+            msg = msg[:MAX_VALIDATION_MSG]
+        bounded.append({"type": error.get("type"), "loc": loc, "msg": msg})
+    return bounded
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Handle request validation errors.
-
-    Only the location, type and message of each error are logged or returned:
-    the request body and each error's ``input``/``ctx`` can carry passwords,
-    and ``ctx`` may hold exception objects that aren't JSON-serialisable
-    (audit S9).
-    """
-    errors = [
-        {"type": e.get("type"), "loc": e.get("loc"), "msg": e.get("msg")} for e in exc.errors()
-    ]
+    """Handle request validation errors with a bounded answer and log line."""
+    raw_errors = exc.errors()
+    errors = _bounded_validation_errors(raw_errors)
+    total = len(raw_errors)
+    dropped = total - len(errors)
     logger.error(
-        f"Validation error: {errors} | Path: {request.url.path} | Method: {request.method}"
+        f"Validation error ({len(errors)} of {total}): {errors} | "
+        f"Path: {request.url.path} | Method: {request.method}"
     )
-    return JSONResponse(
-        status_code=422,
-        content={"detail": jsonable_encoder(errors), "body": "Validation error"},
-    )
+    content: dict = {"detail": jsonable_encoder(errors), "body": "Validation error"}
+    if dropped > 0:
+        content["truncated"] = True
+        content["errorCount"] = total
+    return JSONResponse(status_code=422, content=content)
 
 
 @app.exception_handler(Exception)
