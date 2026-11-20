@@ -491,6 +491,29 @@ def test_oversized_request_is_refused_before_upload(admin, guest, monkeypatch, i
     assert not (image_dir / "Guests" / "a.jpg").exists()
 
 
+def test_guest_upload_fails_cleanly_when_stat_raises(admin, guest, image_dir, monkeypatch):
+    from app.api.routes import share
+    from app.security.share_links import get_share_link_store
+
+    _, token = _make_link(admin)
+
+    def boom(path):
+        raise OSError("stat failed")
+
+    monkeypatch.setattr(share, "_file_mtime_ns", boom)
+    response = _upload(guest, token, ("a.jpg", _photo()))
+    assert response.status_code == 400
+    assert response.json()["detail"]["message"] == "Couldn't save this photo."
+    # No half-recorded upload: the file is gone and its quota slot is free.
+    assert not (image_dir / "Guests" / "a.jpg").exists()
+    link = get_share_link_store().list()[0]
+    assert link["uploadCount"] == 0
+    assert link["uploadBytes"] == 0
+    # The failed attempt did not use up the rate limit either.
+    monkeypatch.setattr(share, "_file_mtime_ns", lambda path: path.stat().st_mtime_ns)
+    assert _upload(guest, token, ("b.jpg", _photo())).status_code == 200
+
+
 def test_link_photo_quota(admin, guest, image_dir):
     _, token = _make_link(admin, max_photos=2)
     response = _upload(guest, token, ("a.jpg", _photo()), ("b.jpg", _photo()), ("c.jpg", _photo()))

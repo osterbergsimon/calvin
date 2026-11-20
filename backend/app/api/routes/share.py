@@ -187,6 +187,11 @@ def _guest_link(request: Request) -> dict[str, Any]:
     return link
 
 
+def _file_mtime_ns(path: Path) -> int:
+    """The file's mtime stamp, the other half of its upload record."""
+    return path.stat().st_mtime_ns
+
+
 def _is_upload_file(plugin: Any, upload: dict[str, Any]) -> bool:
     """Whether the file at the upload's path is still the one the upload wrote."""
     try:
@@ -310,9 +315,14 @@ async def _save_one(
         return "Couldn't save this photo."
     path = Path(image["path"])
     try:
-        mtime_ns: int | None = path.stat().st_mtime_ns
+        mtime_ns = _file_mtime_ns(path)
     except OSError:
-        mtime_ns = None
+        # The file is on disk but its stamp is unknown, so no record could
+        # match it later (and the quota slot would be held for nothing).
+        # Fail the upload: delete the file and take the limiter event back.
+        await plugin_image_service.delete_image(image["id"])
+        guest_upload_limiter.release(limit_key)
+        return "Couldn't save this photo."
     relative = path.relative_to(plugin.image_dir).as_posix()
     store.record_upload(
         link["id"], relative, image["id"], device, size=len(prepared), mtime_ns=mtime_ns
