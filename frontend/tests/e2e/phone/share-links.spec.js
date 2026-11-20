@@ -61,6 +61,44 @@ test.describe("phone: share links", () => {
     expect(consoleErrors).toEqual([]);
   });
 
+  test("owner turns guests-see-all off for a link", async ({ page, consoleErrors }) => {
+    const api = await installApiMock(page, {
+      shareLinks: [
+        {
+          id: "link1",
+          name: "Grandma",
+          folder: "Guests",
+          createdAt: "2026-11-01T09:00:00Z",
+          lastUsedAt: null,
+          expiresAt: null,
+          expired: false,
+          uploadCount: 3,
+          uploadBytes: 1024,
+          maxPhotos: 500,
+          maxBytes: 2 * 1024 ** 3,
+          guestsSeeAll: true,
+          path: "/share/link1.SAMPLETOKEN/",
+        },
+      ],
+    });
+    await gotoSettings(page);
+    await expectSettingsReady(page);
+    await selectCategory(page, "Content");
+    await openSection(page, "content-photos");
+
+    const toggle = page.locator('[data-test="share-link-row-see-all"]');
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    await expect(page.locator('[data-test="share-link-row"]')).toContainText(
+      "Guests see their own photos"
+    );
+    expect(api.shareLinks[0].guestsSeeAll).toBe(false);
+    expect(api.requests).toContain("PATCH /api/share/links/link1");
+    expect(api.hostActions).toEqual([]);
+    expect(consoleErrors).toEqual([]);
+  });
+
   test("guest adds photos, sees them and removes one of their own", async ({
     page,
     consoleErrors,
@@ -145,6 +183,9 @@ test.describe("phone: share links", () => {
     expect(guest.shareTarget.method).toBe("POST");
     expect(guest.shareTarget.contentType).toContain("multipart/form-data");
     expect(guest.shareTarget.body).toContain('name="photos"; filename="IMG_20261101.jpg"');
+    // The page claimed the share's photo for this phone, once.
+    expect(guest.claims).toEqual([guest.shareTarget.claim]);
+    expect(guest.claimed).toBe(1);
     expect(consoleErrors).toEqual([]);
   });
 

@@ -12,8 +12,19 @@ export const JPEG = Buffer.from(
 );
 
 /** Mock the guest routes of one link. Returns the recorded state. */
-export async function installGuestMock(page, { valid = true, expireOnUpload = false } = {}) {
-  const state = { uploads: [], posts: 0, deleted: [], shareTarget: null };
+export async function installGuestMock(
+  page,
+  { valid = true, expireOnUpload = false, seeAll = true } = {}
+) {
+  const state = {
+    uploads: [],
+    posts: 0,
+    deleted: [],
+    shareTarget: null,
+    claims: [],
+    claimed: 0,
+    seeAll,
+  };
   const thumb = id => ({
     imageId: id,
     uploadedAt: "2026-11-01T10:00:00Z",
@@ -26,7 +37,24 @@ export async function installGuestMock(page, { valid = true, expireOnUpload = fa
     const reply = (body, status = 200) =>
       route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
     if (!valid) return reply({ detail: { code: "share_link_invalid" } }, 404);
-    if (path === GUEST) return reply({ name: "Grandma", available: true, maxBytes: 26214400 });
+    if (path === GUEST)
+      return reply({
+        name: "Grandma",
+        expiresAt: null,
+        available: true,
+        maxBytes: 26214400,
+        maxFiles: 50,
+        seeAll: state.seeAll,
+      });
+    if (path === `${GUEST}/claim` && method === "POST") {
+      const claim = request.postDataJSON()?.claim || "";
+      state.claims.push(claim);
+      if (!claim) return reply({ detail: { code: "invalid_claim" } }, 422);
+      // The one pending share above can be claimed once; a repeat finds nothing.
+      const claimed = state.shareTarget?.claim === claim && !state.claimed ? 1 : 0;
+      state.claimed += claimed;
+      return reply({ claimed });
+    }
     if (path === `${GUEST}/manifest.webmanifest`) {
       return route.fulfill({
         status: 200,
@@ -69,15 +97,18 @@ export async function installGuestMock(page, { valid = true, expireOnUpload = fa
   // manifest's share_target action, answered with a redirect to the page.
   await page.route(`**/share/${TOKEN}/receive`, async route => {
     const request = route.request();
+    // The share sheet arrives without the phone's cookie, so the backend
+    // parks its photo under a one-time claim carried back in the redirect.
     state.shareTarget = {
       method: request.method(),
       contentType: request.headers()["content-type"] || "",
       body: request.postDataBuffer()?.toString("latin1") || "",
+      claim: "claim1",
     };
     state.uploads = [thumb("shared1"), ...state.uploads];
     return route.fulfill({
       status: 303,
-      headers: { location: `/share/${TOKEN}/?added=1&failed=0` },
+      headers: { location: `/share/${TOKEN}/?added=1&failed=0&claim=claim1` },
     });
   });
   return state;
