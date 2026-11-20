@@ -65,6 +65,9 @@ async def test_list_kiosks_shape(test_db):
         "displayCheckActive",
         "powerHold",
         "agentHolds",
+        "paired",
+        "pairedAt",
+        "agentPairs",
     }
     assert isinstance(kiosks[0]["lastSeen"], str)  # ISO-8601
 

@@ -198,3 +198,9 @@ class KioskDB(ormar.Model):
     agent_features: str | None = ormar.String(
         max_length=64, nullable=True
     )  # comma-separated features the display agent reports (kfeat), "" for none (calvin-2ifv)
+    credential_hash: str | None = ormar.String(
+        max_length=64, nullable=True
+    )  # SHA-256 hex of the screen's pairing secret; absent while unpaired (calvin-0xns)
+    paired_at: datetime | None = UTCDateTime(
+        nullable=True
+    )  # when the current credential was approved (calvin-0xns)
