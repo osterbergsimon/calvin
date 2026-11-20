@@ -578,6 +578,31 @@ def test_tokens_are_redacted_from_access_logs(admin):
     assert "/share/[redacted]/" in record.getMessage()
 
 
+def test_claim_ids_are_redacted_from_access_logs(admin):
+    _, token = _make_link(admin)
+    from app.security.install import ShareTokenRedactor, redact_share_tokens
+
+    claim = "AbCdEfGhIjKlMnOpQrStUvWx"
+    record = logging.LogRecord(
+        "uvicorn.access",
+        logging.INFO,
+        __file__,
+        1,
+        '%s - "%s %s HTTP/%s" %d',
+        ("1.2.3.4", "GET", f"/share/{token}/?added=1&claim={claim}", "1.1", 200),
+        None,
+    )
+    assert ShareTokenRedactor().filter(record) is True
+    message = record.getMessage()
+    assert token not in message
+    assert claim not in message
+    assert "claim=[redacted]" in message
+    # App log lines go through the same helper.
+    line = f"claim link photo received claim={claim}"
+    assert claim not in redact_share_tokens(line)
+    assert "claim=[redacted]" in redact_share_tokens(line)
+
+
 def test_large_photo_is_resized(admin, guest, image_dir):
     from app.services.guest_image import MAX_EDGE
 

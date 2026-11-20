@@ -30,12 +30,16 @@ def apply_startup_admin_password() -> None:
 
 
 # A share-link token is the path segment after /share/ or /api/guest/
-# (calvin-mwqo); it must never reach a log line.
+# (calvin-mwqo); it must never reach a log line. Neither must a one-time
+# pending-claim id carried as ``claim=`` after a share target redirect.
 SHARE_PATH_PATTERN = re.compile(r"(/share/|/api/guest/)[^/?#\s\"']+")
+CLAIM_QUERY_PATTERN = re.compile(r"(?<![A-Za-z0-9_-])claim=[^&#\s\"']+")
 
 
 def redact_share_tokens(text: str) -> str:
-    return SHARE_PATH_PATTERN.sub(r"\1[redacted]", text)
+    return CLAIM_QUERY_PATTERN.sub(
+        "claim=[redacted]", SHARE_PATH_PATTERN.sub(r"\1[redacted]", text)
+    )
 
 
 class ShareTokenRedactor(logging.Filter):
