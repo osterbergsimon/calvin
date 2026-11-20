@@ -152,3 +152,16 @@ async def test_no_key_on_the_request_is_rejected(name):
     func = getattr(tools, name)
     with pytest.raises(tools.ToolError, match="API key"):
         await func(ctx=fake_ctx(None), **MINIMAL_ARGS.get(name, {}))
+
+
+async def test_kiosk_bearer_at_mcp_not_counted(gateway):
+    """A kiosk secret is not an API key: 401 as for no key, and no limiter failure."""
+    from app.security.admin_auth import api_key_limiter
+    from app.services.kiosk_pairing import new_secret
+
+    async with client_for(gateway, new_secret()) as client:
+        response = await client.post("/api/mcp", json=INIT, headers=HEADERS)
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "api_key_required"
+    assert api_key_limiter._failures == {}
+    assert api_key_limiter._lockouts == {}

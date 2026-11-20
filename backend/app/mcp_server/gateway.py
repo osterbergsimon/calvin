@@ -95,11 +95,20 @@ class McpGateway:
                 detail.get("message", "Unauthorized"),
                 headers,
             )
-        if key is None or is_limited(key):
+        if key is None:
+            # Includes a screen's own ``clv_kiosk_`` secret: it is never an API
+            # key, so MCP answers exactly as it does for no bearer (calvin-0xns).
+            return _error(
+                401,
+                "api_key_required",
+                "The MCP endpoint needs an API key: Authorization: Bearer clv_...",
+                {"WWW-Authenticate": "Bearer"},
+            )
+        if is_limited(key):
             # A limited key gets nothing beyond an anonymous caller over HTTP,
             # and every MCP tool is more than that (calvin-2ifv). One check
             # here, so no tool can forget it.
-            return _error(403, "insufficient_scope", limited_key_message(key or {}))
+            return _error(403, "insufficient_scope", limited_key_message(key))
         server = self._server
         if server is None:
             return _error(503, "mcp_unavailable", "The MCP server is not running.")

@@ -530,3 +530,54 @@ def test_limited_key_creation_is_logged_without_the_secret(client):
     joined = "\n".join(sink)
     assert "Homey" in joined and "screens.power" in joined
     assert secret not in joined
+
+
+# -- a kiosk secret is not an API key (calvin-0xns) -------------------------
+
+
+def test_kiosk_bearer_is_anonymous_on_an_admin_write(client):
+    from app.security.admin_auth import api_key_limiter
+    from app.services.kiosk_pairing import new_secret
+
+    response = client.post("/api/calendar/sources", headers=_bearer(new_secret()))
+    assert response.status_code == 401
+    assert response.json()["detail"]["code"] == "admin_required"
+    assert api_key_limiter._failures == {}
+    assert api_key_limiter._lockouts == {}
+
+
+def test_kiosk_bearer_is_accepted_on_a_public_get(client):
+    from app.services.kiosk_pairing import new_secret
+
+    response = client.get("/api/public", headers=_bearer(new_secret()))
+    assert response.status_code == 200
+
+
+def test_kiosk_bearer_next_to_an_admin_cookie_is_admin(client):
+    from app.services.kiosk_pairing import new_secret
+
+    _session(client)  # the admin cookie stays in the client's jar
+    response = client.post("/api/calendar/sources", headers=_bearer(new_secret()))
+    assert response.status_code == 200
+
+
+def test_a_kiosk_cookie_alone_is_not_admin(client, tmp_path, monkeypatch):
+    from app.security.kiosk_auth import KIOSK_COOKIE, issue_kiosk_cookie
+    from app.services.kiosk_pairing import hash_secret, new_secret
+
+    client.cookies.clear()
+    client.cookies.set(KIOSK_COOKIE, issue_kiosk_cookie("kitchen", hash_secret(new_secret())))
+    response = client.post("/api/calendar/sources")
+    assert response.status_code == 401
+    assert response.json()["detail"]["code"] == "admin_required"
+
+
+def test_create_rerolls_a_secret_with_a_reserved_prefix(tmp_path, monkeypatch):
+    from app.security import api_keys
+
+    secret = api_keys.ApiKeyStore(tmp_path / "api-keys.json")
+    answers = iter(["kiosk_" + "a" * 38, "pair_" + "b" * 39, "c" * 43])
+    monkeypatch.setattr(api_keys.secrets, "token_urlsafe", lambda size: next(answers))
+    record, minted = secret.create("Script", "read")
+    assert minted == "clv_" + "c" * 43
+    assert record["prefix"] == minted[:8]

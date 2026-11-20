@@ -261,3 +261,32 @@ def test_limited_key_refused_on_every_other_unsafe_route(test_client):
             if response.status_code != 403 or _error_code(response) != "insufficient_scope":
                 reached.append((*route_id, response.status_code))
     assert reached == []
+
+
+# -- KIOSK_ROUTES: only the screen itself acts on a gated screen (calvin-0xns) --
+
+
+def test_kiosk_routes_reference_real_routes():
+    from app.security.route_policy import KIOSK_ROUTES
+
+    index = _policy_route_index()
+    missing = sorted(entry for entry in KIOSK_ROUTES if entry not in index)
+    assert missing == []
+    assert KIOSK_ROUTES == {
+        ("POST", "/api/kiosks/{kiosk_id}/screen-sleep"),
+        ("POST", "/api/kiosks/{kiosk_id}/display-check"),
+    }
+
+
+def test_kiosk_routes_not_host_or_permission():
+    from app.security.route_policy import HOST_ROUTES, KIOSK_ROUTES, PERMISSION_ROUTES
+
+    opened = {entry for routes in PERMISSION_ROUTES.values() for entry in routes}
+    assert not KIOSK_ROUTES & HOST_ROUTES
+    assert not KIOSK_ROUTES & opened
+
+
+def test_kiosk_routes_stay_public_writes():
+    from app.security.route_policy import KIOSK_ROUTES
+
+    assert KIOSK_ROUTES <= PUBLIC_WRITES
