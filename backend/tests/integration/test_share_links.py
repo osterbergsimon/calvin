@@ -175,6 +175,20 @@ def test_folders_lists_share_folders_only(admin, image_dir):
     assert admin.get("/api/share/folders").json() == {"folders": ["Party"]}
 
 
+def test_update_body_is_strict(admin):
+    link, token = _make_link(admin)
+    url = f"/api/share/links/{link['id']}"
+    # A string is not a boolean.
+    assert admin.patch(url, json={"guests_see_all": "true"}).status_code == 422
+    # An unknown key is refused instead of ignored.
+    assert admin.patch(url, json={"guests_see_all": False, "extra": 1}).status_code == 422
+    # A valid body still works.
+    response = admin.patch(url, json={"guests_see_all": False})
+    assert response.status_code == 200
+    assert response.json()["link"]["guestsSeeAll"] is False
+    assert admin.patch(url, json={"name": "Nana", "guests_see_all": True}).status_code == 200
+
+
 def test_rename(admin, guest):
     link, token = _make_link(admin)
     response = admin.patch(f"/api/share/links/{link['id']}", json={"name": "Nana"})
@@ -308,6 +322,17 @@ def test_revoke_is_immediate_and_keeps_photos_by_default(admin, guest, image_dir
     assert _upload(guest, token, ("b.jpg", _photo())).status_code == 404
     assert (image_dir / "Guests" / "a.jpg").exists()
     assert admin.delete(f"/api/share/links/{link['id']}").status_code == 404
+
+
+def test_revoke_drops_the_links_lock(admin, guest):
+    from app.api.routes import share
+
+    link, token = _make_link(admin)
+    _upload(guest, token, ("a.jpg", _photo()))
+    assert link["id"] in share._link_locks
+    assert admin.delete(f"/api/share/links/{link['id']}").status_code == 204
+    # A revoked link's entry must not stay in the per-process lock table.
+    assert link["id"] not in share._link_locks
 
 
 def test_revoke_can_remove_its_photos(admin, guest, image_dir):
@@ -477,6 +502,29 @@ def test_oversized_request_is_refused_before_upload(admin, guest, monkeypatch, i
     assert not (image_dir / "Guests" / "a.jpg").exists()
 
 
+def test_guest_upload_fails_cleanly_when_stat_raises(admin, guest, image_dir, monkeypatch):
+    from app.api.routes import share
+    from app.security.share_links import get_share_link_store
+
+    _, token = _make_link(admin)
+
+    def boom(path):
+        raise OSError("stat failed")
+
+    monkeypatch.setattr(share, "_file_mtime_ns", boom)
+    response = _upload(guest, token, ("a.jpg", _photo()))
+    assert response.status_code == 400
+    assert response.json()["detail"]["message"] == "Couldn't save this photo."
+    # No half-recorded upload: the file is gone and its quota slot is free.
+    assert not (image_dir / "Guests" / "a.jpg").exists()
+    link = get_share_link_store().list()[0]
+    assert link["uploadCount"] == 0
+    assert link["uploadBytes"] == 0
+    # The failed attempt did not use up the rate limit either.
+    monkeypatch.setattr(share, "_file_mtime_ns", lambda path: path.stat().st_mtime_ns)
+    assert _upload(guest, token, ("b.jpg", _photo())).status_code == 200
+
+
 def test_link_photo_quota(admin, guest, image_dir):
     _, token = _make_link(admin, max_photos=2)
     response = _upload(guest, token, ("a.jpg", _photo()), ("b.jpg", _photo()), ("c.jpg", _photo()))
@@ -576,6 +624,31 @@ def test_tokens_are_redacted_from_access_logs(admin):
     assert ShareTokenRedactor().filter(record) is True
     assert token not in record.getMessage()
     assert "/share/[redacted]/" in record.getMessage()
+
+
+def test_claim_ids_are_redacted_from_access_logs(admin):
+    _, token = _make_link(admin)
+    from app.security.install import ShareTokenRedactor, redact_share_tokens
+
+    claim = "AbCdEfGhIjKlMnOpQrStUvWx"
+    record = logging.LogRecord(
+        "uvicorn.access",
+        logging.INFO,
+        __file__,
+        1,
+        '%s - "%s %s HTTP/%s" %d',
+        ("1.2.3.4", "GET", f"/share/{token}/?added=1&claim={claim}", "1.1", 200),
+        None,
+    )
+    assert ShareTokenRedactor().filter(record) is True
+    message = record.getMessage()
+    assert token not in message
+    assert claim not in message
+    assert "claim=[redacted]" in message
+    # App log lines go through the same helper.
+    line = f"claim link photo received claim={claim}"
+    assert claim not in redact_share_tokens(line)
+    assert "claim=[redacted]" in redact_share_tokens(line)
 
 
 def test_large_photo_is_resized(admin, guest, image_dir):
@@ -826,6 +899,32 @@ def test_claim_sets_a_cookie_for_a_new_device(admin, app, image_dir):
     assert response.json() == {"claimed": 1}
     assert "calvin_guest" in response.cookies
     assert len(fresh.get(f"/api/guest/{token}/uploads").json()["uploads"]) == 1
+
+
+def test_expired_pending_claim_still_counts_and_revoke_removes_it(
+    admin, app, image_dir, monkeypatch
+):
+    from app.security import share_links
+
+    link, token = _make_link(admin, guests_see_all=False)
+    share_sheet = TestClient(app)
+    response = _share(share_sheet, token)
+    claim = _claim_of(response.headers["location"])
+    path = image_dir / "Guests" / "shared.jpg"
+    assert path.is_file()
+
+    real_time = share_links.time.time
+    monkeypatch.setattr(
+        share_links.time, "time", lambda: real_time() + share_links.PENDING_CLAIM_TTL
+    )
+    # The claim id is dead...
+    phone = TestClient(app)
+    phone.get(f"/api/guest/{token}")
+    assert phone.post(f"/api/guest/{token}/claim", json={"claim": claim}).json() == {"claimed": 0}
+    # ...but the photo is still a real upload, counted and in the link record.
+    assert admin.get("/api/share/links").json()["links"][0]["uploadCount"] == 1
+    assert admin.delete(f"/api/share/links/{link['id']}?remove_photos=true").status_code == 204
+    assert not path.exists()
 
 
 def test_claim_is_scoped_to_its_link(admin, app, image_dir):

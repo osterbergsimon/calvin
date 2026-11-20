@@ -802,6 +802,10 @@ export async function installApiMock(page, options = {}) {
           expiresAt: null,
           expired: false,
           uploadCount: 0,
+          uploadBytes: 0,
+          maxPhotos: body.max_photos ?? 500,
+          maxBytes: (body.max_mb ?? 2048) * 1024 ** 2,
+          guestsSeeAll: body.guests_see_all !== false,
           path: `/share/${id}.SAMPLETOKEN/`,
         };
         state.shareLinks = [link, ...state.shareLinks];
@@ -816,8 +820,13 @@ export async function installApiMock(page, options = {}) {
         return route.fulfill({ status: 204, body: "" });
       }
       const body = request.postDataJSON() || {};
+      // The backend's record shape: PATCH takes guests_see_all and answers
+      // guestsSeeAll (as the real route does).
+      const patch = {};
+      if ("name" in body) patch.name = body.name;
+      if ("guests_see_all" in body) patch.guestsSeeAll = Boolean(body.guests_see_all);
       state.shareLinks = state.shareLinks.map(link =>
-        link.id === shareLink[1] ? { ...link, ...body } : link
+        link.id === shareLink[1] ? { ...link, ...patch } : link
       );
       return json(route, { link: state.shareLinks.find(link => link.id === shareLink[1]) });
     }

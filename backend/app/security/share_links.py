@@ -49,6 +49,10 @@ LAST_USED_INTERVAL = 60  # seconds between last_used_at writes from page loads
 # under this prefix plus the claim id. A device cookie can't contain ":", so a
 # claim never matches a real device and a device id never works as a claim.
 PENDING_PREFIX = "pending:"
+# How long a share waiting for a guest page may still be claimed. The photo is
+# a real upload either way: it keeps counting against the link and stays in the
+# record, so revoking with remove_photos still deletes its file.
+PENDING_CLAIM_TTL = 60 * 60
 _KEY_BYTES = 32
 _FILE_VERSION = 1
 
@@ -251,6 +255,7 @@ class ShareLinkStore:
         self, link_id: str, *, name: str | None = None, guests_see_all: bool | None = None
     ) -> dict[str, Any] | None:
         """Change a link's name and/or its "guests see all photos" setting."""
+        current = time.time()
         with self._lock:
             links = self._load()
             target = next((entry for entry in links if entry["id"] == link_id), None)
@@ -266,17 +271,18 @@ class ShareLinkStore:
             if guests_see_all is not None:
                 target["guests_see_all"] = guests_see_all
             self._write(links)
-        return _public(target, time.time())
+        return _public(target, current)
 
     def revoke(self, link_id: str) -> dict[str, Any] | None:
         """Delete the link. Returns its record plus ``uploads`` (for optional cleanup)."""
+        current = time.time()
         with self._lock:
             links = self._load()
             target = next((entry for entry in links if entry["id"] == link_id), None)
             if target is None:
                 return None
             self._write([entry for entry in links if entry["id"] != link_id])
-        record = _public(target, time.time())
+        record = _public(target, current)
         record["uploads"] = [_public_upload(upload) for upload in target["uploads"]]
         return record
 
@@ -352,19 +358,26 @@ class ShareLinkStore:
                         return _public_upload(upload)
         return None
 
-    def claim_uploads(self, link_id: str, claim: str, device: str) -> int:
+    def claim_uploads(self, link_id: str, claim: str, device: str, now: float | None = None) -> int:
         """Hand the uploads waiting under ``claim`` on this link to ``device``.
 
         One time only: afterwards they belong to the device and the claim
-        matches nothing. Returns how many uploads were claimed.
+        matches nothing. A claim older than ``PENDING_CLAIM_TTL`` claims
+        nothing; the photo stays in the record and keeps its quota. Returns how
+        many uploads were claimed.
         """
         pending = _hash(PENDING_PREFIX + claim)
+        current = time.time() if now is None else now
         with self._lock:
             links = self._load()
             target = next((entry for entry in links if entry["id"] == link_id), None)
             if target is None:
                 return 0
-            claimed = [u for u in target["uploads"] if u["device"] == pending]
+            claimed = [
+                u
+                for u in target["uploads"]
+                if u["device"] == pending and current - float(u["uploaded_at"]) < PENDING_CLAIM_TTL
+            ]
             if not claimed:
                 return 0
             for upload in claimed:

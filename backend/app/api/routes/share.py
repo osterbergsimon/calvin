@@ -32,7 +32,7 @@ from typing import Any
 from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
 from app.security.admin_auth import guest_token_limiter
 from app.security.guest_gate import share_page
@@ -101,6 +101,9 @@ guest_upload_limiter = UploadRateLimiter()
 
 # One lock per link: the quota and limiter check, the reservation and the write
 # run as one step, so parallel requests can't all pass the same check.
+# This table, ``guest_upload_limiter`` and the store's lock are per process, so
+# Calvin must run in ONE uvicorn worker (docker/Dockerfile): more workers, or
+# ``WEB_CONCURRENCY``, would each enforce their own quota.
 _link_locks: dict[str, asyncio.Lock] = {}
 
 
@@ -185,6 +188,11 @@ def _guest_link(request: Request) -> dict[str, Any]:
     # Set by the route policy for every GUEST_ROUTES request.
     link: dict[str, Any] = request.state.share_link
     return link
+
+
+def _file_mtime_ns(path: Path) -> int:
+    """The file's mtime stamp, the other half of its upload record."""
+    return path.stat().st_mtime_ns
 
 
 def _is_upload_file(plugin: Any, upload: dict[str, Any]) -> bool:
@@ -310,9 +318,14 @@ async def _save_one(
         return "Couldn't save this photo."
     path = Path(image["path"])
     try:
-        mtime_ns: int | None = path.stat().st_mtime_ns
+        mtime_ns = _file_mtime_ns(path)
     except OSError:
-        mtime_ns = None
+        # The file is on disk but its stamp is unknown, so no record could
+        # match it later (and the quota slot would be held for nothing).
+        # Fail the upload: delete the file and take the limiter event back.
+        await plugin_image_service.delete_image(image["id"])
+        guest_upload_limiter.release(limit_key)
+        return "Couldn't save this photo."
     relative = path.relative_to(plugin.image_dir).as_posix()
     store.record_upload(
         link["id"], relative, image["id"], device, size=len(prepared), mtime_ns=mtime_ns
@@ -352,8 +365,12 @@ class CreateLinkBody(BaseModel):
 
 
 class UpdateLinkBody(BaseModel):
+    # A bad PATCH must fail loudly: a string "true" is not a boolean, and an
+    # unknown key is refused rather than silently ignored.
+    model_config = ConfigDict(extra="forbid")
+
     name: str | None = Field(default=None, min_length=1, max_length=MAX_NAME_LEN)
-    guests_see_all: bool | None = None
+    guests_see_all: StrictBool | None = None
 
 
 def _clean_name(raw: str) -> str:
@@ -444,6 +461,8 @@ async def revoke_share_link(link_id: str, remove_photos: bool = False):
     revoked = get_share_link_store().revoke(link_id)
     if revoked is None:
         raise _link_not_found()
+    # The link is gone, so its lock is dead weight: don't leak one per revoke.
+    _link_locks.pop(link_id, None)
     removed = 0
     plugin = _local_photos()
     if remove_photos and plugin is not None:
