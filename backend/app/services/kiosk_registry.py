@@ -440,7 +440,7 @@ async def list_kiosks() -> list[dict]:
             "powerHold": _valid_hold(row.power_hold),
             "agentHolds": agent_holds(row.agent_features),
             "paired": row.credential_hash is not None,
-            "pairedAt": _to_utc_iso(row.paired_at),
+            "pairedAt": _set_at_text(row.paired_at) if row.paired_at is not None else None,
             "agentPairs": agent_pairs(row.agent_features),
         }
         for row in rows
@@ -448,6 +448,14 @@ async def list_kiosks() -> list[dict]:
 
 
 # -- the screen's pairing credential (calvin-0xns) --------------------------
+
+
+async def agent_seen(kiosk_id: str) -> bool:
+    """Whether a display agent has ever polled for this screen."""
+    if not valid_kiosk_id(kiosk_id):
+        return False
+    row = await KioskDB.objects.get_or_none(id=kiosk_id)
+    return row is not None and row.agent_version is not None
 
 
 async def get_credential_hash(kiosk_id: str) -> str | None:

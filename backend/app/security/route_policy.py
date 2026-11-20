@@ -53,6 +53,10 @@ PUBLIC_WRITES = frozenset(
         # The display agent: the screen went to sleep, so end that kiosk's sessions.
         ("POST", "/api/kiosks/{kiosk_id}/screen-sleep"),
         ("POST", "/api/screen-sleep"),
+        # Pairing (calvin-0xns). Each handler does its own credential checks:
+        # an agent's own secret, a browser-only body, or an admin session.
+        ("POST", "/api/kiosks/{kiosk_id}/pair"),
+        ("POST", "/api/kiosks/{kiosk_id}/browser-session"),
     }
 )
 

@@ -79,7 +79,7 @@ async def test_list_rows_carry_paired_state_but_never_the_hash(test_db):
 
     rows = {row["id"]: row for row in await list_kiosks()}
     assert rows[KIOSK]["paired"] is True
-    assert rows[KIOSK]["pairedAt"].endswith("+00:00")  # ISO-8601, explicit UTC like lastSeen
+    assert rows[KIOSK]["pairedAt"].endswith("Z")  # ISO-8601 UTC, like a hold's setAt
     assert rows["unpaired"]["paired"] is False
     assert rows["unpaired"]["pairedAt"] is None
     for row in rows.values():

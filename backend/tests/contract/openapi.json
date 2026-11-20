@@ -209,6 +209,47 @@
         "title": "AllowedOriginsBody",
         "type": "object"
       },
+      "ApproveBody": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "ApproveBody",
+        "type": "object"
+      },
+      "ApprovedPairing": {
+        "properties": {
+          "displayName": {
+            "title": "Displayname",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "pairedAt": {
+            "title": "Pairedat",
+            "type": "string"
+          },
+          "replaced": {
+            "title": "Replaced",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "displayName",
+          "pairedAt",
+          "replaced"
+        ],
+        "title": "ApprovedPairing",
+        "type": "object"
+      },
       "BackupSchedule": {
         "properties": {
           "enabled": {
@@ -379,6 +420,23 @@
           "menu"
         ],
         "title": "BrightnessPoint",
+        "type": "object"
+      },
+      "BrowserSession": {
+        "properties": {
+          "state": {
+            "enum": [
+              "paired",
+              "pending"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "BrowserSession",
         "type": "object"
       },
       "CalendarEvent": {
@@ -2052,6 +2110,29 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "InstallCode": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "expiresAt": {
+            "title": "Expiresat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "expiresAt",
+          "command"
+        ],
+        "title": "InstallCode",
+        "type": "object"
+      },
       "KeyboardMappings": {
         "description": "Full key-code -> action map.",
         "properties": {
@@ -2135,6 +2216,79 @@
         "title": "OverridesBody",
         "type": "object"
       },
+      "PairBody": {
+        "properties": {
+          "browser": {
+            "default": false,
+            "title": "Browser",
+            "type": "boolean"
+          },
+          "hostname": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hostname"
+          },
+          "installCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Installcode"
+          }
+        },
+        "title": "PairBody",
+        "type": "object"
+      },
+      "PairState": {
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiresat"
+          },
+          "state": {
+            "enum": [
+              "paired",
+              "pending",
+              "none"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "PairState",
+        "type": "object"
+      },
       "PasswordBody": {
         "properties": {
           "display": {
@@ -2169,6 +2323,57 @@
           "password"
         ],
         "title": "PasswordBody",
+        "type": "object"
+      },
+      "PendingList": {
+        "properties": {
+          "pending": {
+            "items": {
+              "$ref": "#/components/schemas/PendingPairing"
+            },
+            "title": "Pending",
+            "type": "array"
+          }
+        },
+        "required": [
+          "pending"
+        ],
+        "title": "PendingList",
+        "type": "object"
+      },
+      "PendingPairing": {
+        "properties": {
+          "byAgent": {
+            "title": "Byagent",
+            "type": "boolean"
+          },
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "hostname": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hostname"
+          },
+          "kioskId": {
+            "title": "Kioskid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kioskId",
+          "hostname",
+          "createdAt",
+          "byAgent"
+        ],
+        "title": "PendingPairing",
         "type": "object"
       },
       "PluginActionRequest": {
@@ -2874,6 +3079,24 @@
           }
         },
         "title": "StopBody",
+        "type": "object"
+      },
+      "Unpaired": {
+        "properties": {
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "changed"
+        ],
+        "title": "Unpaired",
         "type": "object"
       },
       "UpdateLinkBody": {
@@ -5100,6 +5323,28 @@
         ]
       }
     },
+    "/api/kiosks/install-codes": {
+      "post": {
+        "description": "A one-time code for the install command; it works once, for 30 minutes.",
+        "operationId": "mint_install_code_api_kiosks_install_codes_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallCode"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Mint Install Code",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
     "/api/kiosks/install.sh": {
       "get": {
         "description": "One-command kiosk installer with this server's URL baked in.\n\nUsage on a fresh Pi: ``curl -fsSL http://<server>:8000/api/kiosks/install.sh | sudo bash``",
@@ -5161,6 +5406,68 @@
         ]
       }
     },
+    "/api/kiosks/pairings": {
+      "get": {
+        "description": "Live pending pairings, with no code and no hash (Settings' waiting list).",
+        "operationId": "get_pairings_api_kiosks_pairings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Pairings",
+        "tags": [
+          "kiosks"
+        ]
+      },
+      "post": {
+        "description": "Approve the code a screen shows: store its secret's hash and pair it.",
+        "operationId": "approve_pairing_api_kiosks_pairings_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovedPairing"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Pairing",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
     "/api/kiosks/{kiosk_id}": {
       "delete": {
         "description": "Remove a screen and everything stored for it (admin).\n\nDeletes the registry row with its overrides, calibration, pending update\nrequest and display-check state. 404 for an unknown kiosk; 409 while a\ndisplay check is active on it.\n\nRemoval does not block the device: a kiosk that is still running registers\nagain on its next real poll (one that sends its hostname or agent version),\nso remove only screens that have been decommissioned.",
@@ -5197,6 +5504,49 @@
           }
         },
         "summary": "Delete Kiosk",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
+    "/api/kiosks/{kiosk_id}/browser-session": {
+      "post": {
+        "description": "Swap a screen's bearer secret for the HttpOnly ``calvin_kiosk`` cookie.",
+        "operationId": "post_browser_session_api_kiosks__kiosk_id__browser_session_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserSession"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Browser Session",
         "tags": [
           "kiosks"
         ]
@@ -5914,6 +6264,143 @@
           }
         },
         "summary": "Put Kiosk Overrides",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
+    "/api/kiosks/{kiosk_id}/pair": {
+      "get": {
+        "description": "The caller's own pairing state; the code only to its pending holder.",
+        "operationId": "get_pair_api_kiosks__kiosk_id__pair_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PairState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Pair",
+        "tags": [
+          "kiosks"
+        ]
+      },
+      "post": {
+        "description": "Start or continue pairing for this screen.\n\nAn agent sends its own secret as a bearer; a browser-only screen sends\n``{\"browser\": true}`` and is handed a cookie for a fresh server-made secret.\nThe answer carries a code only to the holder of that pending secret.",
+        "operationId": "post_pair_api_kiosks__kiosk_id__pair_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PairBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PairState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Pair",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
+    "/api/kiosks/{kiosk_id}/pairing": {
+      "delete": {
+        "description": "Unpair a screen: clear its hash, so its secret stops working at once.",
+        "operationId": "delete_pairing_api_kiosks__kiosk_id__pairing_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unpaired"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Pairing",
         "tags": [
           "kiosks"
         ]

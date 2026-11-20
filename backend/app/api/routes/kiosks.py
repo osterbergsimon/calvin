@@ -18,6 +18,7 @@ from app.security.route_policy import (
     request_api_key,
 )
 from app.services import display_check, kiosk_bundle, kiosk_registry, screen_power
+from app.services.kiosk_pairing import pairing_store
 from app.services.kiosk_registry import (
     _KIOSK_ID_RE,
     agent_update_requested,
@@ -116,6 +117,8 @@ async def delete_kiosk(kiosk_id: str):
         )
     if not removed:
         raise HTTPException(status_code=404, detail="Unknown kiosk")
+    # A removed screen's pending pairings die with its row (calvin-0xns).
+    pairing_store.drop_kiosk(kiosk_id)
     return {"id": kiosk_id, "removed": True}
 
 
@@ -549,7 +552,9 @@ async def get_install_script(request: Request):
     Usage on a fresh Pi: ``curl -fsSL http://<server>:8000/api/kiosks/install.sh | sudo bash``
     """
     try:
-        script = kiosk_bundle.render_install_script(public_base_url(request))
+        script = kiosk_bundle.render_install_script(
+            public_base_url(request), pair_code=request.query_params.get("pair")
+        )
     except OSError as exc:
         raise internal_error(
             "kiosk_installer_unavailable",

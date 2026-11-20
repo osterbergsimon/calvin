@@ -131,7 +131,7 @@ async def kiosk_principal(request: Request) -> str | None:
     """
     cached = getattr(request.state, "kiosk_principal_cache", _MISSING)
     if cached is not _MISSING:
-        return cached
+        return cached if isinstance(cached, str) else None
     principal = await _resolve_principal(request)
     request.state.kiosk_principal_cache = principal
     return principal

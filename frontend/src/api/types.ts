@@ -1083,6 +1083,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/kiosks/install-codes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Mint Install Code
+     * @description A one-time code for the install command; it works once, for 30 minutes.
+     */
+    post: operations["mint_install_code_api_kiosks_install_codes_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/kiosks/install.sh": {
     parameters: {
       query?: never;
@@ -1125,6 +1145,30 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/kiosks/pairings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Pairings
+     * @description Live pending pairings, with no code and no hash (Settings' waiting list).
+     */
+    get: operations["get_pairings_api_kiosks_pairings_get"];
+    put?: never;
+    /**
+     * Approve Pairing
+     * @description Approve the code a screen shows: store its secret's hash and pair it.
+     */
+    post: operations["approve_pairing_api_kiosks_pairings_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/kiosks/{kiosk_id}": {
     parameters: {
       query?: never;
@@ -1148,6 +1192,26 @@ export interface paths {
      *     so remove only screens that have been decommissioned.
      */
     delete: operations["delete_kiosk_api_kiosks__kiosk_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/kiosks/{kiosk_id}/browser-session": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Post Browser Session
+     * @description Swap a screen's bearer secret for the HttpOnly ``calvin_kiosk`` cookie.
+     */
+    post: operations["post_browser_session_api_kiosks__kiosk_id__browser_session_post"];
+    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -1363,6 +1427,54 @@ export interface paths {
      *     signed in. Any other key is a 403 for that caller.
      */
     patch: operations["patch_kiosk_overrides_api_kiosks__kiosk_id__overrides_patch"];
+    trace?: never;
+  };
+  "/api/kiosks/{kiosk_id}/pair": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Pair
+     * @description The caller's own pairing state; the code only to its pending holder.
+     */
+    get: operations["get_pair_api_kiosks__kiosk_id__pair_get"];
+    put?: never;
+    /**
+     * Post Pair
+     * @description Start or continue pairing for this screen.
+     *
+     *     An agent sends its own secret as a bearer; a browser-only screen sends
+     *     ``{"browser": true}`` and is handed a cookie for a fresh server-made secret.
+     *     The answer carries a code only to the holder of that pending secret.
+     */
+    post: operations["post_pair_api_kiosks__kiosk_id__pair_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/kiosks/{kiosk_id}/pairing": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Delete Pairing
+     * @description Unpair a screen: clear its hash, so its secret stops working at once.
+     */
+    delete: operations["delete_pairing_api_kiosks__kiosk_id__pairing_delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   "/api/kiosks/{kiosk_id}/screen-power": {
@@ -2607,6 +2719,22 @@ export interface components {
       /** Origins */
       origins: string[];
     };
+    /** ApproveBody */
+    ApproveBody: {
+      /** Code */
+      code: string;
+    };
+    /** ApprovedPairing */
+    ApprovedPairing: {
+      /** Displayname */
+      displayName: string;
+      /** Id */
+      id: string;
+      /** Pairedat */
+      pairedAt: string;
+      /** Replaced */
+      replaced: boolean;
+    };
     /** BackupSchedule */
     BackupSchedule: {
       /**
@@ -2712,6 +2840,14 @@ export interface components {
       ddc: number;
       /** Menu */
       menu: number;
+    };
+    /** BrowserSession */
+    BrowserSession: {
+      /**
+       * State
+       * @enum {string}
+       */
+      state: "paired" | "pending";
     };
     /**
      * CalendarEvent
@@ -3145,6 +3281,15 @@ export interface components {
       /** Detail */
       detail?: components["schemas"]["ValidationError"][];
     };
+    /** InstallCode */
+    InstallCode: {
+      /** Code */
+      code: string;
+      /** Command */
+      command: string;
+      /** Expiresat */
+      expiresAt: string;
+    };
     /**
      * KeyboardMappings
      * @description Full key-code -> action map.
@@ -3182,6 +3327,30 @@ export interface components {
         [key: string]: unknown;
       };
     };
+    /** PairBody */
+    PairBody: {
+      /**
+       * Browser
+       * @default false
+       */
+      browser: boolean;
+      /** Hostname */
+      hostname?: string | null;
+      /** Installcode */
+      installCode?: string | null;
+    };
+    /** PairState */
+    PairState: {
+      /** Code */
+      code?: string | null;
+      /** Expiresat */
+      expiresAt?: string | null;
+      /**
+       * State
+       * @enum {string}
+       */
+      state: "paired" | "pending" | "none";
+    };
     /** PasswordBody */
     PasswordBody: {
       /** Display */
@@ -3190,6 +3359,22 @@ export interface components {
       kiosk?: string | null;
       /** Password */
       password: string;
+    };
+    /** PendingList */
+    PendingList: {
+      /** Pending */
+      pending: components["schemas"]["PendingPairing"][];
+    };
+    /** PendingPairing */
+    PendingPairing: {
+      /** Byagent */
+      byAgent: boolean;
+      /** Createdat */
+      createdAt: string;
+      /** Hostname */
+      hostname: string | null;
+      /** Kioskid */
+      kioskId: string;
     };
     /**
      * PluginActionRequest
@@ -3493,6 +3678,13 @@ export interface components {
        * @default false
        */
       saved: boolean;
+    };
+    /** Unpaired */
+    Unpaired: {
+      /** Changed */
+      changed: boolean;
+      /** Id */
+      id: string;
     };
     /** UpdateLinkBody */
     UpdateLinkBody: {
@@ -5148,6 +5340,26 @@ export interface operations {
       };
     };
   };
+  mint_install_code_api_kiosks_install_codes_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["InstallCode"];
+        };
+      };
+    };
+  };
   get_install_script_api_kiosks_install_sh_get: {
     parameters: {
       query?: never;
@@ -5199,6 +5411,59 @@ export interface operations {
       };
     };
   };
+  get_pairings_api_kiosks_pairings_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PendingList"];
+        };
+      };
+    };
+  };
+  approve_pairing_api_kiosks_pairings_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ApproveBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApprovedPairing"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   delete_kiosk_api_kiosks__kiosk_id__delete: {
     parameters: {
       query?: never;
@@ -5217,6 +5482,37 @@ export interface operations {
         };
         content: {
           "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  post_browser_session_api_kiosks__kiosk_id__browser_session_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BrowserSession"];
         };
       };
       /** @description Validation Error */
@@ -5631,6 +5927,103 @@ export interface operations {
         };
         content: {
           "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_pair_api_kiosks__kiosk_id__pair_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PairState"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  post_pair_api_kiosks__kiosk_id__pair_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PairBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PairState"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_pairing_api_kiosks__kiosk_id__pairing_delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Unpaired"];
         };
       };
       /** @description Validation Error */

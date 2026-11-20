@@ -271,6 +271,7 @@ def test_client(
         "app.api.routes.calendar",
         "app.api.routes.images",
         "app.api.routes.keyboard",
+        "app.api.routes.kiosk_pairing",
         "app.api.routes.kiosks",
         "app.api.routes.system",
         "app.api.routes.web_services",
@@ -315,6 +316,7 @@ def test_client(
         health,
         images,
         keyboard,
+        kiosk_pairing,
         kiosks,
         plugins,
         security,
@@ -336,6 +338,7 @@ def test_client(
     test_app.include_router(health.router, prefix="/api", tags=["health"])
     test_app.include_router(config.router, prefix="/api", tags=["config"])
     test_app.include_router(kiosks.router, prefix="/api", tags=["kiosks"])
+    test_app.include_router(kiosk_pairing.router, prefix="/api", tags=["kiosks"])
     test_app.include_router(calendar.router, prefix="/api", tags=["calendar"])
     test_app.include_router(keyboard.router, prefix="/api", tags=["keyboard"])
     test_app.include_router(images.router, prefix="/api", tags=["images"])
