@@ -2877,6 +2877,7 @@
         "type": "object"
       },
       "UpdateLinkBody": {
+        "additionalProperties": false,
         "properties": {
           "guests_see_all": {
             "anyOf": [
