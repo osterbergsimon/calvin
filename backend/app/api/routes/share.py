@@ -458,6 +458,8 @@ async def revoke_share_link(link_id: str, remove_photos: bool = False):
     revoked = get_share_link_store().revoke(link_id)
     if revoked is None:
         raise _link_not_found()
+    # The link is gone, so its lock is dead weight: don't leak one per revoke.
+    _link_locks.pop(link_id, None)
     removed = 0
     plugin = _local_photos()
     if remove_photos and plugin is not None:

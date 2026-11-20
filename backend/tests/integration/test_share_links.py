@@ -324,6 +324,17 @@ def test_revoke_is_immediate_and_keeps_photos_by_default(admin, guest, image_dir
     assert admin.delete(f"/api/share/links/{link['id']}").status_code == 404
 
 
+def test_revoke_drops_the_links_lock(admin, guest):
+    from app.api.routes import share
+
+    link, token = _make_link(admin)
+    _upload(guest, token, ("a.jpg", _photo()))
+    assert link["id"] in share._link_locks
+    assert admin.delete(f"/api/share/links/{link['id']}").status_code == 204
+    # A revoked link's entry must not stay in the per-process lock table.
+    assert link["id"] not in share._link_locks
+
+
 def test_revoke_can_remove_its_photos(admin, guest, image_dir):
     from tests.test_utils import create_test_image_file
 
