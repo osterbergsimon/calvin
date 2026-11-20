@@ -200,26 +200,48 @@ def test_pending_uploads_are_claimed_once(store):
     assert store.uploads_for(link["id"], device="phone-2") == []
 
 
-def test_unclaimed_pending_uploads_expire(store):
+def test_unclaimed_pending_upload_cannot_be_claimed_after_the_ttl(store):
     link, _ = store.create("Grandma", "Guests")
     store.record_upload(
         link["id"], "Guests/a.jpg", "img-a", device="pending:claim-1", now=1000, size=100
     )
-    # Still inside the window: counted, and claimable.
-    assert store.get(link["id"], now=1000 + PENDING_CLAIM_TTL - 1)["uploadCount"] == 1
-    assert store.get(link["id"], now=1000 + PENDING_CLAIM_TTL - 1)["uploadBytes"] == 100
+    assert store.get(link["id"], now=1000)["uploadCount"] == 1
+    assert store.get(link["id"], now=1000)["uploadBytes"] == 100
 
     expired = 1000 + PENDING_CLAIM_TTL
-    # Past it: it stops counting even before the file is rewritten.
-    assert store.get(link["id"], now=expired)["uploadCount"] == 0
-    assert store.get(link["id"], now=expired)["uploadBytes"] == 0
-    assert store.list(now=expired)[0]["uploadCount"] == 0
-    # And it can no longer be claimed.
+    # What expires is the claim, not the photo: it still counts and stays in
+    # the record (so revoke with remove_photos can still delete its file).
+    assert store.get(link["id"], now=expired)["uploadCount"] == 1
+    assert store.get(link["id"], now=expired)["uploadBytes"] == 100
+    assert store.list(now=expired)[0]["uploadCount"] == 1
     assert store.claim_uploads(link["id"], "claim-1", device="phone-1", now=expired) == 0
-    # The next write drops it from the file for good.
+    assert store.uploads_for(link["id"], device="phone-1") == []
+
+    # A later write keeps the old row instead of dropping it.
     store.record_upload(link["id"], "Guests/b.jpg", "img-b", device="phone-1", now=expired)
     data = json.loads(store.path.read_text())
-    assert [u["image_id"] for u in data["links"][0]["uploads"]] == ["img-b"]
+    assert [u["image_id"] for u in data["links"][0]["uploads"]] == ["img-a", "img-b"]
+    revoked = store.revoke(link["id"])
+    assert {u["path"] for u in revoked["uploads"]} == {"Guests/a.jpg", "Guests/b.jpg"}
+
+
+def test_a_claimed_upload_never_expires(store):
+    link, _ = store.create("Grandma", "Guests")
+    store.record_upload(
+        link["id"], "Guests/a.jpg", "img-a", device="pending:claim-1", now=1000, size=100
+    )
+    assert (
+        store.claim_uploads(
+            link["id"], "claim-1", device="phone-1", now=1000 + PENDING_CLAIM_TTL - 1
+        )
+        == 1
+    )
+    later = 1000 + 10 * PENDING_CLAIM_TTL
+    # Claimed means the phone's own photo: it never looks like a stale claim.
+    assert [u["imageId"] for u in store.uploads_for(link["id"], device="phone-1")] == ["img-a"]
+    assert store.get(link["id"], now=later)["uploadCount"] == 1
+    assert store.get(link["id"], now=later)["uploadBytes"] == 100
+    assert store.claim_uploads(link["id"], "claim-1", device="phone-1", now=later) == 0
 
 
 def test_old_uploads_on_a_device_never_expire(store):

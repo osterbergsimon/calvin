@@ -49,8 +49,9 @@ LAST_USED_INTERVAL = 60  # seconds between last_used_at writes from page loads
 # under this prefix plus the claim id. A device cookie can't contain ":", so a
 # claim never matches a real device and a device id never works as a claim.
 PENDING_PREFIX = "pending:"
-# A share that nobody claims (the guest page never opened with the phone's
-# cookie) must not hold its quota slot for ever.
+# How long a share waiting for a guest page may still be claimed. The photo is
+# a real upload either way: it keeps counting against the link and stays in the
+# record, so revoking with remove_photos still deletes its file.
 PENDING_CLAIM_TTL = 60 * 60
 _KEY_BYTES = 32
 _FILE_VERSION = 1
@@ -68,23 +69,11 @@ def _iso(epoch: int | float) -> str:
     return datetime.fromtimestamp(epoch, UTC).isoformat().replace("+00:00", "Z")
 
 
-def _expired_pending(upload: dict[str, Any], now: float) -> bool:
-    """Whether a pending claim is past its window and must stop counting."""
-    return bool(upload.get("pending")) and (now - float(upload["uploaded_at"]) >= PENDING_CLAIM_TTL)
-
-
-def _drop_expired_pending(links: list[dict[str, Any]], now: float) -> None:
-    """Remove expired pending claims in place, so the next write persists it."""
-    for entry in links:
-        uploads = entry.get("uploads", [])
-        entry["uploads"] = [upload for upload in uploads if not _expired_pending(upload, now)]
-
-
 def _public(entry: dict[str, Any], now: float) -> dict[str, Any]:
     """The shape the admin API returns: never the hash, never the uploads' devices."""
     last_used = entry.get("last_used_at")
     expires = entry.get("expires_at")
-    uploads = [u for u in entry.get("uploads", []) if not _expired_pending(u, now)]
+    uploads = entry.get("uploads", [])
     return {
         "id": entry["id"],
         "name": entry["name"],
@@ -269,7 +258,6 @@ class ShareLinkStore:
         current = time.time()
         with self._lock:
             links = self._load()
-            _drop_expired_pending(links, current)
             target = next((entry for entry in links if entry["id"] == link_id), None)
             if target is None:
                 return None
@@ -290,7 +278,6 @@ class ShareLinkStore:
         current = time.time()
         with self._lock:
             links = self._load()
-            _drop_expired_pending(links, current)
             target = next((entry for entry in links if entry["id"] == link_id), None)
             if target is None:
                 return None
@@ -320,7 +307,6 @@ class ShareLinkStore:
         current = time.time() if now is None else now
         with self._lock:
             links = self._load()
-            _drop_expired_pending(links, current)
             target = next((entry for entry in links if entry["id"] == link_id), None)
             if target is None:
                 return
@@ -334,7 +320,6 @@ class ShareLinkStore:
                     "uploaded_at": current,
                     "size": size,
                     "mtime_ns": mtime_ns,
-                    "pending": device.startswith(PENDING_PREFIX),
                 }
             )
             target["last_used_at"] = current
@@ -344,33 +329,23 @@ class ShareLinkStore:
         """This device's uploads through this link (every upload when ``device`` is
         ``None``), newest first."""
         device_hash = _hash(device) if device is not None else None
-        current = time.time()
         for entry in self._load():
             if entry["id"] == link_id:
                 mine = [
-                    u
-                    for u in entry["uploads"]
-                    if (device_hash is None or u["device"] == device_hash)
-                    and not _expired_pending(u, current)
+                    u for u in entry["uploads"] if device_hash is None or u["device"] == device_hash
                 ]
                 mine.sort(key=lambda u: u["uploaded_at"], reverse=True)
                 return [_public_upload(upload) for upload in mine]
         return []
 
     def remove_upload(
-        self,
-        link_id: str,
-        image_id: str,
-        device: str | None = None,
-        now: float | None = None,
+        self, link_id: str, image_id: str, device: str | None = None
     ) -> dict[str, Any] | None:
         """Forget one of this device's uploads (any of the link's when ``device`` is
         ``None``); returns it so the caller deletes the file."""
         device_hash = _hash(device) if device is not None else None
-        current = time.time() if now is None else now
         with self._lock:
             links = self._load()
-            _drop_expired_pending(links, current)
             for entry in links:
                 if entry["id"] != link_id:
                     continue
@@ -387,17 +362,22 @@ class ShareLinkStore:
         """Hand the uploads waiting under ``claim`` on this link to ``device``.
 
         One time only: afterwards they belong to the device and the claim
-        matches nothing. Returns how many uploads were claimed.
+        matches nothing. A claim older than ``PENDING_CLAIM_TTL`` claims
+        nothing; the photo stays in the record and keeps its quota. Returns how
+        many uploads were claimed.
         """
         pending = _hash(PENDING_PREFIX + claim)
         current = time.time() if now is None else now
         with self._lock:
             links = self._load()
-            _drop_expired_pending(links, current)
             target = next((entry for entry in links if entry["id"] == link_id), None)
             if target is None:
                 return 0
-            claimed = [u for u in target["uploads"] if u["device"] == pending]
+            claimed = [
+                u
+                for u in target["uploads"]
+                if u["device"] == pending and current - float(u["uploaded_at"]) < PENDING_CLAIM_TTL
+            ]
             if not claimed:
                 return 0
             for upload in claimed:

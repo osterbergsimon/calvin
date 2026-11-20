@@ -901,6 +901,32 @@ def test_claim_sets_a_cookie_for_a_new_device(admin, app, image_dir):
     assert len(fresh.get(f"/api/guest/{token}/uploads").json()["uploads"]) == 1
 
 
+def test_expired_pending_claim_still_counts_and_revoke_removes_it(
+    admin, app, image_dir, monkeypatch
+):
+    from app.security import share_links
+
+    link, token = _make_link(admin, guests_see_all=False)
+    share_sheet = TestClient(app)
+    response = _share(share_sheet, token)
+    claim = _claim_of(response.headers["location"])
+    path = image_dir / "Guests" / "shared.jpg"
+    assert path.is_file()
+
+    real_time = share_links.time.time
+    monkeypatch.setattr(
+        share_links.time, "time", lambda: real_time() + share_links.PENDING_CLAIM_TTL
+    )
+    # The claim id is dead...
+    phone = TestClient(app)
+    phone.get(f"/api/guest/{token}")
+    assert phone.post(f"/api/guest/{token}/claim", json={"claim": claim}).json() == {"claimed": 0}
+    # ...but the photo is still a real upload, counted and in the link record.
+    assert admin.get("/api/share/links").json()["links"][0]["uploadCount"] == 1
+    assert admin.delete(f"/api/share/links/{link['id']}?remove_photos=true").status_code == 204
+    assert not path.exists()
+
+
 def test_claim_is_scoped_to_its_link(admin, app, image_dir):
     _, token_a = _make_link(admin, "A", "A", guests_see_all=False)
     _, token_b = _make_link(admin, "B", "B", guests_see_all=False)

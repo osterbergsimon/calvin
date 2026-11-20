@@ -50,8 +50,10 @@ or opening the link at another address (`calvin.local` instead of the IP
 address) starts afresh. The installed app shares the cookie of the browser it
 was installed from. Photos shared from the gallery stay with the phone even
 when Android sends the share without the cookie: the page that opens after
-the share claims them. A share that nobody claims within an hour is dropped
-and stops counting against the link's photo limit.
+the share claims them. A share that nobody claims within an hour can no longer
+be claimed by a phone: the photo stays in the link's folder, counts against
+the link's photo limit, and is removed with the link's other photos if you
+revoke the link and choose that option.
 
 Calvin scales each photo down for display (longest side 2560 px), turns it
 upright and removes the GPS location from its EXIF data. Only JPEG, PNG, WebP
