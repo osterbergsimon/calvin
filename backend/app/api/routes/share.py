@@ -101,6 +101,9 @@ guest_upload_limiter = UploadRateLimiter()
 
 # One lock per link: the quota and limiter check, the reservation and the write
 # run as one step, so parallel requests can't all pass the same check.
+# This table, ``guest_upload_limiter`` and the store's lock are per process, so
+# Calvin must run in ONE uvicorn worker (docker/Dockerfile): more workers, or
+# ``WEB_CONCURRENCY``, would each enforce their own quota.
 _link_locks: dict[str, asyncio.Lock] = {}
 
 

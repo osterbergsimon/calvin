@@ -137,4 +137,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=180s --retries=3 \
     CMD curl -fsS http://localhost:8000/api/health || exit 1
 
 ENTRYPOINT ["calvin-entrypoint"]
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# One worker only. The share-link locks and the guest upload limiter are
+# in-memory tables per process (backend/app/api/routes/share.py), so a second
+# worker (or WEB_CONCURRENCY) would enforce its own quota and break the limits.
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
