@@ -154,5 +154,45 @@ describe("Calvin update lifecycle", () => {
     for (const phase of phases) {
       expect(UPDATE_PHASES[phase], `phase "${phase}" has no words`).toBeTruthy();
     }
+    // The grep only sees literals: a phase assigned through a variable would
+    // slip past it, so fail loudly instead of passing quietly.
+    const assignments = [...script.matchAll(/^\s*UPDATE_PHASE=(\S+)/gm)].map(m => m[1]);
+    const nonLiteral = assignments.filter(value => !/^"[a-z_]+"$/.test(value));
+    expect(nonLiteral, "UPDATE_PHASE is set through a variable").toEqual([]);
+  });
+
+  it("would notice a phase set through a variable", () => {
+    // Keeps the guard above honest: it must reject a variable assignment.
+    const snippet = 'UPDATE_PHASE="$phase"\n';
+    const assignments = [...snippet.matchAll(/^\s*UPDATE_PHASE=(\S+)/gm)].map(m => m[1]);
+    expect(assignments.filter(value => !/^"[a-z_]+"$/.test(value))).toEqual(['"$phase"']);
+  });
+
+  // The browser sees the API's statuses, not the script's; the backend test
+  // keeps the script statuses mapped. This keeps the browser in step with the
+  // API vocabulary it is handed.
+  it("has an event for every API status backend/app/services/update_lifecycle.py reports", () => {
+    const backend = readFileSync(
+      resolve(process.cwd(), "../backend/app/services/update_lifecycle.py"),
+      "utf-8"
+    );
+    const api = new Map(
+      [...backend.matchAll(/^API_(RUNNING|DONE|FAILED|UNKNOWN) = "([a-z]+)"$/gm)].map(m => [
+        m[1],
+        m[2],
+      ])
+    );
+    expect(api.size, "API statuses not found in the backend module").toBe(4);
+    const streamDone = backend.match(/^STREAM_DONE = "([a-z]+)"$/m)?.[1];
+    expect(streamDone, "STREAM_DONE not found in the backend module").toBeTruthy();
+
+    for (const status of [...api.values(), streamDone]) {
+      const event = serverStatusEvent({ status });
+      if (status === api.get("UNKNOWN")) {
+        expect(event, `API status "${status}" should say nothing`).toBeNull();
+      } else {
+        expect(event, `API status "${status}" has no event`).not.toBeNull();
+      }
+    }
   });
 });
