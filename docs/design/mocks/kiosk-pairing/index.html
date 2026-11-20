@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kiosk pairing</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<!--
+  Mock for the kiosk pairing screens (spec: ../../2026-11-21-kiosk-pairing.md).
+  Role tokens copied from frontend/src/styles/theme.css (light and Backlit). Screen names, dates and
+  codes are placeholders. Frames: the 7-inch panel at 800x480 and 480x800, and a 390px phone.
+  Each frame has an id (A1, B2, …) the spec refers to.
+-->
+<style>
+:root {
+  --bg-0:#eef1f4; --bg-1:#ffffff; --bg-2:#ffffff; --line:#dde3e8; --line-soft:#e8edf1;
+  --ink:#1b242b; --ink-2:#5d6b75; --ink-3:#636e77; --focus:#e08a1e; --focus-ink:#1b242b;
+  --focus-text:#875c24; --ok:#2e9e6b; --ok-text:#25674e; --warn:#b38f00; --warn-text:#7f6a0f;
+  --err:#c0392b; --err-text:#76302b;
+  --font-ui:"IBM Plex Sans",system-ui,sans-serif; --font-data:"IBM Plex Mono",ui-monospace,monospace;
+  --text-caption:.75rem; --text-meta:.8rem; --text-body:.9rem; --text-label:1rem; --text-title:1.15rem;
+  --text-display:1.7rem;
+  --weight-body:400; --weight-strong:500; --weight-title:600;
+  --gap-1:.25rem; --gap-2:.5rem; --gap-3:.75rem; --gap-4:1rem; --gap-5:1.25rem; --gap-6:1.5rem; --gap-8:2rem;
+  --radius-control:8px; --radius-card:12px; --radius-panel:16px; --radius-round:999px;
+  --touch-target:2.75rem; --control-height:3rem;
+  /* the one component token this spec adds */
+  --pairing-code-size:calc(var(--text-display) * 1.75);
+}
+.dark {
+  --bg-0:#0e1316; --bg-1:#151c21; --bg-2:#1d262d; --line:#27313a; --line-soft:#1e272e;
+  --ink:#eaf0f3; --ink-2:#9aa7b0; --ink-3:#818d96; --focus:#f3b052; --focus-ink:#151c21;
+  --focus-text:#efcd9a; --ok:#5bd0a0; --ok-text:#9bdec5; --warn:#ffd84d; --warn-text:#ffd84d;
+  --err:#ef6b5e; --err-text:#eda7a1;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:#d9dee3; font-family:var(--font-ui); color:#1b242b; }
+.board { padding:32px 16px; max-width:1240px; margin:0 auto; }
+h1 { font-size:1.4rem; font-weight:600; margin:0 0 8px; }
+h2 { font-size:1.1rem; font-weight:600; margin:40px 0 8px; }
+.board > p { max-width:76ch; margin:0 0 20px; line-height:1.5; }
+.row { display:flex; flex-wrap:wrap; gap:32px; align-items:flex-start; }
+figure { margin:0 0 24px; }
+figcaption { font-size:.85rem; color:#5d6b75; margin-top:8px; max-width:480px; line-height:1.4; }
+figcaption b { color:#1b242b; }
+
+/* ---------------- kiosk frames ---------------- */
+.kiosk { background:var(--bg-0); color:var(--ink); display:flex; flex-direction:column; overflow:hidden;
+  border:6px solid #11161a; border-radius:10px; }
+.k800 { width:812px; height:492px; } .k480 { width:492px; height:812px; }
+.dash { flex:1; min-height:0; display:flex; flex-direction:column; }
+.clockbar { display:flex; align-items:center; justify-content:space-between; padding:0 var(--gap-4); height:52px;
+  background:var(--bg-1); border-bottom:1px solid var(--line); }
+.clockbar__time { font-family:var(--font-data); font-size:1.5rem; font-weight:500; }
+.clockbar__date { font-size:var(--text-body); color:var(--ink-2); }
+.clockbar__btn { width:44px; height:44px; border-radius:var(--radius-control); border:1px solid var(--line); background:var(--bg-2);
+  display:grid; place-items:center; color:var(--ink-2); }
+.regions { flex:1; min-height:0; display:grid; gap:var(--gap-3); padding:var(--gap-3); }
+.k800 .regions { grid-template-columns:1.3fr 1fr; }
+.k480 .regions { grid-template-rows:1fr 1fr; }
+.region { background:var(--bg-1); border:1px solid var(--line); border-radius:var(--radius-panel); padding:var(--gap-3) var(--gap-4);
+  overflow:hidden; display:flex; flex-direction:column; gap:var(--gap-2); }
+.region h4 { margin:0; font-size:var(--text-meta); color:var(--ink-3); font-family:var(--font-data); text-transform:uppercase; letter-spacing:.12em; font-weight:500; }
+.ev { display:flex; gap:var(--gap-3); font-size:var(--text-body); padding:var(--gap-1) 0; border-top:1px solid var(--line-soft); }
+.ev:first-of-type { border-top:0; }
+.ev b { font-family:var(--font-data); font-weight:500; width:3.2rem; color:var(--ink-2); }
+.photo { flex:1; border-radius:var(--radius-card); background:linear-gradient(135deg,#8fa8b8,#c9b48d 60%,#7c8f6a); }
+.dark .photo { background:linear-gradient(135deg,#3b4c58,#6a5b3e 60%,#3c4a33); }
+
+/* the pairing strip: docked at the bottom edge, in the page flow (it never floats over the dashboard) */
+.pair-strip { flex:none; display:flex; align-items:center; gap:var(--gap-4); padding:var(--gap-3) var(--gap-5);
+  background:var(--bg-1); border-top:1px solid var(--line); }
+.pair-strip__icon { flex:none; width:28px; height:28px; color:var(--ink-2); }
+.pair-strip__body { flex:1; min-width:0; display:flex; flex-direction:column; gap:var(--gap-1); }
+.pair-strip__title { margin:0; font-size:var(--text-label); font-weight:var(--weight-strong); color:var(--ink); }
+.pair-strip__text { margin:0; font-size:var(--text-body); color:var(--ink-2); line-height:1.35; }
+.pair-strip__code { flex:none; margin:0; font-family:var(--font-data); font-size:var(--pairing-code-size); font-weight:500;
+  letter-spacing:.06em; line-height:1; color:var(--ink); font-variant-numeric:tabular-nums; }
+.k480 .pair-strip { flex-direction:column; align-items:flex-start; gap:var(--gap-2); padding:var(--gap-3) var(--gap-4); }
+.k480 .pair-strip__head { display:flex; gap:var(--gap-3); align-items:center; }
+
+/* ---------------- settings frames ---------------- */
+.settings { background:var(--bg-0); color:var(--ink); padding:var(--gap-4); border-radius:var(--radius-panel); }
+.p390 { width:390px; } .p480 { width:480px; } .p800 { width:800px; }
+.eyebrow { display:flex; align-items:center; justify-content:space-between; margin:0 0 var(--gap-2); }
+.eyebrow span { font-family:var(--font-data); font-size:var(--text-caption); text-transform:uppercase; letter-spacing:.14em; color:var(--ink-3); }
+.panel { background:var(--bg-1); border:1px solid var(--line); border-radius:var(--radius-panel); margin-bottom:var(--gap-6); }
+.panel > * { padding:var(--gap-3) var(--gap-5); }
+.panel > * + * { border-top:1px solid var(--line-soft); }
+.srow { display:flex; align-items:center; justify-content:space-between; gap:var(--gap-4); }
+.srow--stacked { flex-direction:column; align-items:stretch; }
+.srow__label { font-size:var(--text-label); font-weight:var(--weight-strong); margin:0; }
+.srow__desc { font-size:var(--text-meta); color:var(--ink-2); margin:var(--gap-1) 0 0; line-height:1.4; }
+.note { font-size:var(--text-meta); color:var(--ink-2); margin:0; line-height:1.4; }
+.note--warn { color:var(--warn-text); } .note--err { color:var(--err-text); } .note--ok { color:var(--ok-text); }
+.note .btn--link { min-height:auto; padding:0; margin-left:var(--gap-1); font-size:inherit; }
+.strip-note { display:flex; gap:var(--gap-2); align-items:flex-start; }
+.strip-note svg { flex:none; width:16px; height:16px; margin-top:1px; }
+.btn { font:inherit; font-size:var(--text-body); font-weight:var(--weight-strong); min-height:var(--control-height); padding:0 var(--gap-4);
+  border-radius:var(--radius-control); border:1px solid var(--line); background:var(--bg-2); color:var(--ink); cursor:pointer; white-space:nowrap; }
+.btn--sm { min-height:var(--touch-target); }
+.btn--primary { background:var(--focus); color:var(--focus-ink); border-color:var(--focus); }
+.btn--danger { color:var(--err); }
+.btn--danger-fill { background:var(--err); color:#fff; border-color:var(--err); }
+.dark .btn--danger-fill { color:var(--bg-1); }
+.btn--link { border:0; background:none; padding:0 var(--gap-1); text-decoration:underline; min-height:var(--touch-target); }
+.btn[aria-disabled="true"] { opacity:.5; cursor:not-allowed; }
+.is-focus { outline:2px solid var(--focus); outline-offset:2px; }
+.tag { display:inline-flex; align-items:center; gap:var(--gap-1); font-size:var(--text-caption); font-weight:var(--weight-strong);
+  padding:2px var(--gap-2); border-radius:var(--radius-control); border:1px solid var(--line); color:var(--ink-2); white-space:nowrap; }
+.tag--ok { color:var(--ok-text); border-color:color-mix(in srgb,var(--ok) 45%,transparent); background:color-mix(in srgb,var(--ok) 10%,transparent); }
+.lrow { display:flex; gap:var(--gap-3); align-items:flex-start; }
+.lrow__thumb { flex:none; width:56px; height:36px; border-radius:6px; border:1px solid var(--line); background:var(--bg-0); }
+.lrow__body { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.lrow__name { font-size:var(--text-label); font-weight:var(--weight-strong); margin:0 0 2px; }
+.lrow__actions { flex:none; display:flex; gap:var(--gap-2); }
+.lrow--waiting .lrow__thumb { border-style:dashed; background:transparent; }
+.field { display:flex; flex-direction:column; gap:var(--gap-1); flex:1; min-width:0; }
+.field label { font-size:var(--text-meta); color:var(--ink-2); }
+.field input { font:inherit; font-size:var(--text-body); height:var(--control-height); padding:0 var(--gap-3); width:100%;
+  border:1px solid var(--line); border-radius:var(--radius-control); background:var(--bg-2); color:var(--ink); letter-spacing:.04em; }
+.field input[aria-invalid="true"] { border-color:var(--err); }
+.pair-line { display:flex; gap:var(--gap-2); align-items:flex-end; margin-top:var(--gap-3); }
+.pair-line .field { max-width:14rem; }
+.p390 .pair-line .field { max-width:none; }
+.pair-result { margin-top:var(--gap-2); }
+.toggle { flex:none; width:52px; height:30px; border-radius:var(--radius-round); background:var(--bg-0); border:1px solid var(--line); position:relative; }
+.toggle::after { content:""; position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%; background:var(--ink-3); }
+.toggle--on { background:var(--focus); border-color:var(--focus); }
+.toggle--on::after { left:25px; background:var(--focus-ink); }
+.cmd-row { display:flex; gap:var(--gap-2); align-items:stretch; }
+.cmd { flex:1; min-width:0; display:flex; align-items:center; padding:var(--gap-2) var(--gap-3); overflow-wrap:anywhere; font-family:var(--font-data);
+  font-size:var(--text-meta); color:var(--ink); background:var(--bg-0); border:1px solid var(--line); border-radius:var(--radius-control); }
+.cmd--wait { color:var(--ink-2); font-family:var(--font-ui); }
+.card { background:var(--bg-1); border:1px solid var(--line); border-radius:var(--radius-card); padding:var(--gap-4); display:flex; flex-direction:column; gap:var(--gap-3); }
+.card h5 { margin:0; font-size:var(--text-label); font-weight:var(--weight-strong); }
+.dialog-wrap { padding:var(--gap-6) var(--gap-4); background:color-mix(in srgb,#000 45%,var(--bg-0)); border-radius:var(--radius-panel); }
+.dialog { background:var(--bg-1); color:var(--ink); border-radius:var(--radius-panel); padding:var(--gap-5); max-width:26rem; margin:0 auto;
+  box-shadow:0 18px 50px -16px rgba(0,0,0,.5); }
+.dialog h3 { margin:0 0 var(--gap-2); font-size:var(--text-title); font-weight:var(--weight-title); }
+.dialog p { margin:0 0 var(--gap-5); font-size:var(--text-body); color:var(--ink-2); line-height:1.45; }
+.dialog__actions { display:flex; justify-content:flex-end; gap:var(--gap-2); }
+.back { font-size:var(--text-body); text-decoration:underline; margin:0 0 var(--gap-3); color:var(--ink); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <!-- mdiCellphoneLink -->
+  <symbol id="i-phone" viewBox="0 0 24 24"><path fill="currentColor" d="M22,8H16A1,1 0 0,0 15,9V19A1,1 0 0,0 16,20H22A1,1 0 0,0 23,19V9A1,1 0 0,0 22,8M21,18H17V10H21V18M4,6H22V4H4A2,2 0 0,0 2,6V17H0V20H14V17H4V6Z"/></symbol>
+  <!-- mdiAlert -->
+  <symbol id="i-alert" viewBox="0 0 24 24"><path fill="currentColor" d="M13,14H11V10H13M13,18H11V16H13M1,21H23L12,2L1,21Z"/></symbol>
+  <!-- mdiMenu (show-controls) -->
+  <symbol id="i-menu" viewBox="0 0 24 24"><path fill="currentColor" d="M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z"/></symbol>
+</svg>
+
+<div class="board">
+  <h1>Kiosk pairing</h1>
+  <p>On the wall, an unpaired screen shows its code in a strip docked to the bottom edge. The dashboard gets shorter
+  by the height of the strip, so nothing is hidden and no button is covered. In Settings › Screens, each screen row
+  says whether it is paired. A new Pairing section holds <b>Pair a screen</b> and <b>Only paired screens</b>, and
+  <b>Add a screen</b> gives a one-time code with its install command.</p>
+
+  <!-- ======================= A: the kiosk strip ======================= -->
+  <h2>A. The pairing strip on the screen</h2>
+  <div class="row">
+    <figure id="A1">
+      <div class="kiosk k800">
+        <div class="dash">
+          <div class="clockbar"><span class="clockbar__time">07:42</span><span class="clockbar__date">Thursday 21 November</span>
+            <span class="clockbar__btn"><svg width="22" height="22"><use href="#i-menu"/></svg></span></div>
+          <div class="regions">
+            <div class="region"><h4>Today</h4>
+              <div class="ev"><b>08:00</b>School run</div><div class="ev"><b>12:30</b>Lunch with Ana</div>
+              <div class="ev"><b>17:15</b>Swimming</div><div class="ev"><b>19:00</b>Book club</div></div>
+            <div class="region"><div class="photo"></div></div>
+          </div>
+        </div>
+        <aside class="pair-strip" aria-labelledby="ps1">
+          <svg class="pair-strip__icon" aria-hidden="true"><use href="#i-phone"/></svg>
+          <div class="pair-strip__body">
+            <p class="pair-strip__title" id="ps1">Pair this screen</p>
+            <p class="pair-strip__text">On your phone or computer, open Settings › Screens in Calvin and type this code under Pair a screen.</p>
+          </div>
+          <p class="pair-strip__code" aria-label="Code: K 7 Q, 4 M D">K7Q-4MD</p>
+        </aside>
+      </div>
+      <figcaption><b>A1</b> 800×480, light. The strip is the last box in the page. The dashboard above it is
+      88 px shorter, and the clock bar's buttons stay where they are.</figcaption>
+    </figure>
+
+    <figure id="A2">
+      <div class="kiosk k800 dark">
+        <div class="dash">
+          <div class="clockbar"><span class="clockbar__time">21:08</span><span class="clockbar__date">Thursday 21 November</span>
+            <span class="clockbar__btn"><svg width="22" height="22"><use href="#i-menu"/></svg></span></div>
+          <div class="regions">
+            <div class="region"><h4>Tomorrow</h4>
+              <div class="ev"><b>07:30</b>Bins out</div><div class="ev"><b>09:00</b>Dentist</div>
+              <div class="ev"><b>18:00</b>Pizza night</div></div>
+            <div class="region"><div class="photo"></div></div>
+          </div>
+        </div>
+        <aside class="pair-strip" aria-labelledby="ps2">
+          <svg class="pair-strip__icon" aria-hidden="true"><use href="#i-phone"/></svg>
+          <div class="pair-strip__body">
+            <p class="pair-strip__title" id="ps2">Pair this screen</p>
+            <p class="pair-strip__text">On your phone or computer, open Settings › Screens in Calvin and type this code under Pair a screen.</p>
+          </div>
+          <p class="pair-strip__code" aria-label="Code: K 7 Q, 4 M D">K7Q-4MD</p>
+        </aside>
+      </div>
+      <figcaption><b>A2</b> 800×480, Backlit (dark). Same tokens, no special colour: the code is <code>--ink</code>
+      on <code>--bg-1</code>.</figcaption>
+    </figure>
+  </div>
+
+  <div class="row">
+    <figure id="A3">
+      <div class="kiosk k480">
+        <div class="dash">
+          <div class="clockbar"><span class="clockbar__time">07:42</span><span class="clockbar__date">Thu 21 Nov</span>
+            <span class="clockbar__btn"><svg width="22" height="22"><use href="#i-menu"/></svg></span></div>
+          <div class="regions">
+            <div class="region"><h4>Today</h4>
+              <div class="ev"><b>08:00</b>School run</div><div class="ev"><b>12:30</b>Lunch with Ana</div>
+              <div class="ev"><b>17:15</b>Swimming</div></div>
+            <div class="region"><div class="photo"></div></div>
+          </div>
+        </div>
+        <aside class="pair-strip" aria-labelledby="ps3">
+          <div class="pair-strip__head">
+            <svg class="pair-strip__icon" aria-hidden="true"><use href="#i-phone"/></svg>
+            <p class="pair-strip__title" id="ps3">Pair this screen</p>
+          </div>
+          <p class="pair-strip__text">On your phone or computer, open Settings › Screens in Calvin and type this code under Pair a screen.</p>
+          <p class="pair-strip__code" aria-label="Code: K 7 Q, 4 M D">K7Q-4MD</p>
+        </aside>
+      </div>
+      <figcaption><b>A3</b> 480×800 portrait (any width ≤ 600): the strip stacks, with the code on its own line
+      and left-aligned.</figcaption>
+    </figure>
+
+    <figure id="A4">
+      <div class="kiosk k480 dark">
+        <div class="dash">
+          <div class="clockbar"><span class="clockbar__time">21:08</span><span class="clockbar__date">Thu 21 Nov</span>
+            <span class="clockbar__btn"><svg width="22" height="22"><use href="#i-menu"/></svg></span></div>
+          <div class="regions">
+            <div class="region"><h4>Tomorrow</h4>
+              <div class="ev"><b>07:30</b>Bins out</div><div class="ev"><b>09:00</b>Dentist</div></div>
+            <div class="region"><div class="photo"></div></div>
+          </div>
+        </div>
+        <aside class="pair-strip" aria-labelledby="ps4">
+          <div class="pair-strip__head">
+            <svg class="pair-strip__icon" aria-hidden="true"><use href="#i-phone"/></svg>
+            <p class="pair-strip__title" id="ps4">Pair this screen</p>
+          </div>
+          <p class="pair-strip__text">On your phone or computer, open Settings › Screens in Calvin and type this code under Pair a screen.</p>
+          <p class="pair-strip__code" aria-label="Code: K 7 Q, 4 M D">K7Q-4MD</p>
+        </aside>
+      </div>
+      <figcaption><b>A4</b> 480×800, Backlit. Once the screen is paired, the strip goes and the dashboard takes
+      the full height again. Nothing else is shown.</figcaption>
+    </figure>
+  </div>
+
+  <!-- ======================= B: Screens list ======================= -->
+  <h2>B. Settings › Screens: the list and the Pairing section</h2>
+  <div class="row">
+    <figure id="B1">
+      <div class="settings p390">
+        <div class="eyebrow"><span>Screens</span><button class="btn btn--sm">+ Add a screen</button></div>
+        <div class="panel">
+          <div class="strip-note note note--warn"><svg aria-hidden="true"><use href="#i-alert"/></svg>
+            <span>2 of 4 screens seen this week are paired. Another device on your home network could pretend to be an unpaired screen.</span></div>
+          <div class="lrow"><span class="lrow__thumb"></span><div class="lrow__body"><p class="lrow__name">Default</p>
+            <p class="note">Used by new screens and by browsers that aren't set up as a screen</p></div></div>
+          <div class="lrow"><span class="lrow__thumb"></span><div class="lrow__body"><p class="lrow__name">Kitchen</p>
+            <p class="note">kitchen</p><p class="note">Last seen just now</p><p class="note">Paired since 3 Nov</p></div>
+            <div class="lrow__actions"><span class="tag tag--ok">Online</span></div></div>
+          <div class="lrow"><span class="lrow__thumb"></span><div class="lrow__body"><p class="lrow__name">Hall</p>
+            <p class="note">hall</p><p class="note">Last seen 2 min ago</p><p class="note">Not paired. It shows a code to type in Pair a screen.</p></div>
+            <div class="lrow__actions"><span class="tag tag--ok">Online</span></div></div>
+          <div class="lrow"><span class="lrow__thumb"></span><div class="lrow__body"><p class="lrow__name">Office</p>
+            <p class="note">office</p><p class="note">Last seen 1 h ago</p><p class="note">Needs a software update before it can be paired.</p></div>
+            <div class="lrow__actions"><span class="tag">Offline</span></div></div>
+          <div class="lrow"><span class="lrow__thumb"></span><div class="lrow__body"><p class="lrow__name">Landing</p>
+            <p class="note">landing</p><p class="note">Last seen today</p><p class="note">Paired today</p></div>
+            <div class="lrow__actions"><span class="tag tag--ok">Online</span></div></div>
+        </div>
+
+        <div class="eyebrow"><span>Pairing</span></div>
+        <div class="panel">
+          <div class="srow srow--stacked">
+            <div><p class="srow__label">Pair a screen</p>
+              <p class="srow__desc">Type the code shown at the bottom of the screen.</p></div>
+            <div class="pair-line">
+              <div class="field"><label for="c1">Code</label><input id="c1" value="" autocomplete="off" /></div>
+              <button class="btn btn--primary">Pair</button>
+            </div>
+          </div>
+          <div class="srow">
+            <div><p class="srow__label">Only paired screens</p>
+              <p class="srow__desc">Unpaired screens still show the dashboard, but can't report in or follow home automation.</p></div>
+            <span class="toggle" role="switch" aria-checked="false"></span>
+          </div>
+        </div>
+      </div>
+      <figcaption><b>B1</b> Phone, optional mode (the default). The count line is the Screens section's intro
+      strip. Each row gets one pairing line, last in its meta.</figcaption>
+    </figure>
+
+    <figure id="B2">
+      <div class="settings p390 dark">
+        <div class="eyebrow"><span>Screens</span><button class="btn btn--sm">+ Add a screen</button></div>
+        <div class="panel">
+          <div class="strip-note note note--warn"><svg aria-hidden="true"><use href="#i-alert"/></svg>
+            <span>2 of 4 screens seen this week are paired. Only paired screens is on, so the others show the dashboard but can't report in or follow home automation.</span></div>
+          <div class="lrow"><span class="lrow__thumb"></span><div class="lrow__body"><p class="lrow__name">Kitchen</p>
+            <p class="note">kitchen</p><p class="note">Last seen just now</p><p class="note">Paired since 3 Nov</p></div>
+            <div class="lrow__actions"><span class="tag tag--ok">Online</span></div></div>
+          <div class="lrow"><span class="lrow__thumb"></span><div class="lrow__body"><p class="lrow__name">Hall</p>
+            <p class="note">hall</p><p class="note">Last seen 2 min ago</p>
+            <p class="note note--warn">Not paired, so it can't report in or follow home automation. It shows a code to type in Pair a screen.</p></div>
+            <div class="lrow__actions"><span class="tag tag--ok">Online</span></div></div>
+          <div class="lrow"><span class="lrow__thumb"></span><div class="lrow__body"><p class="lrow__name">Office</p>
+            <p class="note">office</p><p class="note">Last seen 1 h ago</p>
+            <p class="note note--warn">Needs a software update before it can be paired. Until then it can't report in or follow home automation.</p></div>
+            <div class="lrow__actions"><span class="tag">Offline</span></div></div>
+          <div class="lrow lrow--waiting"><span class="lrow__thumb"></span><div class="lrow__body"><p class="lrow__name">calvin-pi-4f2a</p>
+            <p class="note">Waiting to be paired. Type the code it shows in Pair a screen.</p></div></div>
+        </div>
+
+        <div class="eyebrow"><span>Pairing</span></div>
+        <div class="panel">
+          <div class="srow srow--stacked">
+            <div><p class="srow__label">Pair a screen</p>
+              <p class="srow__desc">Type the code shown at the bottom of the screen.</p></div>
+            <div class="pair-line">
+              <div class="field"><label for="c2">Code</label><input id="c2" value="" autocomplete="off" /></div>
+              <button class="btn btn--primary">Pair</button>
+            </div>
+          </div>
+          <div class="srow">
+            <div><p class="srow__label">Only paired screens</p>
+              <p class="srow__desc">Unpaired screens still show the dashboard, but can't report in or follow home automation.</p></div>
+            <span class="toggle toggle--on" role="switch" aria-checked="true"></span>
+          </div>
+        </div>
+      </div>
+      <figcaption><b>B2</b> Phone, Backlit, required mode. Unpaired lines turn <code>warn</code>. A new screen
+      with no row yet shows as "Waiting to be paired", with a dashed thumbnail, and it can't be opened.</figcaption>
+    </figure>
+
+    <figure id="B3">
+      <div class="settings p390">
+        <div class="eyebrow"><span>Screens</span><button class="btn btn--sm">+ Add a screen</button></div>
+        <div class="panel">
+          <div class="strip-note note"><span>All 3 screens seen this week are paired.</span></div>
+          <div class="lrow"><span class="lrow__thumb"></span><div class="lrow__body"><p class="lrow__name">Kitchen</p>
+            <p class="note">kitchen</p><p class="note">Last seen just now</p><p class="note">Paired since 3 Nov</p></div>
+            <div class="lrow__actions"><span class="tag tag--ok">Online</span></div></div>
+        </div>
+      </div>
+      <figcaption><b>B3</b> Everything seen this week is paired: a neutral line with no icon. With no screen
+      seen in the last 7 days there is no line at all.</figcaption>
+    </figure>
+  </div>
+
+  <!-- ======================= C: Pair a screen states ======================= -->
+  <h2>C. Pair a screen: states</h2>
+  <div class="row">
+    <figure id="C1">
+      <div class="settings p390"><div class="panel"><div class="srow srow--stacked">
+        <div><p class="srow__label">Pair a screen</p><p class="srow__desc">Type the code shown at the bottom of the screen.</p></div>
+        <div class="pair-line">
+          <div class="field"><label for="d1">Code</label><input id="d1" value="K7Q4MD" /></div>
+          <button class="btn btn--primary" aria-disabled="true" aria-busy="true">Pairing…</button>
+        </div></div></div></div>
+      <figcaption><b>C1</b> Sending. The code is typed in lower case, with or without the dash, and shown in
+      capitals as it is typed.</figcaption>
+    </figure>
+    <figure id="C2">
+      <div class="settings p390"><div class="panel"><div class="srow srow--stacked">
+        <div><p class="srow__label">Pair a screen</p><p class="srow__desc">Type the code shown at the bottom of the screen.</p></div>
+        <div class="pair-line">
+          <div class="field"><label for="d2">Code</label><input id="d2" value="" class="is-focus" /></div>
+          <button class="btn btn--primary">Pair</button>
+        </div>
+        <p class="note note--ok pair-result" role="status">✓ Hall is paired. <button class="btn btn--link">Open Hall</button></p>
+      </div></div></div>
+      <figcaption><b>C2</b> Paired. The field clears and keeps focus, so the next code can be typed straight
+      away. The name comes from the answer.</figcaption>
+    </figure>
+    <figure id="C3">
+      <div class="settings p390"><div class="panel"><div class="srow srow--stacked">
+        <div><p class="srow__label">Pair a screen</p><p class="srow__desc">Type the code shown at the bottom of the screen.</p></div>
+        <div class="pair-line">
+          <div class="field"><label for="d3">Code</label><input id="d3" value="K7Q4ND" aria-invalid="true" class="is-focus" /></div>
+          <button class="btn btn--primary">Pair</button>
+        </div>
+        <p class="note note--err pair-result">No screen is showing that code. Check the screen and type the code it shows now.</p>
+      </div></div></div>
+      <figcaption><b>C3</b> Wrong, expired or already used (404). The typed code stays, so a single wrong
+      character can be fixed.</figcaption>
+    </figure>
+    <figure id="C4">
+      <div class="settings p390"><div class="panel"><div class="srow srow--stacked">
+        <div><p class="srow__label">Pair a screen</p><p class="srow__desc">Type the code shown at the bottom of the screen.</p></div>
+        <div class="pair-line">
+          <div class="field"><label for="d4">Code</label><input id="d4" value="K7Q4ND" /></div>
+          <button class="btn btn--primary" aria-disabled="true">Pair</button>
+        </div>
+        <p class="note note--err pair-result">Too many wrong codes. Try again in 2 minutes.</p>
+      </div></div></div>
+      <figcaption><b>C4</b> Too many tries (429). Pair stays dimmed (<code>aria-disabled</code>) until the wait
+      from <code>Retry-After</code> is over, and then the line clears.</figcaption>
+    </figure>
+    <figure id="C5">
+      <div class="settings p390"><div class="panel"><div class="srow srow--stacked">
+        <div><p class="srow__label">Pair a screen</p><p class="srow__desc">Type the code shown at the bottom of the screen.</p></div>
+        <div class="pair-line">
+          <div class="field"><label for="d5">Code</label><input id="d5" value="K7Q4" aria-invalid="true" class="is-focus" /></div>
+          <button class="btn btn--primary">Pair</button>
+        </div>
+        <p class="note note--err pair-result">A code has 6 letters and numbers, like K7Q-4MD.</p>
+      </div></div></div>
+      <figcaption><b>C5</b> Empty or the wrong length, checked before sending. When the field is empty the line
+      reads "Type the code shown on the screen."</figcaption>
+    </figure>
+    <figure id="C6">
+      <div class="settings p390 dark"><div class="panel"><div class="srow srow--stacked">
+        <div><p class="srow__label">Pair a screen</p><p class="srow__desc">Type the code shown at the bottom of the screen.</p></div>
+        <div class="pair-line">
+          <div class="field"><label for="d6">Code</label><input id="d6" value="" class="is-focus" /></div>
+          <button class="btn btn--primary">Pair</button>
+        </div>
+        <p class="note note--ok pair-result" role="status">✓ Kitchen is paired again. Its old pairing no longer works. <button class="btn btn--link">Open Kitchen</button></p>
+      </div></div></div>
+      <figcaption><b>C6</b> Backlit. A code for a screen that was already paired (<code>replaced: true</code>).</figcaption>
+    </figure>
+  </div>
+
+  <!-- ======================= D: one screen's Pairing section ======================= -->
+  <h2>D. One screen's page: the Pairing section</h2>
+  <p style="max-width:76ch">It goes between Behaviour and Software. One SettingRow, whose label is the state.</p>
+  <div class="row">
+    <figure id="D1">
+      <div class="settings p480"><div class="eyebrow"><span>Pairing</span></div><div class="panel">
+        <div class="srow"><div><p class="srow__label">Paired</p>
+          <p class="srow__desc">Since 3 Nov. Only this screen can report in for itself.</p></div>
+          <button class="btn">Unpair</button></div>
+      </div></div>
+      <figcaption><b>D1</b> Paired.</figcaption>
+    </figure>
+    <figure id="D2">
+      <div class="settings p480"><div class="eyebrow"><span>Pairing</span></div><div class="panel">
+        <div class="srow"><div><p class="srow__label">Not paired</p>
+          <p class="srow__desc">This screen shows a code at the bottom. Type it in Pair a screen.</p></div>
+          <button class="btn">Pair a screen</button></div>
+      </div></div>
+      <figcaption><b>D2</b> Not paired, and it can pair. The button goes to the Code field on the Screens list
+      and focuses it.</figcaption>
+    </figure>
+    <figure id="D3">
+      <div class="settings p480"><div class="eyebrow"><span>Pairing</span></div><div class="panel">
+        <div class="srow"><div><p class="srow__label">Not paired</p>
+          <p class="srow__desc">Needs a software update before it can be paired.</p></div>
+          <button class="btn">Update</button></div>
+      </div></div>
+      <figcaption><b>D3</b> Old kiosk software. This is the same Update action, with the same state, as the
+      Software section.</figcaption>
+    </figure>
+    <figure id="D4">
+      <div class="settings p480 dark"><div class="eyebrow"><span>Pairing</span></div><div class="panel">
+        <div class="srow"><div><p class="srow__label">Not paired</p>
+          <p class="srow__desc">This screen shows a code at the bottom. Type it in Pair a screen.</p>
+          <p class="note note--warn" style="margin-top:4px">Only paired screens is on, so until it is paired this screen can't report in or follow home automation.</p></div>
+          <button class="btn">Pair a screen</button></div>
+      </div></div>
+      <figcaption><b>D4</b> Required mode, not paired (Backlit). With old software, the description is D3's
+      and the warn line is the same.</figcaption>
+    </figure>
+    <figure id="D5">
+      <div class="settings p480"><div class="eyebrow"><span>Pairing</span></div><div class="panel">
+        <div class="srow"><div><p class="srow__label">Not paired</p>
+          <p class="srow__desc">This screen shows a code at the bottom. Type it in Pair a screen.</p></div>
+          <button class="btn is-focus">Pair a screen</button></div>
+        <p class="note" role="status">Hall is unpaired. It shows a new code within a minute.</p>
+      </div></div>
+      <figcaption><b>D5</b> Just after Unpair. Focus moves to the button that took Unpair's place.</figcaption>
+    </figure>
+  </div>
+
+  <!-- ======================= E: confirmations ======================= -->
+  <h2>E. Confirmations (ConfirmModal)</h2>
+  <div class="row">
+    <figure id="E1">
+      <div class="dialog-wrap p480"><div class="dialog" role="dialog" aria-labelledby="e1t">
+        <h3 id="e1t">Unpair Hall?</h3>
+        <p>Hall will show a new code and stop reporting in until you pair it again.</p>
+        <div class="dialog__actions"><button class="btn is-focus">Cancel</button><button class="btn btn--danger-fill">Unpair</button></div>
+      </div></div>
+      <figcaption><b>E1</b> Unpair. <code>danger</code>, because it ends the screen's protection until someone
+      pairs it again.</figcaption>
+    </figure>
+    <figure id="E2">
+      <div class="dialog-wrap p480"><div class="dialog" role="dialog" aria-labelledby="e2t">
+        <h3 id="e2t">Turn on Only paired screens?</h3>
+        <p>Hall and Office aren't paired. They'll keep showing the dashboard, but stop reporting in and following home automation.</p>
+        <div class="dialog__actions"><button class="btn is-focus">Cancel</button><button class="btn btn--primary">Turn on</button></div>
+      </div></div>
+      <figcaption><b>E2</b> Turning on with unpaired screens seen this week. Not <code>danger</code>: nothing is
+      lost, and it can be turned off again.</figcaption>
+    </figure>
+    <figure id="E3">
+      <div class="dialog-wrap p480 dark"><div class="dialog" role="dialog" aria-labelledby="e3t">
+        <h3 id="e3t">Turn on Only paired screens?</h3>
+        <p>Office isn't paired. It'll keep showing the dashboard, but stop reporting in and following home automation.</p>
+        <div class="dialog__actions"><button class="btn is-focus">Cancel</button><button class="btn btn--primary">Turn on</button></div>
+      </div></div>
+      <figcaption><b>E3</b> One screen (Backlit).</figcaption>
+    </figure>
+  </div>
+
+  <!-- ======================= F: Add a screen ======================= -->
+  <h2>F. Add a screen: the Raspberry Pi card</h2>
+  <div class="row">
+    <figure id="F1">
+      <div class="settings p480"><div class="card">
+        <h5>Raspberry Pi</h5>
+        <p class="note">On a fresh Raspberry Pi OS, open a terminal (or SSH in) and run the command below. The Pi installs the kiosk, pairs itself, reboots into the dashboard and shows up in this list.</p>
+        <div class="cmd-row"><code class="cmd">curl -fsSL 'http://calvin.local:8000/api/kiosks/install.sh?pair=clv_pair_q3Vt8mZkR2xYw9LpN4aB7c' | sudo bash</code><button class="btn">Copy</button></div>
+        <p class="note" role="status">This command works once, for 30 minutes (until 14:32). <button class="btn btn--link">New code</button></p>
+      </div></div>
+      <figcaption><b>F1</b> When the panel opens, a code is made. The Copy button and the command block are
+      today's.</figcaption>
+    </figure>
+    <figure id="F2">
+      <div class="settings p480"><div class="card">
+        <h5>Raspberry Pi</h5>
+        <p class="note">On a fresh Raspberry Pi OS, open a terminal (or SSH in) and run the command below. The Pi installs the kiosk, pairs itself, reboots into the dashboard and shows up in this list.</p>
+        <div class="cmd-row"><code class="cmd cmd--wait">Getting a one-time code…</code><button class="btn" aria-disabled="true">Copy</button></div>
+      </div></div>
+      <figcaption><b>F2</b> While the code is being made (also after New code). Copy is dimmed.</figcaption>
+    </figure>
+    <figure id="F3">
+      <div class="settings p480"><div class="card">
+        <h5>Raspberry Pi</h5>
+        <p class="note">On a fresh Raspberry Pi OS, open a terminal (or SSH in) and run the command below. The Pi installs the kiosk, pairs itself, reboots into the dashboard and shows up in this list.</p>
+        <div class="cmd-row"><code class="cmd">curl -fsSL 'http://calvin.local:8000/api/kiosks/install.sh?pair=clv_pair_q3Vt8mZkR2xYw9LpN4aB7c' | sudo bash</code><button class="btn">Copy</button></div>
+        <p class="note note--warn" role="status">This code has run out. Get a new one before you run the command. <button class="btn btn--link">New code</button></p>
+      </div></div>
+      <figcaption><b>F3</b> Past <code>expiresAt</code> while the panel is open. The command stays, because a
+      Pi that runs it falls back to showing a code.</figcaption>
+    </figure>
+    <figure id="F4">
+      <div class="settings p480 dark"><div class="card">
+        <h5>Raspberry Pi</h5>
+        <p class="note">On a fresh Raspberry Pi OS, open a terminal (or SSH in) and run the command below. The Pi installs the kiosk, pairs itself, reboots into the dashboard and shows up in this list.</p>
+        <div class="cmd-row"><code class="cmd">curl -fsSL http://calvin.local:8000/api/kiosks/install.sh | sudo bash</code><button class="btn">Copy</button></div>
+        <p class="note note--warn" role="status">Couldn't get a one-time code. This command still works: the screen then shows a code to type in Pair a screen. <button class="btn btn--link">Try again</button></p>
+      </div></div>
+      <figcaption><b>F4</b> Making the code failed (Backlit). It falls back to today's plain command.</figcaption>
+    </figure>
+    <figure id="F5">
+      <div class="settings p480"><div class="card">
+        <h5>Any other screen (tablet, TV, laptop)</h5>
+        <p class="note">Give it a name, then open this address in its browser — or scan the code with a tablet. It registers as a kiosk the first time it loads. A few minutes later it shows a code at the bottom: type it in Pair a screen.</p>
+      </div></div>
+      <figcaption><b>F5</b> The browser card gains one sentence. The rest is unchanged.</figcaption>
+    </figure>
+  </div>
+
+  <!-- ======================= G: the screen's own Settings ======================= -->
+  <h2>G. Pairing from the screen itself</h2>
+  <div class="row">
+    <figure id="G1">
+      <div class="kiosk k800 dark">
+        <div class="dash" style="padding:var(--gap-4);overflow:hidden">
+          <p class="back">‹ Dashboard</p>
+          <div class="eyebrow"><span>Pairing</span></div>
+          <div class="panel" style="margin:0">
+            <div class="srow srow--stacked">
+              <div><p class="srow__label">Pair a screen</p><p class="srow__desc">Type the code shown at the bottom of the screen.</p></div>
+              <div class="pair-line"><div class="field"><label for="g1">Code</label><input id="g1" value="K7Q-4MD" class="is-focus" /></div>
+                <button class="btn btn--primary">Pair</button></div>
+            </div>
+          </div>
+        </div>
+        <aside class="pair-strip" aria-labelledby="ps5">
+          <svg class="pair-strip__icon" aria-hidden="true"><use href="#i-phone"/></svg>
+          <div class="pair-strip__body">
+            <p class="pair-strip__title" id="ps5">Pair this screen</p>
+            <p class="pair-strip__text">On your phone or computer, open Settings › Screens in Calvin and type this code under Pair a screen.</p>
+          </div>
+          <p class="pair-strip__code" aria-label="Code: K 7 Q, 4 M D">K7Q-4MD</p>
+        </aside>
+      </div>
+      <figcaption><b>G1</b> The strip shows on every page of the screen, Settings included, so someone signed in
+      at the wall can read the code and type it there. The on-screen keyboard opens over the strip, as it does
+      over the page.</figcaption>
+    </figure>
+  </div>
+</div>
+</body>
+</html>
