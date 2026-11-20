@@ -80,6 +80,15 @@ describe("Calvin update lifecycle", () => {
     expect(nextUpdate(waiting, { type: "progress", phase: "restarting" }).stage).toBe("running");
   });
 
+  it("does not re-send while it is already following", () => {
+    // The 5 s status poll keeps saying "reachable" while the update runs. A
+    // fresh state object here would make useSystem rewrite the message (and
+    // cancel its clear timer) on every poll.
+    const following = run({ type: "start" }, { type: "progress" }, { type: "streamLost" });
+    expect(following.stage).toBe("following");
+    expect(nextUpdate(following, { type: "reachable" })).toBe(following);
+  });
+
   it("only confirms or doubts a restart after the script finished", () => {
     const running = run({ type: "start" }, { type: "progress" });
     expect(nextUpdate(running, { type: "healthy" })).toBe(running);

@@ -144,8 +144,10 @@ export function nextUpdate(state, event) {
     case "unreachable":
       return { ...state, stage: "waiting" };
     // The status endpoint did not answer usefully, but Calvin itself did.
+    // Already following: return the same state so a poll that changes nothing
+    // does not make useSystem rewrite the message (and cancel its timer).
     case "reachable":
-      return { ...state, stage: "following" };
+      return state.stage === "following" ? state : { ...state, stage: "following" };
     case "installed":
       return { stage: "restarting" };
     case "healthy":

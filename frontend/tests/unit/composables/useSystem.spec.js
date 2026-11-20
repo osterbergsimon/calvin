@@ -395,6 +395,28 @@ describe("useSystem", () => {
       await first;
     });
 
+    it("ignores a late event after the update has settled", async () => {
+      systemApi.triggerUpdate.mockResolvedValue({ log_offset: 0 });
+      systemApi.getHealth.mockResolvedValue({ status: "healthy" });
+      vi.useRealTimers();
+
+      const system = useSystem();
+      const promise = system.triggerUpdate();
+      await fireStreamEvent({ type: "status", status: "complete" });
+      await promise;
+      expect(system.updateStage.value).toBe("done");
+      expect(system.updateMessage.value).toBe("Calvin is up to date.");
+
+      // A line buffered on the stream can land after the close: it must not
+      // turn "up to date" back into "updating".
+      await fireStreamEvent({ type: "log", line: "update complete!" });
+      await fireStreamEvent({ type: "status", status: "running", phase: "restarting" });
+
+      expect(system.updateStage.value).toBe("done");
+      expect(system.updateMessage.value).toBe("Calvin is up to date.");
+      expect(system.updateMessageClass.value).toBe("success");
+    });
+
     it("starts no second polling loop when asked about a running update", async () => {
       systemApi.triggerUpdate.mockResolvedValue({ log_offset: 0 });
 
@@ -549,6 +571,11 @@ describe("useSystem", () => {
       expect(system.updateMessageClass.value).toBe("warning");
       expect(system.updateStage.value).toBe("slow");
       expect(system.updating.value).toBe(false);
+
+      // The poll is over: no further status checks after the timeout.
+      const checks = systemApi.getUpdateStatus.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
+      expect(systemApi.getUpdateStatus).toHaveBeenCalledTimes(checks);
     });
 
     it("follows the server when the stream fails before any event arrives", async () => {
@@ -672,6 +699,35 @@ describe("useSystem", () => {
         "The update didn't finish. Calvin is still on the previous version."
       );
       expect(system.updateMessageClass.value).toBe("error");
+    });
+  });
+
+  describe("following an update that is already running", () => {
+    it("leaves the message and its clear timer alone on a repeated reachable", async () => {
+      systemApi.getUpdateStatus.mockResolvedValue({ status: "unknown" });
+      systemApi.getHealth.mockResolvedValue({ status: "healthy" });
+
+      const system = useSystem();
+      const polling = system.pollUpdateStatus();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(system.updateStage.value).toBe("following");
+
+      // The message line and its clear timer are shared with the restart
+      // flows, so a follow poll that changes nothing must not cancel one.
+      const error = new Error("restart failed");
+      error.response = { status: 422, data: { detail: "Service unavailable" } };
+      systemApi.restartFrontend.mockRejectedValue(error);
+      await system.restartFrontend();
+      const clearSpy = vi.spyOn(globalThis, "clearTimeout");
+
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(system.updateStage.value).toBe("following");
+      expect(clearSpy).not.toHaveBeenCalled();
+      expect(system.updateMessage.value).toBe("Service unavailable");
+
+      await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
+      await polling;
     });
   });
 
