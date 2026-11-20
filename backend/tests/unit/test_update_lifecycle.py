@@ -9,6 +9,18 @@ from app.services import update_lifecycle as lc
 
 SCRIPT = Path(__file__).resolve().parents[3] / "scripts" / "update-calvin.sh"
 
+# The guards below grep literals out of the script. A value assigned through a
+# variable would be invisible to them, so their own tests reject one instead of
+# passing quietly.
+PHASE_ASSIGNMENT = re.compile(r"^\s*UPDATE_PHASE=(\S+)", re.MULTILINE)
+PHASE_LITERAL = re.compile(r'"[a-z_]+"')
+STATUS_CALL = re.compile(r"write_update_state\s+(\S+)")
+STATUS_LITERAL = re.compile(r'"[a-z]+"')
+
+
+def _non_literals(values: list[str], literal: re.Pattern[str]) -> list[str]:
+    return [value for value in values if not literal.fullmatch(value)]
+
 
 @pytest.fixture(scope="module")
 def script() -> str:
@@ -26,6 +38,21 @@ def test_every_status_the_script_writes_maps_to_an_api_status(script):
     assert statuses == set(lc.SCRIPT_STATUSES)
     for status in statuses:
         assert lc.api_status(status) in (lc.API_RUNNING, lc.API_DONE, lc.API_FAILED)
+
+
+def test_the_phase_guard_reads_every_assignment(script):
+    """A phase set through a variable would slip past the literal grep."""
+    assert _non_literals(PHASE_ASSIGNMENT.findall(script), PHASE_LITERAL) == []
+
+
+def test_the_status_guard_reads_every_call(script):
+    """A status passed as a variable would slip past the literal grep."""
+    assert _non_literals(STATUS_CALL.findall(script), STATUS_LITERAL) == []
+
+
+def test_the_guards_notice_a_variable():
+    assert _non_literals(['"$phase"'], PHASE_LITERAL) == ['"$phase"']
+    assert _non_literals(['"$status"'], STATUS_LITERAL) == ['"$status"']
 
 
 @pytest.mark.parametrize(

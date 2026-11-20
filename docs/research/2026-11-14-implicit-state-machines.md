@@ -61,23 +61,34 @@ The polling path that could have checked the server (`pollUpdateStatus`) was nev
 stateDiagram-v2
   [*] --> idle
   idle --> starting: start
+  done --> starting: start
+  failed --> starting: start
+  slow --> starting: start
+  unconfirmed --> starting: start
   idle --> following: follow (update already running)
-  starting --> failed: startFailed
+  done --> following: follow
+  failed --> following: follow
+  slow --> following: follow
+  unconfirmed --> following: follow
   starting --> running: progress
+  starting --> following: reachable / streamLost
   starting --> waiting: unreachable
+  starting --> restarting: installed
+  starting --> failed: startFailed / failed
   starting --> slow: timedOut
   running --> running: progress / log
-  running --> following: streamLost
+  running --> following: reachable / streamLost
   running --> waiting: unreachable
   running --> restarting: installed
   running --> failed: failed
   running --> slow: timedOut
-  following --> following: reachable (health answers, status check failed)
+  following --> running: progress
+  following --> following: streamLost / reachable (health answers, status check failed)
   following --> waiting: unreachable
   following --> restarting: installed
   following --> failed: failed
   following --> slow: timedOut
-  waiting --> following: reachable
+  waiting --> following: reachable / streamLost
   waiting --> waiting: unreachable
   waiting --> running: progress
   waiting --> restarting: installed
@@ -86,10 +97,13 @@ stateDiagram-v2
   restarting --> done: healthy
   restarting --> unconfirmed: notHealthy
   restarting --> slow: timedOut
-  done --> starting: start
-  failed --> starting: start
-  slow --> starting: start
 ```
+
+Every edge above is `nextUpdate` in the browser machine, and each event is the one `useSystem` sends. The
+backend only supplies the statuses that become `progress`, `installed` and `failed`: a script `running`
+status (or a stalled state file, which reads as `error`) is `progress` / `failed`, and `idle` (or the
+stream's `complete`) is `installed`. `restarting` ignores every event except `healthy`, `notHealthy` and
+`timedOut`; `start` and `follow` are ignored while an update is in flight.
 
 ## 2. Kiosk software update — stuck state (follow-up)
 
