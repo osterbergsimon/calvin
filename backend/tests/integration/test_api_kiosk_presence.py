@@ -296,6 +296,17 @@ def test_a_stale_cookie_is_resigned_on_the_config_read(test_client: TestClient):
 
 
 @pytest.mark.integration
+def test_an_expired_cookie_is_no_credential_on_the_config_read(test_client: TestClient):
+    kiosk_hash = hash_secret(new_secret())
+    _run(kiosk_registry.set_credential(KIOSK, kiosk_hash))
+    expired = issue_kiosk_cookie(KIOSK, kiosk_hash, now=time.time() - 401 * 24 * 3600)
+    test_client.cookies.clear()
+    response = test_client.get(CONFIG_URL, headers={"cookie": f"{KIOSK_COOKIE}={expired}"})
+    assert response.status_code == 200, response.text
+    assert response.json()["kioskAuth"]["state"] == "unpaired"
+
+
+@pytest.mark.integration
 @pytest.mark.parametrize(
     "headers",
     [
