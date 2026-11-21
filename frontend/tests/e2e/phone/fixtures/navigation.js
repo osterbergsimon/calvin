@@ -78,15 +78,31 @@ export async function selectCategory(page, label) {
 }
 
 /**
+ * True where the app is in its phone layout. Settings renders the category
+ * rail only for the desktop/kiosk layout (`v-if="!phone"`), so its absence is
+ * the app's own answer, forced layouts and the kiosk exemption included.
+ */
+async function isPhoneLayout(page) {
+  return (await page.locator(".category-rail").count()) === 0;
+}
+
+/**
  * On a phone, open one section of a long page (Content, System, a screen):
- * its row in the page's section list. No-op where the page shows every
- * section (a kiosk, a desktop, a short category).
+ * its row in the page's section list. A phone page that lists sections but
+ * lacks this row is broken and fails here. No-op where the section is already
+ * inline (a kiosk, a desktop, a short category, or the page just opened).
  */
 export async function openSection(page, sectionId) {
+  const section = page.locator(`#section-${sectionId}`);
+  if (await section.isVisible()) return;
   const row = page.locator(`[data-test="section-index-${sectionId}"]`);
-  if (!(await row.isVisible())) return;
+  if (await isPhoneLayout(page)) {
+    await expect(row, `the phone page should list a "${sectionId}" section`).toBeVisible();
+  } else if (!(await row.isVisible())) {
+    return;
+  }
   await row.click();
-  await expect(page.locator(`#section-${sectionId}`)).toBeVisible();
+  await expect(section).toBeVisible();
   await page.waitForLoadState("networkidle");
 }
 

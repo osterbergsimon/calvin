@@ -20,15 +20,23 @@ export const useKiosksStore = defineStore("kiosks", () => {
   const pairings = ref([]);
   let refreshSequence = 0;
 
+  // Report how the load went: callers that infer "this screen was removed"
+  // must not do so from a list that never arrived. A cached list is a usable
+  // (stale) answer; no network and no cache is not.
   async function loadKiosks() {
     try {
       const response = await api.get("/kiosks");
       kiosks.value = response.data?.kiosks ?? [];
       setCachedData(CACHE_KEY, kiosks.value);
+      return { ok: true, stale: false };
     } catch (err) {
       logError("[kiosks]", "Failed to load kiosks, using cache:", err);
       const cached = getCachedData(CACHE_KEY, CACHE_TTL, { allowStale: true });
-      if (cached) kiosks.value = cached;
+      if (cached) {
+        kiosks.value = cached;
+        return { ok: true, stale: true };
+      }
+      return { ok: false, stale: false };
     }
   }
 
@@ -38,7 +46,7 @@ export const useKiosksStore = defineStore("kiosks", () => {
     const sequence = ++refreshSequence;
     try {
       const response = await api.get("/kiosks");
-      if (sequence !== refreshSequence) return;
+      if (sequence !== refreshSequence) return { ok: false, stale: false };
       const currentById = new Map(kiosks.value.map(k => [k.id, k]));
       const fresh = response.data?.kiosks ?? [];
       kiosks.value = fresh.map(k => {
@@ -52,8 +60,10 @@ export const useKiosksStore = defineStore("kiosks", () => {
         return { ...k, overrides };
       });
       setCachedData(CACHE_KEY, kiosks.value);
+      return { ok: true, stale: false };
     } catch {
       // Quietly keep the last good data; the next visible interval can retry.
+      return { ok: false, stale: false };
     }
   }
 

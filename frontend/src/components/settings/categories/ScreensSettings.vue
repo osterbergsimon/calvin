@@ -1183,23 +1183,27 @@ function syncScreenToRoute(key, { replace = false } = {}) {
 }
 // A ?screen= that names no screen (removed, or an old link): once the list has
 // loaded, step up to it and say so, instead of a blank page titled with the id.
-const kiosksLoaded = ref(false);
+// `kiosksFresh` means a list arrived that is fresh enough to call a screen
+// removed. A cached list may predate the screen, so it can open a known id
+// but not deny one, and a failed load says nothing about the id either.
+const kiosksFresh = ref(false);
 const removedScreenNote = ref(false);
 function applyRouteScreen(key) {
   if (key === undefined || key === selectionKey.value) return;
   if (!key) closeDetail({ fromRoute: true });
   else if (key === "default") openDefault({ fromRoute: true });
   else if (key === "browser") openBrowser({ fromRoute: true });
-  else if (!kiosksLoaded.value)
-    return; // re-applied once the list has loaded
-  else if (!kiosks.value.some(k => k.id === key)) {
+  else if (kiosks.value.some(k => k.id === key)) select(key, { fromRoute: true });
+  else if (!kiosksFresh.value)
+    return; // wait for a load that can be trusted to know the screen is gone
+  else {
     closeDetail({ fromRoute: true });
     removedScreenNote.value = true;
     const query = { ...route.query };
     delete query.screen;
     delete query.section;
     router.replace({ query });
-  } else select(key, { fromRoute: true });
+  }
 }
 // Not immediate: the page state it resets is declared further down. The first
 // sync runs in onMounted.
@@ -2649,9 +2653,15 @@ async function updateAll() {
 // --- presence + versions ------------------------------------------------
 const ONLINE_WINDOW_MS = 120000; // 2 minutes
 
-useIntervalWhenVisible(() => {
-  store.refreshKiosks();
+useIntervalWhenVisible(async () => {
+  const refreshed = await store.refreshKiosks();
   store.loadPairings();
+  // A failed first load left a ?screen= link unresolved. When the backend
+  // comes back, this fresh list can open the screen or finally say it is gone.
+  if (refreshed?.ok && !refreshed.stale) {
+    kiosksFresh.value = true;
+    if (phoneNavOn.value && route.query.screen) applyRouteScreen(route.query.screen);
+  }
 }, 30000);
 
 function isPending(k) {
@@ -2691,10 +2701,14 @@ if (typeof window !== "undefined") {
 onMounted(async () => {
   refreshBrowserCount();
   await syncInitialPhoneRoute();
-  await store.loadKiosks();
+  const kiosksLoad = await store.loadKiosks();
+  // Only a list that arrived can open a linked screen; only a fresh one can
+  // say it is gone. An unreachable backend with no cache leaves the link alone.
+  kiosksFresh.value = Boolean(kiosksLoad?.ok) && !kiosksLoad?.stale;
+  if (kiosksLoad?.ok && phoneNavOn.value && route.query.screen)
+    applyRouteScreen(route.query.screen);
+  // Pairings are a hint; they must not delay the linked page above.
   await store.loadPairings();
-  kiosksLoaded.value = true;
-  if (phoneNavOn.value && route.query.screen) applyRouteScreen(route.query.screen);
   if (initialOwnScreenId) {
     await select(initialOwnScreenId);
     // The remote's anchor has a different id on a screen's own page; Settings.vue

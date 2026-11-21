@@ -24,19 +24,29 @@ describe("kiosks store", () => {
       },
     });
     const store = useKiosksStore();
-    await store.loadKiosks();
+    const result = await store.loadKiosks();
     expect(store.kiosks.map(k => k.id)).toEqual(["k1"]);
     expect(api.get).toHaveBeenCalledWith("/kiosks");
+    expect(result).toEqual({ ok: true, stale: false });
   });
 
-  it("loadKiosks falls back to cache on network error", async () => {
+  it("loadKiosks falls back to cache on network error and reports a stale load", async () => {
     api.get.mockResolvedValueOnce({ data: { kiosks: [{ id: "k1" }] } });
     const store = useKiosksStore();
     await store.loadKiosks(); // seeds cache
     api.get.mockRejectedValueOnce(new Error("offline"));
     store.kiosks = [];
-    await store.loadKiosks(); // falls back
+    const result = await store.loadKiosks(); // falls back
     expect(store.kiosks.map(k => k.id)).toEqual(["k1"]);
+    expect(result).toEqual({ ok: true, stale: true });
+  });
+
+  it("loadKiosks reports a failed load when the network and the cache both miss", async () => {
+    api.get.mockRejectedValueOnce(new Error("offline"));
+    const store = useKiosksStore();
+    const result = await store.loadKiosks();
+    expect(store.kiosks).toEqual([]);
+    expect(result).toEqual({ ok: false, stale: false });
   });
 
   it("loadKiosks serves expired cache when the request fails", async () => {
@@ -48,8 +58,9 @@ describe("kiosks store", () => {
       vi.advanceTimersByTime(60 * 60 * 1000); // well past the 5 minute TTL
       api.get.mockRejectedValueOnce(new Error("offline"));
       store.kiosks = [];
-      await store.loadKiosks();
+      const result = await store.loadKiosks();
       expect(store.kiosks.map(k => k.id)).toEqual(["k1"]);
+      expect(result).toEqual({ ok: true, stale: true });
     } finally {
       vi.useRealTimers();
     }

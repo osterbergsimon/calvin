@@ -17,7 +17,7 @@ const kiosk = {
   agentVersion: null,
 };
 
-async function mountPhone(query, props = {}) {
+async function mountPhone(query, props = {}, { load = { ok: true }, kiosks = [kiosk] } = {}) {
   setActivePinia(createPinia());
   delete window.matchMedia;
   const router = createRouter({
@@ -28,7 +28,8 @@ async function mountPhone(query, props = {}) {
   await router.isReady();
   const store = useKiosksStore();
   store.loadKiosks = vi.fn(async () => {
-    store.kiosks = [kiosk];
+    store.kiosks = kiosks;
+    return load;
   });
   store.refreshKiosks = vi.fn(async () => {});
   store.fetchOverrides = vi.fn(async () => ({}));
@@ -90,6 +91,41 @@ describe("ScreensSettings — phone page stack", () => {
     const { wrapper } = await mountPhone({ category: "screens", screen: "kitchen" });
     expect(wrapper.find("[data-test='screen-removed-note']").exists()).toBe(false);
     expect(wrapper.find("[data-test='screens-detail']").exists()).toBe(true);
+  });
+
+  it("keeps a ?screen= link when the list failed to load and no cache was served", async () => {
+    const { wrapper, router } = await mountPhone(
+      { category: "screens", screen: "kitchen" },
+      {},
+      { load: { ok: false, stale: false }, kiosks: [] }
+    );
+    await nextTick();
+    expect(router.currentRoute.value.query.screen).toBe("kitchen");
+    expect(router.currentRoute.value.query.category).toBe("screens");
+    expect(wrapper.find("[data-test='screen-removed-note']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='screens-detail']").exists()).toBe(false);
+  });
+
+  it("opens a known ?screen= from a stale cached list", async () => {
+    const { wrapper } = await mountPhone(
+      { category: "screens", screen: "kitchen" },
+      {},
+      { load: { ok: true, stale: true } }
+    );
+    expect(wrapper.find("[data-test='screen-removed-note']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='screens-detail']").exists()).toBe(true);
+  });
+
+  it("keeps a ?screen= link a stale cached list does not know", async () => {
+    const { wrapper, router } = await mountPhone(
+      { category: "screens", screen: "kitchen" },
+      {},
+      { load: { ok: true, stale: true }, kiosks: [{ ...kiosk, id: "somewhere-else" }] }
+    );
+    await nextTick();
+    expect(router.currentRoute.value.query.screen).toBe("kitchen");
+    expect(wrapper.find("[data-test='screen-removed-note']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='screens-detail']").exists()).toBe(false);
   });
 
   it("keeps the category in the URL when a ?setting= deep link opens a screen page", async () => {
