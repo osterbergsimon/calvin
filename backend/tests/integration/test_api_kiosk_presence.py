@@ -83,7 +83,26 @@ def _pair(kiosk_id: str = KIOSK) -> str:
 
 
 def _hold() -> None:
-    _run(kiosk_registry.set_power_hold(KIOSK, "off", "settings"))
+    """A command in force: External mode, so it stands and is projected."""
+    _run(config_service.set_value("screen_power", "external"))
+    _run(config_service.set_value("display_schedule_enabled", False))
+    _run(kiosk_registry.set_power_command(KIOSK, "off", "settings", mode="external"))
+
+
+def _legacy_screen_now() -> None:
+    """A layer written by Settings before the command column existed (calvin-25g9)."""
+    from app.models.db_models import KioskDB
+
+    async def _write() -> None:
+        row = await KioskDB.objects.get(id=KIOSK)
+        row.overrides = {
+            **(row.overrides or {}),
+            "_agentUpdateRequested": True,
+            "screenNow": {"power": "off", "setAt": "2026-11-18T09:00:00Z"},
+        }
+        await row.update(_columns=["overrides"])
+
+    _run(_write())
 
 
 def _display_check() -> None:
@@ -165,12 +184,7 @@ def test_list_and_overrides_hide_presence_per_row(test_client: TestClient, mode,
     if paired:
         _pair()
     _hold()
-    _run(
-        kiosk_registry.set_overrides(
-            KIOSK,
-            {"screenNow": {"power": "off", "setAt": "x"}, "_agentUpdateRequested": True},
-        )
-    )
+    _legacy_screen_now()
     headers, principal, admin = _credentials(test_client, paired=paired)["anonymous"]
 
     listed = test_client.get(LIST_URL, headers=headers)
@@ -204,16 +218,19 @@ def test_list_and_overrides_hide_presence_per_row(test_client: TestClient, mode,
     answer = patched.json()
     patched_layer = answer["overrides"]
     assert "_agentUpdateRequested" not in patched_layer
-    assert ("screenNow" in patched_layer or "screen_now" in patched_layer) is visible
+    # A layer write strips the legacy Screen now, so it is gone for everyone.
+    assert "screenNow" not in patched_layer and "screen_now" not in patched_layer
     assert (answer.get("presenceHidden") is True) is (not visible)
 
 
 @pytest.mark.integration
 def test_a_kiosk_cookie_unlocks_only_its_own_row(test_client: TestClient):
+    _run(config_service.set_value("screen_power", "external"))
+    _run(config_service.set_value("display_schedule_enabled", False))
     for kiosk_id in ("kitchen", "hall"):
         _pair(kiosk_id)
         _run(kiosk_registry.record_kiosk(kiosk_id, agent_version="v1"))
-        _run(kiosk_registry.set_power_hold(kiosk_id, "off", "settings"))
+        _run(kiosk_registry.set_power_command(kiosk_id, "off", "settings", mode="external"))
     cookie = issue_kiosk_cookie("kitchen", _run(kiosk_registry.get_credential_hash("kitchen")))
     test_client.cookies.clear()
 

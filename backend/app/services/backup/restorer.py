@@ -496,6 +496,27 @@ async def _migrate_photo_frame(out: _Outcome, doc: BackupDocument) -> None:
         )
 
 
+async def _migrate_screen_now(out: _Outcome) -> None:
+    """Drop a restored layer's stored ``screenNow`` (calvin-25g9).
+
+    Settings used to write a "Screen now" choice into the layer; the screen's
+    command column replaced it, so a restored one would be projected and could
+    switch a screen invisibly. The whole-database migration is idempotent and
+    also runs at startup. Runs after the kiosks are restored. Best effort: the
+    restore has already been applied, so a failure is a warning.
+    """
+    from app.services.kiosk_registry import migrate_strip_screen_now
+
+    try:
+        await migrate_strip_screen_now()
+    except Exception as exc:  # noqa: BLE001 - the restore itself succeeded
+        logger.warning(f"Could not drop a restored Screen now from the screens: {exc}")
+        out.warnings.append(
+            "The backup's Screen now choices could not be removed from the screens; "
+            "it will be retried at the next restart."
+        )
+
+
 async def _stop_and_unregister(instance_id: str) -> None:
     from app.plugins.manager import plugin_manager
     from app.plugins.protocols import BackendPlugin
@@ -697,6 +718,7 @@ async def apply_restore(
         await _migrate_room_name(out)
         await _migrate_screen_controls(out)
         await _migrate_photo_frame(out, doc)
+        await _migrate_screen_now(out)
 
         if loaded.signing_key and restore_signing_key:
             _write_signing_key(loaded.signing_key)

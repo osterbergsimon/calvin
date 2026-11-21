@@ -521,11 +521,13 @@ async def lifespan(app: FastAPI):
             migrate_global_photo_frame,
             migrate_global_room_name,
             migrate_global_screen_controls,
+            migrate_strip_screen_now,
         )
 
         await migrate_global_room_name()
         await migrate_global_screen_controls()
         await migrate_global_photo_frame()
+        await migrate_strip_screen_now()
         logger.info("Per-screen migrations checked")
         await _start_schedulers()
         logger.info("Schedulers started")

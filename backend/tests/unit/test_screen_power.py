@@ -1,6 +1,6 @@
 """Screen power: the agent's precedence on the server, the projection, the limiter (calvin-2ifv)."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -114,85 +114,3 @@ def test_strip_holds_drops_a_hold_that_did_not_come_from_the_column():
     merged = {"screenHold": {"power": "off"}, "screen_hold": {"power": "off"}, "x": 1}
     strip_holds(merged)
     assert merged == {"x": 1}
-
-
-def test_drop_superseded_screen_now_keeps_only_a_fresh_choice():
-    from app.services.screen_power import drop_superseded_screen_now
-
-    changed_at = _at(12)
-    now = _at(15)  # nothing in this layer is near "now", so only the old rule runs
-    layer = {
-        "displayName": "Kitchen",
-        "screenNow": {"power": "off", "setAt": "2026-11-18T11:59:59Z"},
-    }
-    assert drop_superseded_screen_now(layer, changed_at, now=now) == {"displayName": "Kitchen"}
-    # Set at exactly the change time: replaced by it.
-    layer["screenNow"] = {"power": "off", "setAt": "2026-11-18T12:00:00Z"}
-    assert drop_superseded_screen_now(layer, changed_at, now=now) == {"displayName": "Kitchen"}
-    # Strictly newer: the person's own fresh choice stays.
-    layer["screenNow"] = {"power": "on", "setAt": "2026-11-18T12:00:01Z"}
-    assert drop_superseded_screen_now(layer, changed_at, now=now) == layer
-    # Both spellings are checked; a malformed one is not a choice.
-    both = {
-        "screenNow": {"power": "on", "setAt": "2026-11-18T12:00:01Z"},
-        "screen_now": {"power": "on", "setAt": "2026-11-18T10:00:00Z"},
-    }
-    assert drop_superseded_screen_now(both, changed_at, now=now) == {
-        "screenNow": {"power": "on", "setAt": "2026-11-18T12:00:01Z"}
-    }
-    for malformed in ({"power": "on"}, {"power": "on", "setAt": "later"}, "on", None):
-        assert drop_superseded_screen_now({"screenNow": malformed}, changed_at, now=now) == {}
-
-
-def test_a_fresh_choice_survives_a_slow_client_clock_and_is_restamped():
-    """The page stamps ``setAt`` with the BROWSER clock; the server judges with its own.
-
-    Ending a hold writes the tombstone on the server, and the page saves the new
-    choice milliseconds later. A phone a few seconds behind, or ahead, must not
-    have that press silently dropped (calvin-ldeu). Its ``setAt`` is re-stamped
-    with the server's now so every later comparison uses one clock.
-    """
-    from app.services.screen_power import drop_superseded_screen_now
-
-    changed_at = _at(12)  # the hold ended at 12:00:00 on the server
-    now = datetime(2026, 11, 18, 12, 0, 0, 400000, tzinfo=UTC)
-    for offset in (-5, 5):
-        set_at = (now + timedelta(seconds=offset)).isoformat()
-        layer = {"displayName": "Kitchen", "screenNow": {"power": "off", "setAt": set_at}}
-        kept = drop_superseded_screen_now(layer, changed_at, now=now)
-        assert kept == {
-            "displayName": "Kitchen",
-            "screenNow": {"power": "off", "setAt": "2026-11-18T12:00:00.400Z"},
-        }
-        assert layer["screenNow"]["setAt"] == set_at  # the input is not changed
-
-
-def test_the_tolerance_does_not_keep_an_old_choice():
-    """A stale page carries the time it was set: minutes or hours old, so it is dropped."""
-    from app.services.screen_power import drop_superseded_screen_now
-
-    now = datetime(2026, 11, 18, 12, 0, 30, tzinfo=UTC)
-    for age_s in (61, 120, 3600):
-        stale = (now - timedelta(seconds=age_s)).isoformat()
-        layer = {"displayName": "Kitchen", "screenNow": {"power": "on", "setAt": stale}}
-        assert drop_superseded_screen_now(layer, _at(12), now=now) == {"displayName": "Kitchen"}
-
-
-def test_a_choice_far_in_the_future_is_not_fresh():
-    """Beyond the tolerance: not re-stamped forward, and the old rule decides."""
-    from app.services.screen_power import drop_superseded_screen_now
-
-    now = datetime(2026, 11, 18, 12, 0, 0, tzinfo=UTC)
-    ahead = (now + timedelta(hours=1)).isoformat()
-    layer = {"screenNow": {"power": "on", "setAt": ahead}}
-    # Strictly newer than the last change: kept as it is, not moved forward.
-    assert drop_superseded_screen_now(layer, _at(12), now=now) == layer
-    # Older than a later change: dropped like any superseded choice.
-    assert drop_superseded_screen_now(layer, _at(13), now=now) == {}
-
-
-def test_drop_superseded_screen_now_without_a_change_keeps_the_layer():
-    from app.services.screen_power import drop_superseded_screen_now
-
-    layer = {"screenNow": {"power": "off", "setAt": "2026-11-18T12:00:00Z"}}
-    assert drop_superseded_screen_now(layer, None) == layer

@@ -13,7 +13,7 @@ from sqlalchemy.exc import IntegrityError as SAIntegrityError
 
 from app.models.db_models import KioskDB
 from app.schemas.config_update import sanitize_overrides
-from app.services import display_check
+from app.services import display_check, screen_power
 from app.utils.db_retry import retry_on_db_locked
 from app.utils.utc import as_utc, utcnow
 
@@ -136,47 +136,39 @@ def agent_pairs(agent_features: str | None) -> bool | None:
     return PAIR_FEATURE in agent_features.split(",")
 
 
-# A hold is {power, setAt, by}. ``by`` is the kind of writer, never a key name:
-# it reaches the public kiosk list.
-HOLD_POWERS: tuple[str, ...] = ("on", "off")
-HOLD_WRITERS: tuple[str, ...] = ("automation", "settings")
+# A command is {power, setAt, by, mode[, keyName]}. ``by`` is the kind of
+# writer, never a key name: it reaches the public kiosk list. ``keyName`` is
+# stored at the time of the command and is only shown to an admin session
+# (calvin-25g9).
+COMMAND_POWERS: tuple[str, ...] = ("on", "off")
+COMMAND_WRITERS: tuple[str, ...] = ("automation", "settings")
+COMMAND_MODES: tuple[str, ...] = ("schedule", "external")
 _SCREEN_NOW_KEYS = ("screenNow", "screen_now")
-
-# Ending a hold leaves a tombstone {power: None, setAt} in the column instead of
-# NULL: the time of the last power change, kept so a stale Settings page cannot
-# put back a manual choice the hold replaced (calvin-ldeu). A tombstone is never
-# a hold (``_valid_hold`` requires a power), so the kiosk list, the config
-# projection and every agent read exactly as they did before it existed. The
-# column is not exported in a backup either way.
 
 
 def _set_at_text(moment: datetime) -> str:
-    """The wire form of a hold/change time: UTC ISO-8601, seconds, trailing ``Z``."""
+    """The wire form of a command's time: UTC ISO-8601, seconds, trailing ``Z``."""
     return as_utc(moment).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
-def _change_time(raw: object) -> datetime | None:
-    """When the hold column last changed (a live hold or a tombstone), if valid."""
+def _valid_command(raw: object) -> dict | None:
+    """A stored power command in its full shape, or None when absent or malformed.
+
+    A command without a valid mode (a hold written before the mode existed) is
+    malformed: it is treated as absent, like an expired one.
+    """
     if not isinstance(raw, dict):
         return None
-    set_at = raw.get("setAt")
-    if not isinstance(set_at, str):
+    power, set_at, by, mode = raw.get("power"), raw.get("setAt"), raw.get("by"), raw.get("mode")
+    if power not in COMMAND_POWERS or not isinstance(set_at, str) or by not in COMMAND_WRITERS:
         return None
-    try:
-        moment = datetime.fromisoformat(set_at.replace("Z", "+00:00"))
-    except ValueError:
+    if mode not in COMMAND_MODES:
         return None
-    return as_utc(moment)
-
-
-def _valid_hold(raw: object) -> dict | None:
-    """A stored hold in its public shape, or None when absent or malformed."""
-    if not isinstance(raw, dict):
-        return None
-    power, set_at, by = raw.get("power"), raw.get("setAt"), raw.get("by")
-    if power not in HOLD_POWERS or not isinstance(set_at, str) or by not in HOLD_WRITERS:
-        return None
-    return {"power": power, "setAt": set_at, "by": by}
+    command = {"power": power, "setAt": set_at, "by": by, "mode": mode}
+    key_name = raw.get("keyName")
+    if isinstance(key_name, str) and key_name.strip():
+        command["keyName"] = key_name.strip()
+    return command
 
 
 # How many addresses are remembered per kiosk, and for how long. A few cover a
@@ -495,7 +487,7 @@ async def record_kiosk(
     ):
         ov = dict(existing.overrides)
         if ov.pop(_UPDATE_FLAG_KEY, None) is not None:
-            existing.overrides = ov
+            existing.overrides = without_screen_now(ov)
             changed = True
             clear_flag = True
     if (
@@ -507,8 +499,8 @@ async def record_kiosk(
     existing.last_seen = now
     # Never the display-check columns: the kiosk's own poll rewrites its row about
     # every 1.5 s during a check and must not put back a stale copy of the run.
-    # The layer only when the update flag was cleared: otherwise a poll could
-    # put back a screenNow that a hold change just removed (calvin-2ifv).
+    # The layer only when the update flag was cleared; that write also drops a
+    # legacy ``screenNow`` (calvin-25g9).
     columns = [*_HEARTBEAT_COLUMNS, "overrides"] if clear_flag else _HEARTBEAT_COLUMNS
     await existing.update(_columns=columns)
 
@@ -551,7 +543,7 @@ async def list_kiosks() -> list[dict]:
             "displayCheckActive": bool(
                 (display_check.view_of(row.display_check) or {}).get("active")
             ),
-            "powerHold": _valid_hold(row.power_hold),
+            "powerHold": screen_power.public_command(_valid_command(row.power_hold)),
             "agentHolds": agent_holds(row.agent_features),
             "paired": row.credential_hash is not None,
             "pairedAt": _set_at_text(row.paired_at) if row.paired_at is not None else None,
@@ -1093,10 +1085,15 @@ async def migrate_global_photo_frame() -> None:
 
 @retry_on_db_locked()
 async def set_overrides(kiosk_id: str, overrides: dict) -> None:
-    """Upsert the kiosk row and replace its overrides. No-op on malformed id."""
+    """Upsert the kiosk row and replace its overrides. No-op on malformed id.
+
+    Every layer write drops ``screenNow`` (calvin-25g9): the screen's command
+    lives in its own column and reaches an agent through the projection.
+    """
     if not kiosk_id or not _KIOSK_ID_RE.fullmatch(kiosk_id):
         logger.warning(f"Refusing to set overrides for malformed kiosk_id: {kiosk_id!r}")
         return
+    overrides = without_screen_now(overrides)
     now = utcnow()
     existing = await KioskDB.objects.get_or_none(id=kiosk_id)
     if existing is None:
@@ -1135,6 +1132,7 @@ async def merge_into_overrides(kiosk_id: str, partial: dict) -> dict | None:
         return None
     merged = dict(existing.overrides or {})
     merged.update(partial)
+    merged = without_screen_now(merged)
     if merged != (existing.overrides or {}):
         existing.overrides = merged
         # Only this column: a concurrent heartbeat (last_seen, agent_*) must not
@@ -1143,30 +1141,12 @@ async def merge_into_overrides(kiosk_id: str, partial: dict) -> dict | None:
     return merged
 
 
-# -- screen power hold (calvin-2ifv) ----------------------------------------
+# -- the screen's power command (calvin-2ifv, calvin-25g9) -------------------
 
 
-async def get_power_hold(kiosk_id: str) -> dict | None:
-    """The screen's hold ``{power, setAt, by}``, or None (none, malformed or unknown)."""
-    if not valid_kiosk_id(kiosk_id):
-        return None
-    row = await KioskDB.objects.get_or_none(id=kiosk_id)
-    return _valid_hold(row.power_hold) if row is not None else None
-
-
-async def power_state(kiosk_id: str) -> tuple[dict | None, datetime | None]:
-    """The live hold and when screen power last changed, from one row read.
-
-    ``changedAt`` is the hold's ``setAt``, or the tombstone a cleared hold left,
-    so it survives the hold ending (calvin-ldeu). ``(None, None)`` for a row that
-    never had a screen-power change, and for an unknown or malformed id.
-    """
-    if not valid_kiosk_id(kiosk_id):
-        return (None, None)
-    row = await KioskDB.objects.get_or_none(id=kiosk_id)
-    if row is None:
-        return (None, None)
-    return (_valid_hold(row.power_hold), _change_time(row.power_hold))
+def without_screen_now(overrides: dict) -> dict:
+    """The layer minus any stored ``screenNow``/``screen_now`` (calvin-25g9)."""
+    return {key: value for key, value in overrides.items() if key not in _SCREEN_NOW_KEYS}
 
 
 def _without_screen_now(overrides: dict | None) -> dict | None:
@@ -1174,15 +1154,22 @@ def _without_screen_now(overrides: dict | None) -> dict | None:
     layer = dict(overrides or {})
     if not any(key in layer for key in _SCREEN_NOW_KEYS):
         return None
-    for key in _SCREEN_NOW_KEYS:
-        layer.pop(key, None)
-    return layer
+    return without_screen_now(layer)
+
+
+async def get_power_command(kiosk_id: str) -> dict | None:
+    """The screen's stored command, or None (none, malformed or unknown)."""
+    if not valid_kiosk_id(kiosk_id):
+        return None
+    row = await KioskDB.objects.get_or_none(id=kiosk_id)
+    return _valid_command(row.power_hold) if row is not None else None
 
 
 async def power_status(kiosk_id: str) -> dict | None:
     """What the screen-power route needs about a known screen, or None.
 
-    ``{"hold", "lastSeen", "agentHolds", "overrides"}``; ``overrides`` is the raw
+    ``{"command", "paired", "lastSeen", "agentHolds", "overrides"}``; the command
+    keeps its ``keyName`` for the admin-only answer, and ``overrides`` is the raw
     (sanitized) layer.
     """
     if not valid_kiosk_id(kiosk_id):
@@ -1191,7 +1178,7 @@ async def power_status(kiosk_id: str) -> dict | None:
     if row is None:
         return None
     return {
-        "hold": _valid_hold(row.power_hold),
+        "command": _valid_command(row.power_hold),
         "paired": row.credential_hash is not None,
         "lastSeen": as_utc(row.last_seen) if row.last_seen is not None else None,
         "agentHolds": agent_holds(row.agent_features),
@@ -1199,51 +1186,49 @@ async def power_status(kiosk_id: str) -> dict | None:
     }
 
 
-def without_screen_now(overrides: dict) -> dict:
-    """The layer minus any ``screenNow`` (a hold replaces it, calvin-2ifv)."""
-    return {k: v for k, v in overrides.items() if k not in _SCREEN_NOW_KEYS}
-
-
 @retry_on_db_locked()
-async def set_power_hold(
-    kiosk_id: str, power: str, by: str, now: datetime | None = None
+async def set_power_command(
+    kiosk_id: str,
+    power: str,
+    by: str,
+    mode: str,
+    key_name: str | None = None,
+    now: datetime | None = None,
 ) -> dict | None:
-    """Hold a known screen on or off until changed; None for an unknown screen.
+    """Store the screen's command in the mode it was given in; None if unknown.
 
-    Removes any ``screenNow`` from the layer as well, so an old manual choice
-    cannot come back when the hold ends. Only these two columns are written.
+    Also drops any legacy ``screenNow`` from the layer (calvin-25g9), so only the
+    command column ever switches a screen. Only these two columns are written.
     """
-    if power not in HOLD_POWERS or by not in HOLD_WRITERS:
-        raise ValueError("power must be on/off and by automation/settings")
+    if power not in COMMAND_POWERS or by not in COMMAND_WRITERS or mode not in COMMAND_MODES:
+        raise ValueError("power must be on/off, by automation/settings, mode schedule/external")
     if not valid_kiosk_id(kiosk_id):
         return None
     row = await KioskDB.objects.get_or_none(id=kiosk_id)
     if row is None:
         return None
     moment = as_utc(now) if now is not None else utcnow()
-    hold = {
+    command = {
         "power": power,
         "setAt": _set_at_text(moment),
         "by": by,
+        "mode": mode,
     }
-    row.power_hold = hold
+    if isinstance(key_name, str) and key_name.strip():
+        command["keyName"] = key_name.strip()
+    row.power_hold = command
     columns = ["power_hold"]
     layer = _without_screen_now(row.overrides)
     if layer is not None:
         row.overrides = layer
         columns.append("overrides")
     await row.update(_columns=columns)
-    return hold
+    return command
 
 
 @retry_on_db_locked()
-async def clear_power_hold(kiosk_id: str, now: datetime | None = None) -> bool | None:
-    """Back to the schedule: clear the hold and any ``screenNow``.
-
-    Leaves a ``{power: None, setAt}`` tombstone in the hold column with the time
-    of this change, so a Settings page that missed the hold cannot put its old
-    manual choice back (calvin-ldeu). That includes ending a plain ``screenNow``
-    with no hold: removing it is a power change too.
+async def clear_power_command(kiosk_id: str) -> bool | None:
+    """Back to the schedule: clear the command and any legacy ``screenNow``.
 
     Returns whether anything changed; None for an unknown screen.
     """
@@ -1252,12 +1237,10 @@ async def clear_power_hold(kiosk_id: str, now: datetime | None = None) -> bool |
     row = await KioskDB.objects.get_or_none(id=kiosk_id)
     if row is None:
         return None
-    hold = _valid_hold(row.power_hold)
     layer = _without_screen_now(row.overrides)
     columns = []
-    if hold is not None or layer is not None:
-        moment = as_utc(now) if now is not None else utcnow()
-        row.power_hold = {"power": None, "setAt": _set_at_text(moment)}
+    if _valid_command(row.power_hold) is not None:
+        row.power_hold = None
         columns.append("power_hold")
     if layer is not None:
         row.overrides = layer
@@ -1265,3 +1248,26 @@ async def clear_power_hold(kiosk_id: str, now: datetime | None = None) -> bool |
     if columns:
         await row.update(_columns=columns)
     return bool(columns)
+
+
+@retry_on_db_locked()
+async def migrate_strip_screen_now() -> int:
+    """Drop a stored ``screenNow`` from every screen's layer once (calvin-25g9).
+
+    Settings used to write one into the layer; the command column replaced it,
+    so a value that is still stored would be projected and could switch a
+    screen invisibly. Idempotent: rows without the keys are not written, so
+    running it again (startup, then a restore) changes nothing. Returns how many
+    rows it changed.
+    """
+    changed = 0
+    for row in await KioskDB.objects.all():
+        layer = _without_screen_now(row.overrides)
+        if layer is None:
+            continue
+        row.overrides = layer
+        await row.update(_columns=["overrides"])
+        changed += 1
+    if changed:
+        logger.info(f"Dropped a stored Screen now from {changed} screen(s)")
+    return changed

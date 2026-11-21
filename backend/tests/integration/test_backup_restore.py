@@ -853,6 +853,35 @@ def _restore_seed(client, doc: dict, mode: str = "merge"):
     )
 
 
+@pytest.mark.parametrize("mode", ["merge", "replace"])
+def test_restore_drops_a_stored_screen_now_from_a_layer(test_client, mode):
+    """calvin-25g9: a backup from before the command column carries a Screen now.
+
+    A restored one would otherwise be projected and could switch a screen
+    invisibly, so the restore runs the same idempotent migration as startup.
+    """
+    from app.services import kiosk_registry as kr
+
+    doc = _seed(
+        [
+            {
+                "id": "kitchen-1a2b3c",
+                "hostname": "kitchen",
+                "overrides": {
+                    "displayName": "Kitchen",
+                    "screenNow": {"power": "off", "setAt": "2026-11-18T09:00:00Z"},
+                },
+            }
+        ]
+    )
+    response = _restore_seed(test_client, doc, mode)
+    assert response.status_code == 200, response.text
+
+    layer = _run(kr.get_overrides("kitchen-1a2b3c"))
+    assert "screenNow" not in layer and "screen_now" not in layer
+    assert layer["displayName"] == "Kitchen"
+
+
 def _principal_request(kiosk_id: str, secret: str) -> Request:
     scope = {
         "type": "http",
