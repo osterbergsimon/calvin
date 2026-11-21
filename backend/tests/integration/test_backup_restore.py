@@ -707,6 +707,64 @@ def test_restore_rearms_a_pre_migration_photo_frame_backup(test_client):
     assert _run(config_service.get_value(kr.PHOTO_FRAME_MIGRATED_KEY)) is True
 
 
+def _photo_frame_default_seed() -> dict:
+    """A pre-migration backup whose household photo frame is still at its defaults."""
+    return {
+        "format": "calvin-backup",
+        "format_version": 1,
+        "data": {
+            "config": [
+                {"key": "photo_frame_enabled", "value": "false", "value_type": "bool"},
+                {"key": "photo_frame_timeout", "value": "300", "value_type": "int"},
+            ],
+            "kiosks": [
+                {"id": "kitchen-1a2b3c", "hostname": "kitchen", "overrides": {}},
+            ],
+        },
+    }
+
+
+@pytest.mark.parametrize("mode", ["merge", "replace"])
+def test_restore_does_not_pin_the_seeded_photo_frame_defaults(test_client, mode):
+    """calvin-wkl3: a restored default is the fallback, not a screen's choice.
+
+    An older install seeded ``photo_frame_enabled`` false and
+    ``photo_frame_timeout`` 300 in its backup without anyone choosing them. The
+    restore migration must leave the screen on the household fallback so a
+    later household change still reaches it.
+    """
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    r = test_client.post(
+        "/api/backup/restore",
+        files={
+            "file": (
+                "seed.json",
+                json.dumps(_photo_frame_default_seed()).encode(),
+                "application/json",
+            )
+        },
+        data={"mode": mode},
+    )
+    assert r.status_code == 200, r.text
+
+    assert (
+        _run(kr.get_overrides("kitchen-1a2b3c"))
+        .keys()
+        .isdisjoint({"photoFrameEnabled", "photoFrameTimeout"})
+    )
+    assert _run(config_service.get_value("photo_frame_enabled")) is False
+    assert _run(config_service.get_value("photo_frame_timeout")) == 300
+
+    # The household can still turn the frame on afterwards.
+    r = test_client.post("/api/config", json={"photoFrameEnabled": True, "photoFrameTimeout": 600})
+    assert r.status_code == 200, r.text
+    body = test_client.get("/api/kiosks/kitchen-1a2b3c/config").json()
+    assert body["photoFrameEnabled"] is True
+    assert body["photoFrameTimeout"] == 600
+
+
 def test_restore_succeeds_with_a_warning_when_room_name_migration_fails(test_client, monkeypatch):
     """The migration is best effort: the restore is already applied when it runs."""
     from app.services import kiosk_registry as kr

@@ -1,5 +1,6 @@
 """Integration tests for the kiosk registry."""
 
+import asyncio
 import hashlib
 from pathlib import Path
 from unittest.mock import patch
@@ -9,6 +10,14 @@ from fastapi.testclient import TestClient
 
 # Root of the Calvin checkout — used to give bundle tests a real repo_dir.
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent
+
+
+def _run(coro):
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
 
 
 @pytest.fixture(autouse=True)
@@ -479,3 +488,37 @@ def test_wifi_power_save_configured_and_cleared_when_the_kiosk_goes_wired(test_c
     # Moved to Ethernet: the agent says "none", and the stale state goes.
     test_client.get("/api/kiosks/hall-wired/config?khost=pi&kwifi=none")
     assert state() is None
+
+
+@pytest.mark.integration
+def test_screen_follows_a_household_photo_frame_change_after_the_migration(test_client: TestClient):
+    """calvin-wkl3: the startup defaults must not become per-screen overrides.
+
+    The lifespan seeds ``photo_frame_enabled``/``photo_frame_timeout`` before
+    the one-time per-screen migration runs (main.py). A screen that existed
+    before the upgrade never chose those values, so after the migration it must
+    still read the household value; otherwise turning the photo frame on in
+    Settings never reaches it.
+    """
+    from app.main import _initialize_default_config
+    from app.services import kiosk_registry as kr
+
+    # A screen that registered before the upgrade (and keeps its row).
+    assert test_client.get("/api/kiosks/kitchen-1a2b3c/config?khost=pi").status_code == 200
+    # The startup order in the lifespan: seed defaults, then migrate.
+    _run(_initialize_default_config())
+    _run(kr.migrate_global_photo_frame())
+
+    assert (
+        _run(kr.get_overrides("kitchen-1a2b3c"))
+        .keys()
+        .isdisjoint({"photoFrameEnabled", "photoFrameTimeout"})
+    )
+
+    # The owner turns the photo frame on for the household (Default screen).
+    r = test_client.post("/api/config", json={"photoFrameEnabled": True, "photoFrameTimeout": 600})
+    assert r.status_code == 200, r.text
+
+    body = test_client.get("/api/kiosks/kitchen-1a2b3c/config").json()
+    assert body["photoFrameEnabled"] is True
+    assert body["photoFrameTimeout"] == 600
