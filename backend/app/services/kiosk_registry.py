@@ -1024,11 +1024,32 @@ _PHOTO_FRAME_KEYS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("photoFrameTimeout", ("photo_frame_timeout", "photoFrameTimeout")),
 )
 
+# The built-in defaults the startup seeds into the global config
+# (``_initialize_default_config`` in main.py, which imports these so they
+# cannot drift). A global still holding its default was seeded, not chosen: the
+# fallback already answers it, so copying it would only pin the screen against
+# a later household change (calvin-wkl3).
+PHOTO_FRAME_DEFAULTS: dict[str, Any] = {
+    "photoFrameEnabled": False,
+    "photoFrameTimeout": 300,
+}
+
 # Marks the one-time copy as done, like screenControlsMigrated (calvin-hi6w).
 # Kept in the config so a restart, a screen reset to Default, a screen
 # registering later and a restore of a post-migration backup all leave the
 # screen on the global fallback instead of being filled in again.
 PHOTO_FRAME_MIGRATED_KEY = "photoFrameMigrated"
+
+
+def _is_photo_frame_default(canonical: str, value: Any) -> bool:
+    """Whether ``value`` is the built-in default for a photo-frame key.
+
+    Type-checked too: ``False == 0`` in Python, and a timeout of 0 must never
+    read as "off". A default was seeded at startup, so it is not a choice to
+    copy onto a screen (calvin-wkl3).
+    """
+    default = PHOTO_FRAME_DEFAULTS[canonical]
+    return type(value) is type(default) and value == default
 
 
 @retry_on_db_locked()
@@ -1037,9 +1058,12 @@ async def migrate_global_photo_frame() -> None:
 
     The global ``photo_frame_enabled``/``photo_frame_timeout`` become each
     screen's own override where it has none; a screen that already chose keeps
-    its value. The global keys are kept (not deleted): a browser that is not a
-    known screen, and a screen that registers later, still reads them as the
-    fallback.
+    its value. A global still at its built-in default is not copied: the
+    startup seeded that value before this migration ran, and the screen already
+    reads it as the fallback, so copying it would only pin the screen against a
+    later household change (calvin-wkl3). The global keys are kept (not
+    deleted): a browser that is not a known screen, and a screen that registers
+    later, still reads them as the fallback.
 
     One-time: after the copy the done marker is stored, so a screen reset to
     Default, a screen registering later or a restore of a post-migration backup
@@ -1057,7 +1081,8 @@ async def migrate_global_photo_frame() -> None:
         for spelling in spellings:
             value = await config_service.get_value(spelling)
             if value is not None:
-                globals_[canonical] = value
+                if not _is_photo_frame_default(canonical, value):
+                    globals_[canonical] = value
                 break
     if not globals_:
         # Nothing to copy, but this run still completes the one-time migration.

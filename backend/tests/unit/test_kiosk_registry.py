@@ -1079,10 +1079,11 @@ async def test_global_photo_frame_moves_to_screens_without_their_own(test_db):
 
     await kr.migrate_global_photo_frame()
 
-    # A screen with no choice of its own inherits the old global value ...
+    # A screen with no choice of its own inherits the old global value. The
+    # timeout was left at its built-in default, so the household fallback
+    # already answers it and it is not pinned on the screen (calvin-wkl3).
     assert await kr.get_overrides("kitchen") == {
         "photoFrameEnabled": True,
-        "photoFrameTimeout": 300,
     }
     # ... and one that already chose keeps it.
     assert await kr.get_overrides("hallway") == {
@@ -1124,11 +1125,11 @@ async def test_photo_frame_migration_respects_a_snake_case_screen_choice(test_db
 
     await kr.migrate_global_photo_frame()
 
-    # The screen's own (snake_case) choice wins and is not duplicated; the
-    # setting it has not chosen is copied.
+    # The screen's own (snake_case) choice wins and is not duplicated. The
+    # timeout is still the built-in default, so copying it would only pin the
+    # screen against a later household change (calvin-wkl3).
     assert await kr.get_overrides("hallway") == {
         "photo_frame_enabled": False,
-        "photoFrameTimeout": 300,
     }
 
 
@@ -1200,7 +1201,6 @@ async def test_photo_frame_migration_is_idempotent_and_keeps_screen_choices(test
 
     assert await kr.get_overrides("kitchen") == {
         "photoFrameEnabled": True,
-        "photoFrameTimeout": 300,
     }
 
     # A later global change never overwrites a screen that already has a value.
@@ -1210,7 +1210,6 @@ async def test_photo_frame_migration_is_idempotent_and_keeps_screen_choices(test
 
     assert await kr.get_overrides("kitchen") == {
         "photoFrameEnabled": True,
-        "photoFrameTimeout": 300,
     }
 
 
@@ -1261,5 +1260,41 @@ async def test_photo_frame_migration_writes_only_the_overrides_column(test_db, m
     monkeypatch.undo()
 
     row = await KioskDB.objects.get(id="kitchen")
-    assert row.overrides == {"photoFrameEnabled": True, "photoFrameTimeout": 300}
+    # Only the non-default global is copied; the timeout stays on the fallback.
+    assert row.overrides == {"photoFrameEnabled": True}
     assert row.agent_version == "2.0"
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_photo_frame_migration_does_not_pin_the_seeded_defaults(test_db):
+    """calvin-wkl3: startup seeds the defaults before the migration runs.
+
+    ``_initialize_default_config`` (main.py) writes ``photo_frame_enabled``
+    false and ``photo_frame_timeout`` 300 on every install, so an upgrade from
+    the global-only setting finds those values even when nobody chose them.
+    Copying them would make the screen look as if it had its own value and a
+    later household change would never reach it.
+    """
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    await kr.record_kiosk("kitchen")
+    # The order in the lifespan (main.py): defaults, then the one-time copy.
+    await config_service.set_value("photo_frame_enabled", False)
+    await config_service.set_value("photo_frame_timeout", 300)
+
+    await kr.migrate_global_photo_frame()
+
+    assert await kr.get_overrides("kitchen") == {}
+    assert await config_service.get_value(kr.PHOTO_FRAME_MIGRATED_KEY) is True
+
+    # Turning the photo frame on for the household still reaches the screen.
+    await config_service.set_value("photo_frame_enabled", True)
+    await config_service.set_value("photo_frame_timeout", 600)
+
+    merged = kr.merge_overrides(
+        await config_service.get_config(), await kr.get_overrides("kitchen")
+    )
+    assert merged["photo_frame_enabled"] is True
+    assert merged["photo_frame_timeout"] == 600

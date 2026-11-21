@@ -305,6 +305,7 @@ async def _initialize_default_config():
     import json
 
     from app.services.config_service import config_service
+    from app.services.kiosk_registry import PHOTO_FRAME_DEFAULTS
 
     # Define all default config values
     default_configs = {
@@ -338,8 +339,8 @@ async def _initialize_default_config():
                 }
             ],
         },
-        "photo_frame_enabled": False,
-        "photo_frame_timeout": 300,  # 5 minutes
+        "photo_frame_enabled": PHOTO_FRAME_DEFAULTS["photoFrameEnabled"],
+        "photo_frame_timeout": PHOTO_FRAME_DEFAULTS["photoFrameTimeout"],
         "config_poll_interval": 30,  # 30 seconds
         "show_ui": True,
         "photo_rotation_interval": 30,  # 30 seconds
