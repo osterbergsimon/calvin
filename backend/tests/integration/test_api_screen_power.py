@@ -21,6 +21,26 @@ SCHEDULE = [
     {"day": day, "enabled": True, "onTime": "07:00", "offTime": "22:00"} for day in range(7)
 ]
 
+# A fixed instant at 12:00 UTC on a Wednesday: inside SCHEDULE, so a test about
+# the schedule saying on does not depend on the wall clock. The route reads
+# "now" through screen_power.now_in, and a command's setAt through the registry.
+NOW = datetime(2026, 11, 18, 12, 0, tzinfo=UTC)
+
+
+@pytest.fixture(autouse=True)
+def _fixed_clock(test_client, monkeypatch):
+    """Pin the clocks the screen-power routes read, whatever the time of day.
+
+    ``test_client`` is requested first: it reloads the registry and route
+    modules, which would drop a patch set before they are bound to the test DB.
+    """
+    from app.api.routes import kiosks
+    from app.services import kiosk_registry, screen_power
+
+    monkeypatch.setattr(screen_power, "now_in", lambda _cfg: NOW)
+    monkeypatch.setattr(kiosk_registry, "utcnow", lambda: NOW)
+    monkeypatch.setattr(kiosks, "utcnow", lambda: NOW)
+
 
 @pytest.fixture(autouse=True)
 def _fresh_limiter():
@@ -348,7 +368,7 @@ def test_old_agent_desired_on_follows_the_projected_screen_now(test_client: Test
     # Expired long ago: absent, the schedule says on.
     assert body["held"] is False and body["desiredOn"] is True
 
-    _set_command("off", "schedule", datetime.now(UTC))
+    _set_command("off", "schedule", NOW)  # inside the schedule, before its 22:00 boundary
     body = test_client.get(URL).json()
     assert body["held"] is True and body["agentHolds"] is False
     assert body["desiredOn"] is False
@@ -446,8 +466,8 @@ def test_until_is_the_end_of_a_schedule_command(test_client: TestClient):
     test_client.post("/api/config", json={"screenPower": "schedule", "displaySchedule": SCHEDULE})
     body = test_client.put(URL, json={"power": "off"}).json()
     assert body["until"] is not None
-    now = datetime.now().astimezone()
-    until = datetime.fromisoformat(body["until"].replace("Z", "+00:00")).astimezone()
+    now = NOW
+    until = datetime.fromisoformat(body["until"].replace("Z", "+00:00")).astimezone(UTC)
     assert until > now
     assert (until - now).days <= 8
     # It is the boundary at which the command ends: the next 22:00 or 07:00.
