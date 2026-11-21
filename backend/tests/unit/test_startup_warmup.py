@@ -102,6 +102,9 @@ async def test_lifespan_schedules_the_warmups(monkeypatch):
     monkeypatch.setattr("app.database.connect_db", noop)
     monkeypatch.setattr("app.database.disconnect_db", noop)
     monkeypatch.setattr("app.utils.legacy_data.migrate_legacy_data", lambda _settings: None)
+    # The per-screen startup migrations read the kiosks table this test never
+    # creates; they are covered by their own tests.
+    monkeypatch.setattr("app.services.kiosk_registry.migrate_strip_screen_now", noop)
 
     image_scan = AsyncMock()
     monkeypatch.setattr(main, "_initialize_image_service", image_scan)

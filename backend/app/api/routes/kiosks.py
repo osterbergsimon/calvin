@@ -269,7 +269,9 @@ def _conflict(code: str, message: str) -> HTTPException:
     return HTTPException(status_code=409, detail={"code": code, "message": message})
 
 
-async def _screen_state(status: dict) -> tuple[dict, str, dict | None, datetime]:
+async def _screen_state(
+    status: dict,
+) -> tuple[dict, screen_power.ScreenMode, dict | None, datetime]:
     """The screen's merged config, mode, command in force and the screen's now."""
     merged = merge_overrides(await build_global_config(), status["overrides"])
     now = screen_power.now_in(merged)
