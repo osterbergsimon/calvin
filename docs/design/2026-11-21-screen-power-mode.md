@@ -13,7 +13,8 @@ Builds on:
   rules, the [Default screen](2026-10-30-default-screen.md) override pattern and the
   [kiosk pairing](2026-11-21-kiosk-pairing.md) spec (§3.4 hidden presence, §5 Pair a screen).
 
-The server design (the coordinator's) fixes the behaviour, the config key and the routes. This spec fixes the
+The server design ([2026-11-21-screen-power-mode-design.md](../superpowers/specs/2026-11-21-screen-power-mode-design.md))
+fixes the behaviour, the config key (`screenPower`: `schedule` | `always_on` | `external`) and the routes. This spec fixes the
 layout, the copy, the states, focus and screen-reader behaviour. Copy in **bold** is exact.
 
 ## 1. Decisions in one place
@@ -43,15 +44,15 @@ layout, the copy, the states, focus and screen-reader behaviour. Copy in **bold*
 
 ### 2.1 The row (P1-P3, K1, K2)
 
-`SettingRow` `stacked`, label **Screen power**, `id` from `rowAnchorId(<mode key>)`.
+`SettingRow` `stacked`, label **Screen power**, `id` from `rowAnchorId('screenPower')`.
 
 - **Control:** `SegmentedControl`, `aria-label="Screen power"`, options in this order:
 
-| value (server's key) | Label | Hint (the row's description) |
+| `screenPower` | Label | Hint (the row's description) |
 |---|---|---|
-| schedule | **Schedule** | **Turns on and off at the times below.** |
-| always on | **Always on** | **Never turns off on a schedule. Turn off when idle still applies.** |
-| external | **External** | **Homey, Home Assistant or a script with an API key turns it on and off.** |
+| `schedule` | **Schedule** | **Turns on and off at the times below.** |
+| `always_on` | **Always on** | **Never turns off on a schedule. Turn off when idle still applies.** |
+| `external` | **External** | **Homey, Home Assistant or a script with an API key turns it on and off.** |
 
 - **Description slot, in order:**
   1. the hint for the current choice, as a plain `<span data-test="screen-power-hint">`;
@@ -96,16 +97,16 @@ the dimming note (today's, unchanged).
 | Case | Status line | Until line |
 |---|---|---|
 | Following the schedule | **On · by the schedule** / **Off · by the schedule** | **Turns off at {time}** / **Turns on at {time}** (the next scheduled change); no line when no change comes in the next 8 days |
-| A choice made here | **On · set here {when}** / **Off · set here {when}** | **Until the next scheduled change at {time}**; **Until the next scheduled change** when the time can't be shown |
+| A choice made here | **On · set here {when}** / **Off · set here {when}** | **Until the next scheduled change at {time}**, where {time} is the answer's `until`; no line when `until` is `null` |
 | A command from home automation | **On · set by {who} {when}** / **Off · set by {who} {when}** | same as above |
 
 - **Buttons:** **Turn on now**, **Turn off now** (secondary). The one that matches the current state is
   `aria-disabled` (today's rule).
 - **Back to schedule** (`variant="link"`, `screen-now-follow`) shows while a choice or a command is in force. It
   ends it, and the status goes back to **by the schedule**.
-- The until line can show a time only when this browser can compute it in the screen's time zone (today's
-  `formatUntil` rule). Otherwise it uses the fallback text. If the server sends the end of the command, use
-  that and drop the fallback.
+- {time} in both until lines is a clock time in the screen's time zone and the household's 12/24-hour choice
+  (`formatUntil`). For a command in force it is the answer's `until`; the browser doesn't work out the end
+  itself. For the following-the-schedule line it is the next boundary (`nextScheduleBoundary`), as today.
 
 ### 3.2 External
 
@@ -113,7 +114,7 @@ the dimming note (today's, unchanged).
 |---|---|
 | A command from home automation | **On · set by {who} {when}** / **Off · set by {who} {when}** |
 | A choice made here | **On · set here {when}** / **Off · set here {when}** |
-| No command since External was chosen | **On · no command yet** / **Off · no command yet** |
+| No command since External was chosen (the answer's `power` is `"schedule"`) | **On · no command yet** (External with no command is on) |
 
 - No until line: the last command stands.
 - **Buttons:** **Turn on**, **Turn off** (secondary), with the same `aria-disabled` rule. Pressing one does what
@@ -122,11 +123,11 @@ the dimming note (today's, unchanged).
 
 ### 3.3 {who} and {when}
 
-- **{who}** is the API key's name when the server sends it (for example **Homey**, the name the person typed
-  when making the key), else **home automation**. It is never "API", a key id or a key prefix. The name is
-  shown as given, cut to 40 characters with "…".
-  - This spec asks the server for the key's name next to `by`. Without it, every command reads
-    **set by home automation**, which is still correct.
+- **{who}** is the answer's `keyName` (for example **Homey**, the name the person typed when making the key),
+  else **home automation**. It is never "API", a key id or a key prefix. The name is shown as given, cut to 40
+  characters with "…".
+  - The server sends `keyName` only to an admin session, which Settings is. A `null` `keyName` reads **set by
+    home automation**, which is still correct.
 - **{when}** is `setAt`, in the screen's time zone and the household's 12/24-hour choice:
   - today: **at 21:04** (or **at 9:04 PM**);
   - in the last 6 days: **on Tue at 21:04**;
@@ -143,6 +144,11 @@ the dimming note (today's, unchanged).
   updates within a minute.**, or the offline line. Focus stays on the pressed button (now `aria-disabled`).
 - **Failure:** `powerMsg` `tone="err"`, `friendlyError(err, "turn {name} on")` / `"turn {name} off"`. Nothing
   else changes.
+- **409** (`screen_power_always_on`, `screen_power_external`): Settings never sends a call that gets one,
+  because the buttons and Back to schedule aren't shown in those modes. If one comes back anyway (the mode
+  changed on another device), `powerMsg` `tone="err"` shows the server's `message` as given, for example
+  **This screen is set to Always on. Choose Schedule or External to switch it.** Then reload the screen's
+  power state. No new UI and no copy of our own.
 - **429:** **Too many changes in a minute. Try again in {wait}.** `{wait}` is the pairing spec's §4.1 rule
   (`Retry-After`).
 - One press is one call. Today's two-step (end the hold, then save `screenNow`) and its
@@ -151,7 +157,8 @@ the dimming note (today's, unchanged).
 ### 3.5 Always on
 
 The Screen now row is not rendered. `desiredOnNow` is `true` for the Brightness group and the display check, so
-neither says the screen is asleep. If the server reports a command for an Always on screen, the page ignores it.
+neither says the screen is asleep. The server refuses commands in Always on with a 409 (§3.4), so there is no
+command to show.
 
 ## 4. Household default and per-screen override
 
@@ -168,14 +175,14 @@ neither says the screen is asleep. If the server reports a command for an Always
 
 The Power section (`device-power`) shows, in order:
 1. **Screen power**, the same row as §2.1, without a `ScopeLine` (the Default page has none);
-2. `DefaultEditNote` for the mode key, so after a change: **Hall keeps its own screen power.** /
+2. `DefaultEditNote` for `screenPower`, so after a change: **Hall keeps its own screen power.** /
    **Hall and Office keep their own screen power.**, with **Change them too** (today's component);
 3. in Schedule: the schedule, its `DefaultEditNote`, and the Timezone row, as today;
 4. Turn off when idle and the brightness note, as today.
 
 There is no Screen now row and there are no buttons on the Default page: the Default isn't a screen.
 
-- `SCREEN_SETTING_LABELS[<mode key>]` is **screen power**. It drives the note and the Changed here list.
+- `SCREEN_SETTING_LABELS.screenPower` is **screen power**. It drives the note and the Changed here list.
 - The old `displayScheduleEnabled` label and its toggle go. The server maps the stored value
   (`true` → Schedule, `false` → Always on).
 
@@ -216,13 +223,12 @@ in this order.
 | Hidden presence | `presenceHidden` | Schedule, External | replaces the status and until lines, neutral: **Sign in as admin to see whether this screen is on or off, and who set it.** (`screen-now-hidden`). Both buttons stay enabled, and Back to schedule shows, as today |
 | Not paired, while Only paired screens is on | `paired === false` and `kioskPairing === "required"` | Schedule | `warn`: **Not paired, so home automation can't switch it. Its schedule still works.** (`screen-now-unpaired`) |
 | | | External | `warn`: **Not paired, so home automation can't switch it. Pair it to use External.**, with the action **Pair a screen** (the pairing spec's §5 handler) |
-| Software too old for External | `agentHolds === false` | External only | `warn`: **This screen needs a software update before External works fully. Until then, its next scheduled change can switch it.**, with the action **Update** (the Software section's `onUpdate`, its **Updating…** and **Try again** labels) (`screen-now-old-agent`) |
 | Offline | `!isOnline(selectedKiosk)` | Schedule, External | neutral: **Offline. It turns on when it's back.** / **Offline. It turns off when it's back.** (from `desiredOn`) (`screen-now-offline`) |
 
 - In the unpaired case, the status line keeps its state and drops {who and when}: **On** / **Off**. Home
   automation's command isn't reaching the screen, so naming it would mislead.
-- `agentHolds === null` (no poll since the update) gets no note.
-- In Schedule an old agent needs no note: it already obeys a command until the next scheduled change.
+- Old screen software needs no note in any mode: the server sends External to it in a form it already obeys.
+  `agentHolds` is not read by the Power section any more, and today's `screen-now-old-agent` note is removed.
 - An offline screen's buttons stay enabled. The press is stored, and the offline save line says when it
   applies.
 
@@ -247,7 +253,7 @@ The mock shows every state at 390 px (phone) and 800×480 (the wall panel, lands
 - **Don't clear or edit the schedule** when the mode changes (§2.2).
 - **Don't show Screen now, or Turn on or Turn off, in Always on** (§3.5), and don't show buttons on the Default
   page.
-- **Don't invent a key name.** Without the server's name, say **home automation** (§3.3). Never show a key id,
+- **Don't invent a key name.** With no `keyName`, say **home automation** (§3.3). Never show a key id,
   a prefix or a secret.
 - **Don't read `presenceHidden` as "following the schedule"** (pairing spec §3.4).
 - **Don't add a Tag or a coloured dot** for the mode, or a second copy of the control elsewhere (for example on
@@ -274,8 +280,8 @@ The mock shows every state at 390 px (phone) and 800×480 (the wall panel, lands
   - {when} for today, 3 days ago and 20 days ago, in 24h and 12h;
   - a name longer than 40 characters is cut.
 - **Edges:** `presenceHidden`, unpaired with required pairing (both modes, and the **Pair a screen** action),
-  `agentHolds: false` only in External, `agentHolds: null` with no note, and offline with each `desiredOn`.
-- **Override:** ScopeLine reads **Same as Default** / **Changed here**. Reset removes only the mode key and keeps
+  no note for `agentHolds: false` in any mode, and offline with each `desiredOn`.
+- **Override:** ScopeLine reads **Same as Default** / **Changed here**. Reset removes only `screenPower` and keeps
   `displaySchedule`.
 - **Default page:** no Screen now, and the `DefaultEditNote` sentence **Hall keeps its own screen power.**
 - **Summaries:** **External on/off** in the list and the Default card.
@@ -288,12 +294,16 @@ The mock shows every state at 390 px (phone) and 800×480 (the wall panel, lands
 - Update the existing `ScreensSettings.hold.spec.js` and `settings-dashboard-screens.spec.js` cases that assert
   the old copy. Don't delete them: rewrite them to the new copy.
 
-## 10. Left to the server design and the docs
+## 10. The server's answers
 
-These aren't layout calls. The UI above needs them:
-- the mode key and its values, and the mapping from `displayScheduleEnabled`;
-- in the screen-power answer: the mode, `by`, `setAt`, the key's name (§3.3), and, ideally, when a command made in
-  Schedule ends;
-- what a command does in Always on. This spec assumes it is ignored (§3.5);
-- what happens to the last command when the mode changes away from External;
-- `HOME_AUTOMATION.md` "Settings and people" and the Homey app spec must be rewritten to this page's words.
+The server design answers what this page asked:
+- **The key** is `screenPower` (`schedule`, `always_on`, `external`). When a layer doesn't have it, the server
+  derives it from `displayScheduleEnabled`, so existing installs read as before.
+- **A command in Always on**, or `schedule` in External, gets a 409 with the server's own message (§3.4).
+- **Changing the mode ends the last command.** External with no command is on (§3.2).
+- **Old screen software obeys External**, so there is no old-software note (§6).
+- **The answer** carries `mode`, `power`, `by`, `setAt`, `until` (§3.1) and, for admin sessions, `keyName`
+  (§3.3).
+
+Still open, for the docs lane: `HOME_AUTOMATION.md` "Settings and people" and the Homey app spec must be
+rewritten to this page's words.
