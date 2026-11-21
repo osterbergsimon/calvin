@@ -140,11 +140,14 @@ export function usePhotoFrameMode() {
       inactivityTimer.value = null;
     }
 
-    // If photo frame is active, exit it
+    // If photo frame is active, exit it. The idle wait is still armed below:
+    // this path is activity the wake listeners do not own (a mouse move, or a
+    // settings change that restarted the wait), and a frame dismissed that way
+    // must come back on its own like one dismissed by a wake gesture
+    // (calvin-agnx). exitPhotoFrameMode's own reset is a no-op here: the guard
+    // above is still set.
     if (isPhotoFrameActive.value) {
       exitPhotoFrameMode();
-      isResettingTimer.value = false;
-      return; // Don't start a new timer immediately after exiting
     }
 
     // Don't start timer if user is on settings page
