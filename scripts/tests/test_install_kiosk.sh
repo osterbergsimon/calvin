@@ -246,4 +246,13 @@ if bash "$tmp/served.sh" --no-reboot --pair-code 'clv_pair_short' 2>/dev/null; t
 [ ! -f "$RUN_LOG" ] || { echo "FAIL: setup ran with a malformed pair code"; exit 1; }
 echo "PASS install-rejects-malformed-pair-code"
 
+# The value is checked as a whole string: grep is line-wise, so a multi-line
+# value used to pass and then be embedded in the generated installer (review m5).
+MULTILINE=$'x; echo pwned\n'"clv_pair_$(printf 'a%.0s' {1..22})"
+reset
+if bash "$tmp/served.sh" --no-reboot --pair-code "$MULTILINE" 2>/dev/null; then
+    echo "FAIL: multi-line --pair-code accepted"; exit 1; fi
+[ ! -f "$RUN_LOG" ] || { echo "FAIL: setup ran with a multi-line pair code"; exit 1; }
+echo "PASS install-rejects-multiline-pair-code"
+
 echo "PASS"

@@ -51,6 +51,9 @@ if ! bash "${INSTALLER}" --backend-url "${url}" --no-reboot; then
     status "Kiosk install failed; will retry in a minute. Details: journalctl -u calvin-kiosk-firstboot"
     exit 1
 fi
+# The baked installer is world-readable and holds the one-time pair code. It has
+# done its work, so leave no copy behind (design section 10, review m6).
+sed -i "s/^PAIR_CODE='clv_pair_[^']*'/PAIR_CODE=''/" "${INSTALLER}" 2>/dev/null || true
 status "Kiosk installed; rebooting into the dashboard."
 
 mkdir -p "$(dirname "${SENTINEL}")"

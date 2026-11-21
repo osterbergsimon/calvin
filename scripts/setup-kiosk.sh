@@ -116,8 +116,10 @@ install_pair_code() {
     local dir="${CALVIN_AGENT_STATE_DIR:-/var/lib/calvin/agent}"
     local file="${dir}/install-pair-code"
     local tmp="${file}.tmp"
+    local owner="${CALVIN_USER:-calvin}"
     [ -n "$code" ] || return 0
-    if ! printf '%s' "$code" | grep -qE '^clv_pair_[A-Za-z0-9_-]{22,64}$'; then
+    # Whole-string match (grep is line-wise and would accept a multi-line value).
+    if ! [[ "$code" =~ ^clv_pair_[A-Za-z0-9_-]{22,64}$ ]]; then
         log "Refusing a malformed install code"
         return 1
     fi
@@ -125,18 +127,39 @@ install_pair_code() {
         log "The agent state dir ${dir} is missing; the install code was not written"
         return 1
     fi
+    # The dir belongs to calvin, so root must never write through a path calvin
+    # could have swapped for a symlink (review m4). install replaces a symlink
+    # destination rather than following it; the checks make that explicit.
+    if [ -L "$tmp" ]; then
+        log "Refusing to write through a symlink: ${tmp}"
+        return 1
+    fi
     install -m 0600 /dev/null "$tmp" || return 1
+    if [ -L "$tmp" ]; then
+        log "Refusing to write through a symlink: ${tmp}"
+        return 1
+    fi
     if ! printf '%s\n' "$code" > "$tmp"; then
         rm -f "$tmp"
         return 1
     fi
     chmod 0600 "$tmp" || true
+    # Owner and mode are set on the temp file before the rename, so root never
+    # chowns a final path that calvin could have swapped underneath it. -h never
+    # follows a symlink.
+    if ! chown -h "${owner}:${owner}" "$tmp" 2>/dev/null; then
+        log "Could not make ${file} owned by ${owner}"
+        rm -f "$tmp"
+        return 1
+    fi
     if ! mv -f "$tmp" "$file"; then
         rm -f "$tmp"
         return 1
     fi
-    if ! chown "${CALVIN_USER:-calvin}:${CALVIN_USER:-calvin}" "$file" 2>/dev/null; then
-        log "Could not make ${file} owned by ${CALVIN_USER:-calvin}"
+    if [ -L "$file" ]; then
+        log "Refusing a symlinked ${file}"
+        rm -f "$file"
+        return 1
     fi
 }
 
@@ -210,7 +233,7 @@ parse_args() {
         exit 1
     fi
 
-    if [ -n "${PAIR_CODE}" ] && ! printf '%s' "${PAIR_CODE}" | grep -qE '^clv_pair_[A-Za-z0-9_-]{22,64}$'; then
+    if [ -n "${PAIR_CODE}" ] && ! [[ "${PAIR_CODE}" =~ ^clv_pair_[A-Za-z0-9_-]{22,64}$ ]]; then
         echo "Error: --pair-code is not a Calvin one-time install code" >&2
         exit 1
     fi

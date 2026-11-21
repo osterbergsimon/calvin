@@ -84,9 +84,26 @@ pair_file="$agent_dir/install-pair-code"
     || { echo "FAIL: install-pair-code content is wrong"; exit 1; }
 [ "$(stat -c '%a' "$pair_file")" = "600" ] \
     || { echo "FAIL: install-pair-code is not 0600"; exit 1; }
-grep -q "calvin:calvin $pair_file" "$TMPDIR_TEST/chown.log" \
-    || { echo "FAIL: install-pair-code is not owned by calvin"; exit 1; }
+grep -q "calvin:calvin $agent_dir/install-pair-code.tmp" "$TMPDIR_TEST/chown.log" \
+    || { echo "FAIL: install-pair-code temp file is not owned by calvin"; exit 1; }
+grep -q "chown -h calvin:calvin $agent_dir/install-pair-code.tmp" "$TMPDIR_TEST/chown.log" \
+    || { echo "FAIL: install-pair-code chown does not use -h"; exit 1; }
 echo "PASS: setup-kiosk.sh writes install-pair-code 0600 for calvin"
+
+# A symlink left at the temp path is refused: root must never write through a
+# path the calvin-writable state dir lets calvin swap (review m4).
+sym_dir="$TMPDIR_TEST/agent-symlink"
+mkdir -p "$sym_dir"
+victim="$TMPDIR_TEST/symlink-victim"
+echo keep > "$victim"
+ln -s "$victim" "$sym_dir/install-pair-code.tmp"
+if ( CALVIN_AGENT_STATE_DIR="$sym_dir"; install_pair_code "$PAIR_CODE" ) 2>/dev/null; then
+    echo "FAIL: install_pair_code wrote through a symlink"; exit 1; fi
+[ "$(cat "$victim")" = keep ] \
+    || { echo "FAIL: the symlink target was clobbered"; exit 1; }
+[ ! -e "$sym_dir/install-pair-code" ] \
+    || { echo "FAIL: a code was written despite the symlink"; exit 1; }
+echo "PASS: setup-kiosk.sh refuses a symlinked install-pair-code.tmp"
 
 # A malformed code is refused before anything is written.
 bad_dir="$TMPDIR_TEST/agent-bad"
@@ -104,11 +121,27 @@ if ( parse_args --backend-url http://h:8000 --pair-code 'clv_pair_short' ) 2>/de
     || { echo "FAIL: --pair-code rejected a valid code"; exit 1; }
 echo "PASS: setup-kiosk.sh validates --pair-code"
 
+# The whole string is checked: grep used to accept any single matching line, so
+# a multi-line value (shell injection in the baked installer) got through m5.
+MULTILINE=$'x; echo pwned\n'"clv_pair_$(printf 'b%.0s' {1..22})"
+multi_dir="$TMPDIR_TEST/agent-multi"
+mkdir -p "$multi_dir"
+if ( CALVIN_AGENT_STATE_DIR="$multi_dir"; install_pair_code "$MULTILINE" ) 2>/dev/null; then
+    echo "FAIL: install_pair_code accepted a multi-line code"; exit 1; fi
+[ ! -e "$multi_dir/install-pair-code" ] \
+    || { echo "FAIL: a multi-line pair code was written"; exit 1; }
+echo "PASS: setup-kiosk.sh refuses a multi-line pair code"
+if ( parse_args --backend-url http://h:8000 --pair-code "$MULTILINE" ) 2>/dev/null; then
+    echo "FAIL: --pair-code accepted a multi-line code"; exit 1; fi
+echo "PASS: setup-kiosk.sh validates --pair-code as a whole string"
+
 # The code is written only after bootstrap_kiosk created the agent's dir. main()
 # is defined after setup-kiosk.sh's source-only return, so pin the call order in
 # the file: bootstrap first, then install_pair_code.
 setup_src="$(dirname "$0")/../setup-kiosk.sh"
+# shellcheck disable=SC2016  # the patterns are literal source text
 bootstrap_line="$(grep -n 'bootstrap_kiosk "${BACKEND_URL}"' "$setup_src" | cut -d: -f1)"
+# shellcheck disable=SC2016
 pair_line="$(grep -n 'install_pair_code "${PAIR_CODE}"' "$setup_src" | cut -d: -f1)"
 [ -n "$bootstrap_line" ] && [ -n "$pair_line" ] \
     || { echo "FAIL: the setup-kiosk bootstrap/pair-code calls are missing"; exit 1; }

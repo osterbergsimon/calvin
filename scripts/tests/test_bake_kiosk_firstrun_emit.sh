@@ -66,5 +66,9 @@ echo "$out5" | grep -qF "PAIR_CODE='$PAIR_CODE'" \
     || { echo "FAIL: pair code not baked into the installer"; exit 1; }
 if echo "$out5" | grep -qF '__PAIR_CODE__'; then
     echo "FAIL: the pair placeholder survived a baked code"; exit 1; fi
+# The code lives on the world-readable FAT partition only until boot 1 removes
+# the script it is embedded in (review m6).
+echo "$out5" | grep -qF 'rm -f /boot/firmware/firstrun.sh' \
+    || { echo "FAIL: firstrun.sh with a pair code does not delete itself"; exit 1; }
 
 echo "PASS"

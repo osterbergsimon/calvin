@@ -103,7 +103,7 @@ validate_args() {
         echo "Error: --admin-user must be a lowercase user name other than calvin or root (got: ${ADMIN_USER})" >&2; return 1; fi
     if [ -n "${SIGNING_KEY}" ] && ! printf '%s' "${SIGNING_KEY}" | grep -qE '^[0-9a-fA-F]{64}$'; then
         echo "Error: signing key must be 64 hex characters (the content of kiosk-signing.key)" >&2; return 1; fi
-    if [ -n "${PAIR_CODE}" ] && ! printf '%s' "${PAIR_CODE}" | grep -qE '^clv_pair_[A-Za-z0-9_-]{22,64}$'; then
+    if [ -n "${PAIR_CODE}" ] && ! [[ "${PAIR_CODE}" =~ ^clv_pair_[A-Za-z0-9_-]{22,64}$ ]]; then
         echo "Error: --pair-code is not a Calvin one-time install code" >&2; return 1; fi
     return 0
 }

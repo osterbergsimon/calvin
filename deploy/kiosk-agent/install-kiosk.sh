@@ -95,7 +95,9 @@ case "$DISPLAY_STACK" in
     *) die "--display-stack must be auto, x11, wayland or cog (got: $DISPLAY_STACK)" ;;
 esac
 if [ -n "$PAIR_CODE" ]; then
-    printf '%s' "$PAIR_CODE" | grep -qE '^clv_pair_[A-Za-z0-9_-]{22,64}$' \
+    # Whole-string match: grep is line-wise, so a multi-line value would pass it
+    # and then be embedded in the generated installer (review m5).
+    [[ "$PAIR_CODE" =~ ^clv_pair_[A-Za-z0-9_-]{22,64}$ ]] \
         || die "--pair-code is not a Calvin one-time install code"
 fi
 [ "$(id -u)" -eq 0 ] || die "run as root: curl -fsSL $SERVER_URL/api/kiosks/install.sh | sudo bash"
