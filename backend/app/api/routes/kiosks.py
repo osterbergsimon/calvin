@@ -111,6 +111,7 @@ async def put_kiosk_overrides(kiosk_id: str, body: OverridesBody):
     _check_floor_under_limit(merge_overrides(await build_global_config(), body.overrides))
     _checked_overrides(body.overrides)
     layer = await _without_superseded_screen_now(kiosk_id, body.overrides)
+    layer = screen_power.sync_mode_keys(layer)
     await set_overrides(kiosk_id, layer)
     return {"id": kiosk_id, "overrides": layer}
 
@@ -229,6 +230,7 @@ async def patch_kiosk_overrides(kiosk_id: str, body: OverridesBody, request: Req
         _check_floor_under_limit(merge_overrides(await build_global_config(), layer))
     _checked_overrides(body.overrides)
     partial = await _without_superseded_screen_now(kiosk_id, body.overrides)
+    partial = screen_power.sync_mode_keys(partial)
     merged = await merge_into_overrides(kiosk_id, partial)
     if merged is None:
         raise HTTPException(status_code=404, detail="Unknown kiosk")

@@ -25,6 +25,11 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 _HOLD_KEYS = ("screen_hold", "screenHold")
 _NOW_KEYS = ("screen_now", "screenNow")
 
+# Screen power modes (calvin-25g9): one plain choice per screen.
+MODES: tuple[str, ...] = ("schedule", "always_on", "external")
+_MODE_KEYS = ("screen_power", "screenPower")
+_SWITCH_KEYS = ("display_schedule_enabled", "displayScheduleEnabled")
+
 # How far a ``screenNow.setAt`` may sit from the server's clock and still count
 # as "set just now" (in either direction). The page stamps it with the phone's
 # clock and the server compares it with its own, so the tolerance absorbs clock
@@ -49,6 +54,52 @@ def _should_be_on(now_t: time, on_t: time, off_t: time) -> bool:
     if off_t < on_t:
         return now_t >= on_t or now_t < off_t
     return on_t <= now_t < off_t
+
+
+def _mode_value(value: object) -> str | None:
+    """One of :data:`MODES`, or None for anything else (a stale stored value)."""
+    return value if isinstance(value, str) and value in MODES else None
+
+
+def derived_mode(cfg: dict) -> str:
+    """The mode an absent ``screenPower`` means: the schedule switch decides.
+
+    With the schedule on it is ``schedule``; with it off it is ``always_on``,
+    which is exactly what every install did before the mode existed.
+    """
+    enabled = _get(cfg, *_SWITCH_KEYS, default=False)
+    return "schedule" if bool(enabled) else "always_on"
+
+
+def effective_mode(cfg: dict) -> str:
+    """The screen's ``screenPower``: the stored value, else derived from the switch."""
+    return _mode_value(_get(cfg, *_MODE_KEYS)) or derived_mode(cfg)
+
+
+def sync_mode_keys(layer: dict, *, snake: bool = False) -> dict:
+    """Return ``layer`` with ``screenPower`` and the schedule switch in step.
+
+    Only when the write carries one of them. A mode is stored with
+    ``displayScheduleEnabled`` true only for ``schedule``, so a restore onto, or
+    a downgrade to, an older backend still behaves sensibly (calvin-25g9). When a
+    write carries both, the mode wins. The schedule itself is never touched.
+
+    ``snake`` selects the household config's stored spelling
+    (``screen_power``/``display_schedule_enabled``); the default is the
+    camelCase the API and a screen's override layer use. The other spelling is
+    dropped so one setting cannot drift between two keys.
+    """
+    mode_key = "screen_power" if snake else "screenPower"
+    switch_key = "display_schedule_enabled" if snake else "displayScheduleEnabled"
+    other_mode = "screenPower" if snake else "screen_power"
+    other_switch = "displayScheduleEnabled" if snake else "display_schedule_enabled"
+    if not any(key in layer for key in (mode_key, other_mode, switch_key, other_switch)):
+        return layer
+    mode = _mode_value(layer.get(mode_key, layer.get(other_mode))) or derived_mode(layer)
+    synced = {key: value for key, value in layer.items() if key not in (other_mode, other_switch)}
+    synced[mode_key] = mode
+    synced[switch_key] = mode == "schedule"
+    return synced
 
 
 def _parse_instant(value: object) -> datetime | None:

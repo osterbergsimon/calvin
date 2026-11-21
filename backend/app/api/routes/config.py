@@ -12,6 +12,7 @@ from app.config import settings
 from app.schemas.config_update import PER_SCREEN_ONLY_KEYS, ConfigUpdate
 from app.security.admin_auth import get_admin_store
 from app.security.route_policy import CONFIG_DISPLAY_KEYS, admin_error, is_admin
+from app.services import screen_power
 from app.services.config_service import config_service
 from app.services.display_orientation_service import display_orientation_service
 from app.utils.errors import internal_error
@@ -261,6 +262,10 @@ async def build_global_config() -> dict:
         config["displayScheduleEnabled"] = False  # Disabled by default
     elif "display_schedule_enabled" in config and "displayScheduleEnabled" not in config:
         config["displayScheduleEnabled"] = config["display_schedule_enabled"]
+    # Screen power (calvin-25g9): the mode is always answered, derived from the
+    # schedule switch when it was never written, so an existing install reads as
+    # before ("schedule off" is Always on) with no write.
+    config["screenPower"] = screen_power.effective_mode(config)
     # Handle display schedule (per-day schedule)
     # Check if we have a valid schedule (not None, not empty string, not empty list)
     has_schedule = False
@@ -579,6 +584,13 @@ async def update_config(config_update: ConfigUpdate, request: Request):
         update_dict["type_theme"] = update_dict.pop("typeTheme")
     if "displayScheduleEnabled" in update_dict:
         update_dict["display_schedule_enabled"] = update_dict.pop("displayScheduleEnabled")
+    # Screen power (calvin-25g9): a mode write keeps the schedule switch in step,
+    # and an old page's switch-only write gets the derived mode, so the two never
+    # disagree. displaySchedule is never touched.
+    if "screenPower" in update_dict:
+        update_dict["screen_power"] = update_dict.pop("screenPower")
+    if "screen_power" in update_dict or "display_schedule_enabled" in update_dict:
+        update_dict = screen_power.sync_mode_keys(update_dict, snake=True)
     if "displaySchedule" in update_dict:
         # Store schedule with explicit type
         # Pass the schedule directly (list/array) to set_value, which will serialize it

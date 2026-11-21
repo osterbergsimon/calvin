@@ -187,6 +187,10 @@ class ConfigUpdate(BaseModel):
     # keeps no list of ids: an unknown id falls back to the default face.
     typeTheme: str | None = Field(None, max_length=64)
     displayScheduleEnabled: bool | None = None  # Enable display power schedule
+    # Screen power (calvin-25g9): schedule, always_on or external. When it is
+    # absent the mode is derived from displayScheduleEnabled, and every write of
+    # either keeps the pair in step (set), so both spellings agree.
+    screenPower: Literal["schedule", "always_on", "external"] | None = None
     # Display schedule as JSON string or array:
     # [{"day": 0-6, "enabled": bool, "onTime": "HH:MM", "offTime": "HH:MM"}, ...]
     displaySchedule: str | list[dict[str, Any]] | None = None
