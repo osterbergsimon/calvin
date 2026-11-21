@@ -160,7 +160,7 @@ class KioskDB(ormar.Model):
 
     id: str = ormar.String(max_length=255, primary_key=True, index=True)  # CALVIN_KIOSK_ID
     hostname: str | None = ormar.String(max_length=255, nullable=True)  # reported by the kiosk
-    last_seen: datetime = UTCDateTime(default=utcnow, nullable=False)
+    last_seen: datetime | None = UTCDateTime(default=utcnow, nullable=True)
     last_applied_version: str | None = ormar.String(
         max_length=64, nullable=True
     )  # device-config version the display-agent last confirmed applied (used by dd9.3)
@@ -198,3 +198,9 @@ class KioskDB(ormar.Model):
     agent_features: str | None = ormar.String(
         max_length=64, nullable=True
     )  # comma-separated features the display agent reports (kfeat), "" for none (calvin-2ifv)
+    credential_hash: str | None = ormar.String(
+        max_length=64, nullable=True
+    )  # SHA-256 hex of the screen's pairing secret; absent while unpaired (calvin-0xns)
+    paired_at: datetime | None = UTCDateTime(
+        nullable=True
+    )  # when the current credential was approved (calvin-0xns)

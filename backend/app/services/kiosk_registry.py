@@ -103,10 +103,12 @@ def _normalized_wifi_power_save(value: str | None) -> str | None:
 
 
 # Features the display agent can report on its config poll (``kfeat``,
-# calvin-2ifv). "hold": it obeys ``screenHold`` until it changes. An agent poll
-# without the flag stores "" (cannot hold); never polled since reads as unknown.
+# calvin-2ifv). "hold": it obeys ``screenHold`` until it changes. "pair": it can
+# make and send its own pairing secret (calvin-0xns). An agent poll without the
+# flag stores "" (cannot hold); never polled since reads as unknown.
 HOLD_FEATURE = "hold"
-AGENT_FEATURES: tuple[str, ...] = (HOLD_FEATURE,)
+PAIR_FEATURE = "pair"
+AGENT_FEATURES: tuple[str, ...] = (HOLD_FEATURE, PAIR_FEATURE)
 
 
 def _normalized_agent_features(value: str | None) -> str:
@@ -122,6 +124,13 @@ def agent_holds(agent_features: str | None) -> bool | None:
     if agent_features is None:
         return None
     return HOLD_FEATURE in agent_features.split(",")
+
+
+def agent_pairs(agent_features: str | None) -> bool | None:
+    """True/False once an agent reported it can pair; None when it never polled."""
+    if agent_features is None:
+        return None
+    return PAIR_FEATURE in agent_features.split(",")
 
 
 # A hold is {power, setAt, by}. ``by`` is the kind of writer, never a key name:
@@ -430,9 +439,124 @@ async def list_kiosks() -> list[dict]:
             ),
             "powerHold": _valid_hold(row.power_hold),
             "agentHolds": agent_holds(row.agent_features),
+            "paired": row.credential_hash is not None,
+            "pairedAt": _set_at_text(row.paired_at) if row.paired_at is not None else None,
+            "agentPairs": agent_pairs(row.agent_features),
         }
         for row in rows
     ]
+
+
+# -- the screen's pairing credential (calvin-0xns) --------------------------
+
+
+async def agent_seen(kiosk_id: str) -> bool:
+    """Whether a display agent has ever polled for this screen."""
+    if not valid_kiosk_id(kiosk_id):
+        return False
+    row = await KioskDB.objects.get_or_none(id=kiosk_id)
+    return row is not None and row.agent_version is not None
+
+
+async def get_credential_hash(kiosk_id: str) -> str | None:
+    """The SHA-256 hex of the screen's active pairing secret, or None."""
+    if not valid_kiosk_id(kiosk_id):
+        return None
+    row = await KioskDB.objects.get_or_none(id=kiosk_id)
+    return row.credential_hash if row is not None else None
+
+
+@retry_on_db_locked()
+async def create_paired_kiosk(
+    kiosk_id: str,
+    secret_hash: str,
+    hostname: str | None = None,
+    now: datetime | None = None,
+) -> bool:
+    """Pair a screen that has no row yet; False when the id already exists.
+
+    Used by the install-code path, where the code may only ever give someone a
+    screen of their own: create-if-absent, never an update. A concurrent
+    approval or a second install code that registers the id between the caller's
+    check and this insert makes the create fail, so neither pairing is
+    overwritten. ``last_seen`` stays the schema's "never polled" value: the row
+    is paired, not seen.
+    """
+    if not valid_kiosk_id(kiosk_id):
+        logger.warning(f"Refusing to pair a malformed kiosk_id: {kiosk_id!r}")
+        return False
+    moment = as_utc(now) if now is not None else utcnow()
+    try:
+        await KioskDB.objects.create(
+            id=kiosk_id,
+            hostname=hostname,
+            last_seen=None,
+            credential_hash=secret_hash,
+            paired_at=moment,
+        )
+    except _INTEGRITY_ERRORS:
+        return False
+    await _adopt_global_settings()
+    return True
+
+
+@retry_on_db_locked()
+async def set_credential(
+    kiosk_id: str,
+    secret_hash: str,
+    hostname: str | None = None,
+    now: datetime | None = None,
+) -> None:
+    """Store an approved secret's hash for a screen, creating its row if needed.
+
+    Column-scoped, so a concurrent heartbeat is not overwritten. ``hostname`` is
+    used only when the row is created; a poll fills it in afterwards anyway.
+    """
+    if not valid_kiosk_id(kiosk_id):
+        logger.warning(f"Refusing to set a credential for malformed kiosk_id: {kiosk_id!r}")
+        return
+    moment = as_utc(now) if now is not None else utcnow()
+    existing = await KioskDB.objects.get_or_none(id=kiosk_id)
+    if existing is None:
+        try:
+            await KioskDB.objects.create(
+                id=kiosk_id,
+                hostname=hostname,
+                last_seen=None,  # approval is not a poll: see create_paired_kiosk
+                credential_hash=secret_hash,
+                paired_at=moment,
+            )
+        except _INTEGRITY_ERRORS:
+            # Lost a create race; fall through and write the columns only.
+            existing = await KioskDB.objects.get_or_none(id=kiosk_id)
+            if existing is None:
+                return
+        else:
+            await _adopt_global_settings()
+            return
+    existing.credential_hash = secret_hash
+    existing.paired_at = moment
+    await existing.update(_columns=["credential_hash", "paired_at"])
+
+
+@retry_on_db_locked()
+async def clear_credential(kiosk_id: str) -> bool | None:
+    """Unpair a screen: clear its hash and approval time.
+
+    ``None`` for an unknown (or malformed) screen; otherwise whether anything
+    changed, so unpairing an unpaired screen is a successful no-op.
+    """
+    if not valid_kiosk_id(kiosk_id):
+        return None
+    row = await KioskDB.objects.get_or_none(id=kiosk_id)
+    if row is None:
+        return None
+    if row.credential_hash is None and row.paired_at is None:
+        return False
+    row.credential_hash = None
+    row.paired_at = None
+    await row.update(_columns=["credential_hash", "paired_at"])
+    return True
 
 
 @retry_on_db_locked()

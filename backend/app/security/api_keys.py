@@ -22,6 +22,9 @@ from typing import Any
 
 from loguru import logger
 
+from app.services.kiosk_pairing import INSTALL_PREFIX as _INSTALL_PREFIX
+from app.services.kiosk_pairing import SECRET_PREFIX as _KIOSK_PREFIX
+
 SECRET_PREFIX = "clv_"
 SECRET_BYTES = 32
 PREFIX_LEN = 8
@@ -30,6 +33,10 @@ SCOPE_RANK = {"read": 0, "admin": 1, "host": 2}
 MAX_NAME_LEN = 40
 LAST_USED_INTERVAL = 60  # seconds between last_used_at writes, per key
 _FILE_VERSION = 1
+
+# A new API key must never look like a screen secret or an install code
+# (calvin-0xns): create() re-rolls one that would.
+RESERVED_PREFIXES = (_KIOSK_PREFIX, _INSTALL_PREFIX)
 
 # Named permissions a key can carry (calvin-2ifv). A key with a ``permissions``
 # field is *limited*: it is stored with the ``read`` scope, so an older backend
@@ -175,6 +182,8 @@ class ApiKeyStore:
                 raise ValueError("Unknown or missing permissions")
             permissions = list(dict.fromkeys(permissions))
         secret = SECRET_PREFIX + secrets.token_urlsafe(SECRET_BYTES)
+        while secret.startswith(RESERVED_PREFIXES):
+            secret = SECRET_PREFIX + secrets.token_urlsafe(SECRET_BYTES)
         created = time.time() if now is None else now
         with self._lock:
             keys = self._load()

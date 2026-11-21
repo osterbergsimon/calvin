@@ -295,8 +295,13 @@ class AdminAuthStore:
             return None
         if generation != current_generation:
             return None
+        # Shape-check the MAC before compare_digest, which raises TypeError on a
+        # non-ASCII string: a garbled cookie is "no session", never a 500.
+        mac = parts[6]
+        if len(mac) != 64 or any(char not in "0123456789abcdef" for char in mac):
+            return None
         body = ".".join(parts[:6])
-        if not hmac.compare_digest(self._cookie_mac(body, server_secret), parts[6]):
+        if not hmac.compare_digest(self._cookie_mac(body, server_secret), mac):
             return None
         session = Session(kind, kiosk_id, issued_at, last_active)
         current_time = int(time.time() if now is None else now)

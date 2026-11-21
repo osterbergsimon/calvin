@@ -290,3 +290,51 @@ def test_bundle_version_raises_for_removed_file_after_caching(tmp_path):
     (tmp_path / kiosk_bundle.BUNDLE_FILES[0].repo_path).unlink()
     with pytest.raises(FileNotFoundError):
         kiosk_bundle.bundle_version(tmp_path)
+
+
+# -- the one-time pair code in the served installer (calvin-0xns) -------------
+
+_PAIR_CODE_TEMPLATE = "SERVER='@CALVIN_SERVER_URL@'\nPAIR_CODE='__PAIR_CODE__'\n"
+
+
+def _install_script_root(tmp_path: Path) -> Path:
+    path = tmp_path / kiosk_bundle.INSTALL_SCRIPT_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(_PAIR_CODE_TEMPLATE)
+    return tmp_path
+
+
+def test_render_install_script_embeds_a_valid_pair_code(tmp_path):
+    root = _install_script_root(tmp_path)
+    code = "clv_pair_" + "a" * 22
+    rendered = kiosk_bundle.render_install_script("http://calvin:8000", root, pair_code=code)
+    assert f"PAIR_CODE='{code}'" in rendered
+    assert "http://calvin:8000" in rendered
+    assert "__PAIR_CODE__" not in rendered
+
+
+def test_render_install_script_ignores_a_malformed_pair_code(tmp_path):
+    root = _install_script_root(tmp_path)
+    plain = kiosk_bundle.render_install_script("http://calvin:8000", root)
+    for bad in (
+        "",
+        "clv_pair_short",
+        "clv_pair_" + "a" * 21 + "'",
+        "clv_pair_" + "a" * 22 + "\n",
+        "clv_pair_$(touch /tmp/x)",
+        "clv_pair_" + "a" * 21 + " ",
+        "clv_kiosk_" + "a" * 43,
+    ):
+        assert (
+            kiosk_bundle.render_install_script("http://calvin:8000", root, pair_code=bad) == plain
+        )
+
+
+def test_render_install_script_without_the_placeholder_is_unchanged(tmp_path):
+    """Part A's real installer has no placeholder; a code changes nothing there."""
+    root = tmp_path
+    (root / "deploy/kiosk-agent").mkdir(parents=True)
+    (root / kiosk_bundle.INSTALL_SCRIPT_PATH).write_text("echo plain\n")
+    assert kiosk_bundle.render_install_script(
+        "http://calvin:8000", root, pair_code="clv_pair_" + "a" * 22
+    ) == ("echo plain\n")

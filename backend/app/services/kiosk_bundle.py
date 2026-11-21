@@ -128,6 +128,9 @@ INSTALLER_FILES: dict[str, str] = {
 
 INSTALL_SCRIPT_PATH = "deploy/kiosk-agent/install-kiosk.sh"
 _SERVER_URL_PLACEHOLDER = "@CALVIN_SERVER_URL@"
+# Replaced only with a code that has the install-code shape, so nothing a caller
+# sends can break out of the bash single-quoted assignment (calvin-0xns).
+PAIR_CODE_PLACEHOLDER = "__PAIR_CODE__"
 # Baked into a bash single-quoted string; the value comes from the request's Host
 # header, so allow only plain URL characters (no quotes, $, backticks, spaces).
 _SAFE_URL_RE = re.compile(r"https?://[A-Za-z0-9.\-\[\]:]+(/[A-Za-z0-9._~/\-]*)?")
@@ -155,13 +158,25 @@ def read_installer_file(name: str, root: Path | None = None) -> bytes:
     return (_root(root) / rel).read_bytes()
 
 
-def render_install_script(server_url: str, root: Path | None = None) -> str:
-    """The kiosk installer with this server's URL baked in (empty if the URL is unsafe)."""
+def render_install_script(
+    server_url: str, root: Path | None = None, pair_code: str | None = None
+) -> str:
+    """The kiosk installer with this server's URL (and optional pair code) baked in.
+
+    Empty URL if it is unsafe. The pair code is embedded only when it has the
+    install-code shape; anything else (quotes, ``$``, spaces, a newline) is
+    ignored, so the output equals the no-code render.
+    """
+    from app.services.kiosk_pairing import is_install_code
+
     url = server_url.rstrip("/")
     if not _SAFE_URL_RE.fullmatch(url):
         url = ""  # installer then insists on --backend-url
     template = (_root(root) / INSTALL_SCRIPT_PATH).read_text()
-    return template.replace(_SERVER_URL_PLACEHOLDER, url)
+    script = template.replace(_SERVER_URL_PLACEHOLDER, url)
+    if pair_code is not None and is_install_code(pair_code):
+        script = script.replace(PAIR_CODE_PLACEHOLDER, pair_code)
+    return script
 
 
 def ensure_signing_key() -> Path:

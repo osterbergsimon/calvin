@@ -18,6 +18,7 @@ from app.security.admin_auth import (
     get_admin_store,
 )
 from app.security.api_keys import PERMISSIONS, SCOPE_RANK, get_api_key_store, is_limited
+from app.services.kiosk_pairing import SECRET_PREFIX as KIOSK_SECRET_PREFIX
 
 UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
@@ -52,6 +53,10 @@ PUBLIC_WRITES = frozenset(
         # The display agent: the screen went to sleep, so end that kiosk's sessions.
         ("POST", "/api/kiosks/{kiosk_id}/screen-sleep"),
         ("POST", "/api/screen-sleep"),
+        # Pairing (calvin-0xns). Each handler does its own credential checks:
+        # an agent's own secret, a browser-only body, or an admin session.
+        ("POST", "/api/kiosks/{kiosk_id}/pair"),
+        ("POST", "/api/kiosks/{kiosk_id}/browser-session"),
     }
 )
 
@@ -100,6 +105,17 @@ PERMISSION_ROUTES: dict[str, frozenset[tuple[str, str]]] = {
         }
     ),
 }
+
+# Unsafe routes where, on a gated screen, only the screen itself may act
+# (calvin-0xns, design §3). Both stay in PUBLIC_WRITES so an ungated screen
+# behaves as it does today; their handlers call ``require_screen_itself``.
+# A test keeps every entry a real route and out of HOST_ROUTES/PERMISSION_ROUTES.
+KIOSK_ROUTES = frozenset(
+    {
+        ("POST", "/api/kiosks/{kiosk_id}/screen-sleep"),
+        ("POST", "/api/kiosks/{kiosk_id}/display-check"),
+    }
+)
 
 # Share-link guest routes (calvin-mwqo). The ``{token}`` in the path is the
 # only credential: the policy resolves it to its link before the handler runs
@@ -253,9 +269,16 @@ def admin_error(store_configured: bool) -> HTTPException:
 
 
 def _authenticate_bearer(request: Request) -> dict | None:
-    """Resolve a bearer key; a bad one is 401 (or 429), never anonymous."""
+    """Resolve a bearer key; a bad one is 401 (or 429), never anonymous.
+
+    A ``clv_kiosk_`` bearer is a screen's own secret, not an API key: it is
+    "no key" here, before the limiter and the store, so the policy and the MCP
+    gateway treat it exactly like an absent bearer (calvin-0xns).
+    """
     secret = bearer_secret(request)
     if secret is None:
+        return None
+    if secret.startswith(KIOSK_SECRET_PREFIX):
         return None
     ip = request.client.host if request.client else "unknown"
     wait = api_key_limiter.check(ip)

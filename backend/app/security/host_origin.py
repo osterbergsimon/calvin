@@ -12,6 +12,7 @@ from starlette.responses import JSONResponse, PlainTextResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.security.route_policy import UNSAFE_METHODS
+from app.services.kiosk_pairing import SECRET_PREFIX as KIOSK_SECRET_PREFIX
 
 _ALLOWED_SUFFIXES = (".local", ".lan", ".home", ".home.arpa", ".internal", ".localdomain")
 _DEFAULT_PORTS = {"http": 80, "https": 443}
@@ -166,8 +167,15 @@ class HostOriginMiddleware:
         path = scope.get("path", "")
         # A bearer key can't be forged cross-site (the header needs a CORS
         # preflight, and the route policy then ignores any cookie), so only the
-        # cookie path needs the Origin check. The Host check above still applies.
-        has_bearer = headers.get("authorization", "").lower().startswith("bearer ")
+        # cookie path needs the Origin check. A kiosk bearer is the exception:
+        # the route policy honours an admin cookie beside it (design §3), so it
+        # counts as no bearer here. The Host check above still applies.
+        scheme, _, token = headers.get("authorization", "").partition(" ")
+        has_bearer = (
+            scheme.lower() == "bearer"
+            and bool(token.strip())
+            and not token.strip().startswith(KIOSK_SECRET_PREFIX)
+        )
         if (
             method in UNSAFE_METHODS
             and path.startswith("/api")

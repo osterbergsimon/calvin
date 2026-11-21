@@ -33,7 +33,14 @@ log_level_map = {
 }
 log_level = log_level_map.get(settings.log_level.upper(), "INFO")
 
-# Add handler with our desired format
+# Add handler with our desired format. ``diagnose`` annotates each traceback
+# frame with its local values, and pairing frames hold screen secrets and
+# install codes, so it must stay off (the message patcher never sees them).
+LOGURU_SINK_OPTIONS: dict[str, Any] = {
+    "level": log_level,
+    "colorize": True,  # Enable colors for better readability
+    "diagnose": False,
+}
 logger.add(
     sys.stderr,
     format=(
@@ -42,8 +49,7 @@ logger.add(
         "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
         "<level>{message}</level>"
     ),
-    level=log_level,
-    colorize=True,  # Enable colors for better readability
+    **LOGURU_SINK_OPTIONS,
 )
 
 
@@ -131,6 +137,7 @@ from app.api.routes import (  # noqa: E402
     health,
     images,
     keyboard,
+    kiosk_pairing,
     kiosks,
     plugins,
     security,
@@ -696,6 +703,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(config.router, prefix="/api", tags=["config"])
 app.include_router(kiosks.router, prefix="/api", tags=["kiosks"])
+app.include_router(kiosk_pairing.router, prefix="/api", tags=["kiosks"])
 app.include_router(calendar.router, prefix="/api", tags=["calendar"])
 app.include_router(keyboard.router, prefix="/api", tags=["keyboard"])
 app.include_router(images.router, prefix="/api", tags=["images"])
