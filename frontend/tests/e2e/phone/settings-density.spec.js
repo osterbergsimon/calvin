@@ -34,7 +34,7 @@ const WEEK = [0, 1, 2, 3, 4, 5, 6].map(day => ({
 
 async function openSettings(page, category = null) {
   const api = await installApiMock(page, {
-    config: { displayScheduleEnabled: true, displaySchedule: WEEK },
+    config: { screenPower: "schedule", displayScheduleEnabled: true, displaySchedule: WEEK },
   });
   await gotoSettings(page);
   await expectSettingsReady(page);

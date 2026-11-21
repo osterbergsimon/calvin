@@ -50,17 +50,16 @@ function modeConfig(mode) {
 }
 
 function commandFor(mode) {
-  const setAt = new Date(Date.now() - 3600 * 1000).toISOString();
-  if (mode === "always_on") return {};
+  // Schedule follows its schedule in the shot: an "Until …" line with a made-up
+  // boundary would contradict the schedule summary beside it. External shows a
+  // named key's command, which has no until line.
+  if (mode !== "external") return {};
   return {
     hallway: {
       power: "off",
-      setAt,
+      setAt: new Date(Date.now() - 3600 * 1000).toISOString(),
       by: "automation",
       keyName: "Homey",
-      ...(mode === "schedule"
-        ? { until: new Date(Date.now() + 2 * 3600 * 1000).toISOString() }
-        : {}),
     },
   };
 }
@@ -126,6 +125,12 @@ for (const [sizeName, kiosk, viewport] of SIZES) {
 
           if (SHOTS) {
             await page.evaluate(() => document.fonts.ready);
+            // The section is taller than a wall panel: shoot it on a tall
+            // viewport, like the brightness review screenshots do, so no sticky
+            // top bar or scroll edge lands in the frame.
+            const original = page.viewportSize();
+            await page.setViewportSize({ width: original.width, height: 1900 });
+            await section.scrollIntoViewIfNeeded();
             await page.evaluate(() =>
               Promise.all(
                 document
@@ -139,6 +144,7 @@ for (const [sizeName, kiosk, viewport] of SIZES) {
             await section.screenshot({
               path: path.join(SHOTS, `${sizeName}-${themeName}-${mode}.png`),
             });
+            await page.setViewportSize(original);
           }
 
           expect(api.hostActions).toEqual([]);
