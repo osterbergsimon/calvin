@@ -38,11 +38,14 @@ afterEach(() => {
 describe("takeBootPairSecret", () => {
   it("returns the fragment secret once, then null", async () => {
     setLocation({ hash: `#pair=${SECRET}` });
-    const { takeBootPairSecret } = await import("@/utils/kioskBoot");
+    const boot = await import("@/utils/kioskBoot");
 
-    expect(takeBootPairSecret()).toBe(SECRET);
-    expect(takeBootPairSecret()).toBeNull();
-    expect(takeBootPairSecret()).toBeNull();
+    // The module exports the taker only: the secret itself is not a binding
+    // another module can read after the hand-off.
+    expect(Object.keys(boot)).toEqual(["takeBootPairSecret"]);
+    expect(boot.takeBootPairSecret()).toBe(SECRET);
+    expect(boot.takeBootPairSecret()).toBeNull();
+    expect(boot.takeBootPairSecret()).toBeNull();
   });
 
   it("returns null when the start URL had no fragment", async () => {
