@@ -582,27 +582,28 @@ server, verifies it, swaps it in, and rolls back if it doesn't come up healthy. 
 [Kiosk agent self-update](KIOSK_PROVISIONING.md#kiosk-agent-self-update). To pick up a new
 Calvin version, update the server container; the kiosk follows when you press Update.
 
-## Screens held on or off by home automation
+## Screen power from home automation
 
-Home automation (or Settings) can hold a screen on or off with the
-[screen-power call](../integrations/HOME_AUTOMATION.md). A hold stays until it is
-changed, even across the screen's schedule. The display agent learns about it on
-its regular config poll, so a change shows within about a minute.
+Home automation (or Settings) can switch a screen on or off with the
+[screen-power call](../integrations/HOME_AUTOMATION.md). Each screen has one mode in
+Settings: **Schedule**, **Always on** or **External**. Home automation switches only an
+External screen, and a command there stands until the next one. The display agent learns
+about it on its regular config poll, so a change shows within about a minute.
 
-The agent reports what it understands with `kfeat=hold` on that poll, and the
-server answers with `screenHold`. Both directions stay compatible:
+Every mode reaches today's screens, including one on older software. In External the
+server sends the command as both `screenHold` (an agent that reports `kfeat=hold` obeys it
+until it changes) and `screenNow`. An agent from before External already follows
+`screenNow`, and the schedule is switched off, so there is no next change to end it:
 
-| | Agent from before holds | Agent that holds |
+| | Agent from before External | Agent that holds |
 |---|---|---|
-| **Server from before holds** | as before | sends `kfeat`, which the server ignores; as before |
-| **Server with holds** | obeys the hold as a "Screen now" choice, so it follows the next scheduled change | obeys `screenHold` until it changes |
+| **Server from before External** | as before | sends `kfeat`, which the server ignores; as before |
+| **Server with screen power modes** | obeys a command until the next scheduled change in Schedule; the same command stands in External | obeys `screenHold` until it changes |
 
-**Settings › Screens** shows "This screen needs an update to stay this way" for a
-screen whose agent can't hold yet. Choose **Update** for that screen (see
-[Updating a kiosk later](#updating-a-kiosk-later)). A touch on a screen held off
-can wake it, depending on the display. It is not left lit: Calvin sleeps it again
-at its next check, once the screen's idle time (**Turn off when idle**) has
-passed, or about once a minute when no idle time is set. The hold itself is
+**Settings › Screens** no longer needs an update note: External works with every agent. A
+touch on a screen that is off can wake it, depending on the display. It is not left lit:
+Calvin sleeps it again at its next check, once the screen's idle time (**Turn off when
+idle**) has passed, or about once a minute when no idle time is set. The command itself is
 unchanged.
 
 ## Troubleshooting

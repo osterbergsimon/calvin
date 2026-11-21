@@ -2,7 +2,7 @@
 
 import hashlib
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -17,6 +17,7 @@ from app.security.route_policy import (
     admin_error,
     direct_peer_ip,
     is_admin,
+    is_admin_session,
     is_loopback_peer,
     permission_routes,
     request_api_key,
@@ -55,7 +56,9 @@ class OverridesBody(BaseModel):
 async def get_kiosks(request: Request, response: Response):
     """List known kiosks (id, hostname, last-seen, lastAppliedVersion).
 
-    A gated row's presence fields (``powerHold``, ``displayCheckActive`` and the
+    Each row carries the screen's effective ``screenPower`` mode and the
+    command in force as ``powerHold`` (calvin-25g9). A gated row's presence
+    fields (``powerHold``, ``screenPower``, ``displayCheckActive`` and the
     layer's ``screenNow``) go only to an admin or to that screen itself; the
     list has no kiosk id in its path, so only the screen's cookie unlocks its
     own row and a bearer unlocks none (calvin-0xns).
@@ -64,7 +67,15 @@ async def get_kiosks(request: Request, response: Response):
     admin = is_admin(request)
     cookie_id = await kiosk_auth.kiosk_cookie_id(request)
     rows = await kiosk_registry.list_kiosks()
+    base = await build_global_config()
     for row in rows:
+        # The effective mode and the command in force (calvin-25g9): an expired
+        # command, or one from another mode, is not in force and reads as none.
+        merged = merge_overrides(base, row.get("overrides") or {})
+        row["screenPower"] = screen_power.effective_mode(merged)
+        row["powerHold"] = screen_power.active_command(
+            row.get("powerHold"), merged, screen_power.now_in(merged)
+        )
         visible = kiosk_view.can_see_presence(
             admin=admin,
             principal=cookie_id,
@@ -237,14 +248,21 @@ class ScreenPowerBody(BaseModel):
 
 class ScreenPowerView(BaseModel):
     id: str
+    mode: Literal["schedule", "always_on", "external"]
     power: Literal["on", "off", "schedule"]
-    held: bool
+    held: bool  # deprecated: a command is in force (``power`` says which)
     setAt: str | None  # noqa: N815 - wire name
     by: Literal["automation", "settings"] | None
+    until: str | None  # when a Schedule command ends; null in other modes
+    keyName: str | None  # noqa: N815 - the API key's name, admin sessions only
     desiredOn: bool  # noqa: N815 - what the agent will do, not what the panel reports
     online: bool
     agentHolds: bool | None  # noqa: N815 - False: this screen's agent is too old to hold
     paired: bool
+
+
+def _instant_text(moment: datetime) -> str:
+    return moment.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def _conflict(code: str, message: str) -> HTTPException:
@@ -255,9 +273,7 @@ async def _screen_state(status: dict) -> tuple[dict, str, dict | None, datetime]
     """The screen's merged config, mode, command in force and the screen's now."""
     merged = merge_overrides(await build_global_config(), status["overrides"])
     now = screen_power.now_in(merged)
-    command = screen_power.active_command(
-        screen_power.public_command(status["command"]), merged, now
-    )
+    command = screen_power.active_command(status["command"], merged, now)
     return merged, screen_power.effective_mode(merged), command, now
 
 
@@ -270,7 +286,9 @@ async def _power_status_or_404(kiosk_id: str) -> dict:
     return status
 
 
-async def _screen_power_view(kiosk_id: str, status: dict) -> ScreenPowerView:
+async def _screen_power_view(
+    kiosk_id: str, status: dict, *, include_key_name: bool = False
+) -> ScreenPowerView:
     merged, mode, command, now = await _screen_state(status)
     screen_power.strip_holds(merged)
     merged = screen_power.without_screen_now(merged)
@@ -284,12 +302,16 @@ async def _screen_power_view(kiosk_id: str, status: dict) -> ScreenPowerView:
         receives_hold = status["paired"] and kiosk_registry.agent_polls_authenticated(kiosk_id)
     agent_cfg = screen_power.agent_view(merged, status["agentHolds"], receives_hold)
     last_seen = status["lastSeen"]
+    until = screen_power.command_until(command, merged, now)
     return ScreenPowerView(
         id=kiosk_id,
+        mode=mode,
         power=command["power"] if command else "schedule",
         held=command is not None,
         setAt=command["setAt"] if command else None,
         by=command["by"] if command else None,
+        until=_instant_text(until) if until is not None else None,
+        keyName=command.get("keyName") if command and include_key_name else None,
         desiredOn=screen_power.desired_on(agent_cfg, now),
         online=last_seen is not None and (utcnow() - last_seen).total_seconds() < _ONLINE_S,
         agentHolds=status["agentHolds"],
@@ -330,7 +352,7 @@ async def get_screen_power(kiosk_id: str, request: Request):
     status = await _power_status_or_404(kiosk_id)
     if kiosk_view.is_gated(status["paired"], await kiosk_view.pairing_mode()):
         await _may_read_screen_power(request, kiosk_id)
-    return await _screen_power_view(kiosk_id, status)
+    return await _screen_power_view(kiosk_id, status, include_key_name=is_admin_session(request))
 
 
 @router.put("/kiosks/{kiosk_id}/screen-power", response_model=ScreenPowerView)
@@ -343,6 +365,7 @@ async def put_screen_power(kiosk_id: str, body: ScreenPowerBody, request: Reques
     """
     status = await _power_status_or_404(kiosk_id)
     _merged, mode, command, _now = await _screen_state(status)
+    include_key_name = is_admin_session(request)
     # Always on has no command: sending one is refused, and "schedule" has
     # nothing to clear (design decision 3).
     if mode == "always_on":
@@ -351,7 +374,7 @@ async def put_screen_power(kiosk_id: str, body: ScreenPowerBody, request: Reques
                 "screen_power_always_on",
                 "This screen is set to Always on. Choose Schedule or External to switch it.",
             )
-        return await _screen_power_view(kiosk_id, status)
+        return await _screen_power_view(kiosk_id, status, include_key_name=include_key_name)
     if mode == "external" and body.power == "schedule":
         raise _conflict(
             "screen_power_external",
@@ -362,7 +385,7 @@ async def put_screen_power(kiosk_id: str, body: ScreenPowerBody, request: Reques
     else:
         changes = command is None or command["power"] != body.power
     if not changes:
-        return await _screen_power_view(kiosk_id, status)
+        return await _screen_power_view(kiosk_id, status, include_key_name=include_key_name)
 
     key = request_api_key(request)
     caller = f"key:{key['id']}" if key is not None else "session"
@@ -388,7 +411,9 @@ async def put_screen_power(kiosk_id: str, body: ScreenPowerBody, request: Reques
     # The key's name only: never its secret (the log patcher also redacts keys).
     who = f"API key {key['name']!r}" if key is not None else "an admin session"
     logger.info(f"Screen {kiosk_id!r} power set to {body.power} in {mode} mode by {who}")
-    return await _screen_power_view(kiosk_id, await _power_status_or_404(kiosk_id))
+    return await _screen_power_view(
+        kiosk_id, await _power_status_or_404(kiosk_id), include_key_name=include_key_name
+    )
 
 
 @router.post("/kiosks/{kiosk_id}/update")

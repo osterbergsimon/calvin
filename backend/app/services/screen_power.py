@@ -22,14 +22,16 @@ Pure helpers for the screen-power route and the kiosk config poll:
 import time as time_module
 from collections import deque
 from datetime import UTC, datetime, time, timedelta
-from typing import Any
+from typing import Any, Literal, cast
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+ScreenMode = Literal["schedule", "always_on", "external"]
 
 _HOLD_KEYS = ("screen_hold", "screenHold")
 _NOW_KEYS = ("screen_now", "screenNow")
 
 # Screen power modes (calvin-25g9): one plain choice per screen.
-MODES: tuple[str, ...] = ("schedule", "always_on", "external")
+MODES: tuple[ScreenMode, ...] = ("schedule", "always_on", "external")
 _MODE_KEYS = ("screen_power", "screenPower")
 _SWITCH_KEYS = ("display_schedule_enabled", "displayScheduleEnabled")
 
@@ -51,12 +53,14 @@ def _should_be_on(now_t: time, on_t: time, off_t: time) -> bool:
     return on_t <= now_t < off_t
 
 
-def _mode_value(value: object) -> str | None:
+def _mode_value(value: object) -> ScreenMode | None:
     """One of :data:`MODES`, or None for anything else (a stale stored value)."""
-    return value if isinstance(value, str) and value in MODES else None
+    if isinstance(value, str) and value in MODES:
+        return cast(ScreenMode, value)
+    return None
 
 
-def derived_mode(cfg: dict) -> str:
+def derived_mode(cfg: dict) -> ScreenMode:
     """The mode an absent ``screenPower`` means: the schedule switch decides.
 
     With the schedule on it is ``schedule``; with it off it is ``always_on``,
@@ -66,7 +70,7 @@ def derived_mode(cfg: dict) -> str:
     return "schedule" if bool(enabled) else "always_on"
 
 
-def effective_mode(cfg: dict) -> str:
+def effective_mode(cfg: dict) -> ScreenMode:
     """The screen's ``screenPower``: the stored value, else derived from the switch."""
     return _mode_value(_get(cfg, *_MODE_KEYS)) or derived_mode(cfg)
 

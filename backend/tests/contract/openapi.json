@@ -1733,6 +1733,22 @@
             ],
             "title": "Rebootcombokey2"
           },
+          "screenPower": {
+            "anyOf": [
+              {
+                "enum": [
+                  "schedule",
+                  "always_on",
+                  "external"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Screenpower"
+          },
           "selectedTheme": {
             "anyOf": [
               {
@@ -2835,6 +2851,26 @@
             "title": "Id",
             "type": "string"
           },
+          "keyName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keyname"
+          },
+          "mode": {
+            "enum": [
+              "schedule",
+              "always_on",
+              "external"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
           "online": {
             "title": "Online",
             "type": "boolean"
@@ -2862,14 +2898,28 @@
               }
             ],
             "title": "Setat"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Until"
           }
         },
         "required": [
           "id",
+          "mode",
           "power",
           "held",
           "setAt",
           "by",
+          "until",
+          "keyName",
           "desiredOn",
           "online",
           "agentHolds",
@@ -5264,7 +5314,7 @@
     },
     "/api/kiosks": {
       "get": {
-        "description": "List known kiosks (id, hostname, last-seen, lastAppliedVersion).\n\nA gated row's presence fields (``powerHold``, ``displayCheckActive`` and the\nlayer's ``screenNow``) go only to an admin or to that screen itself; the\nlist has no kiosk id in its path, so only the screen's cookie unlocks its\nown row and a bearer unlocks none (calvin-0xns).",
+        "description": "List known kiosks (id, hostname, last-seen, lastAppliedVersion).\n\nEach row carries the screen's effective ``screenPower`` mode and the\ncommand in force as ``powerHold`` (calvin-25g9). A gated row's presence\nfields (``powerHold``, ``screenPower``, ``displayCheckActive`` and the\nlayer's ``screenNow``) go only to an admin or to that screen itself; the\nlist has no kiosk id in its path, so only the screen's cookie unlocks its\nown row and a bearer unlocks none (calvin-0xns).",
         "operationId": "get_kiosks_api_kiosks_get",
         "responses": {
           "200": {
@@ -5574,7 +5624,7 @@
     },
     "/api/kiosks/{kiosk_id}/config": {
       "get": {
-        "description": "Return a kiosk's effective (merged) config; records the kiosk + its agent report.\n\n``vw``/``vh`` are the kiosk's CSS viewport (``window.innerWidth/innerHeight``,\nreported at load and on resize) so the layout editor can preview a screen at\nits real aspect ratio (CLV-36). ``kfeat`` is what the display agent\nunderstands, comma-separated (``hold``: it obeys ``screenHold``).\n\nA held screen power (calvin-2ifv) is projected as ``screenHold`` and as\n``screenNow``, so an agent too old to hold still obeys it until the next\nscheduled change. The stored layer is not changed.\n\nOnly a real poll is recorded (registers a new kiosk and bumps last-seen): one\nthat carries ``khost`` (the kiosk browser) or ``kagent`` (the display agent).\nA bare fetch (curl, a typo'd id, the Settings UI reading a screen) gets the\nconfig but changes nothing, so it can neither create a ghost nor make a dead\nscreen look online (calvin-7aqu).",
+        "description": "Return a kiosk's effective (merged) config; records the kiosk + its agent report.\n\n``vw``/``vh`` are the kiosk's CSS viewport (``window.innerWidth/innerHeight``,\nreported at load and on resize) so the layout editor can preview a screen at\nits real aspect ratio (CLV-36). ``kfeat`` is what the display agent\nunderstands, comma-separated (``hold``: it obeys ``screenHold``).\n\nA screen's power mode (calvin-25g9) is projected as the agent obeys it:\nSchedule sends the command as ``screenNow`` (until its boundary), External\nsends it as both ``screenHold`` and ``screenNow`` with the schedule switch\noff, and Always on sends neither. The stored layer is not changed.\n\nOnly a real poll is recorded (registers a new kiosk and bumps last-seen): one\nthat carries ``khost`` (the kiosk browser) or ``kagent`` (the display agent).\nA bare fetch (curl, a typo'd id, the Settings UI reading a screen) gets the\nconfig but changes nothing, so it can neither create a ghost nor make a dead\nscreen look online (calvin-7aqu).",
         "operationId": "get_kiosk_config_api_kiosks__kiosk_id__config_get",
         "parameters": [
           {

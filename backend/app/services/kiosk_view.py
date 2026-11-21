@@ -27,7 +27,7 @@ PRESENCE_KEYS: tuple[str, ...] = (
 )
 
 # What the kiosk list hides on a gated row, besides the layer's screenNow.
-LIST_PRESENCE_KEYS: tuple[str, ...] = ("powerHold", "displayCheckActive")
+LIST_PRESENCE_KEYS: tuple[str, ...] = ("powerHold", "screenPower", "displayCheckActive")
 SCREEN_NOW_KEYS: tuple[str, ...] = ("screenNow", "screen_now")
 
 

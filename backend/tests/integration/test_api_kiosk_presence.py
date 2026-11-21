@@ -194,6 +194,7 @@ def test_list_and_overrides_hide_presence_per_row(test_client: TestClient, mode,
     row = next(k for k in listed.json()["kiosks"] if k["id"] == KIOSK)
     visible = admin or principal == KIOSK or not (paired or mode == "required")
     assert ("powerHold" in row) is visible
+    assert ("screenPower" in row) is visible
     assert ("displayCheckActive" in row) is visible
     assert (row.get("presenceHidden") is True) is (not visible)
     # Never hidden: the evidence Settings needs to explain the screen.

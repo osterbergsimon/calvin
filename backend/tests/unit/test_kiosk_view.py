@@ -93,6 +93,24 @@ def test_presence_keys_are_the_global_constraints_list():
     )
 
 
+def test_a_gated_list_row_hides_the_mode_and_the_command():
+    from app.services.kiosk_view import strip_list_row
+
+    row = {
+        "id": "kitchen",
+        "screenPower": "external",
+        "powerHold": {"power": "off"},
+        "displayCheckActive": True,
+        "overrides": {"screenNow": {"power": "off"}, "displayName": "Kitchen"},
+    }
+    strip_list_row(row)
+    assert "screenPower" not in row
+    assert "powerHold" not in row
+    assert "displayCheckActive" not in row
+    assert "screenNow" not in row["overrides"]
+    assert row["overrides"]["displayName"] == "Kitchen"
+
+
 async def test_pairing_mode_defaults_to_optional(test_db):
     from app.services.config_service import config_service
 

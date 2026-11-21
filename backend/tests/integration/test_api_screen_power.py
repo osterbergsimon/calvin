@@ -420,6 +420,146 @@ def test_a_refused_change_does_not_count_toward_the_limit(test_client: TestClien
     assert test_client.put(URL, json={"power": "off"}).status_code == 200
 
 
+# -- the answer (design decision 7) and the kiosk list (decision 8) ----------
+
+
+@pytest.mark.integration
+def test_the_answer_reports_the_mode(test_client: TestClient):
+    _register(test_client, mode="schedule")
+    assert test_client.get(URL).json()["mode"] == "schedule"
+    _set_mode(test_client, "always_on")
+    assert test_client.get(URL).json()["mode"] == "always_on"
+    _set_mode(test_client, "external")
+    assert test_client.get(URL).json()["mode"] == "external"
+
+
+@pytest.mark.integration
+def test_until_is_the_end_of_a_schedule_command(test_client: TestClient):
+    _register(test_client, mode="schedule")
+    assert test_client.get(URL).json()["until"] is None  # no command in force
+
+    test_client.post("/api/config", json={"screenPower": "schedule", "displaySchedule": SCHEDULE})
+    body = test_client.put(URL, json={"power": "off"}).json()
+    assert body["until"] is not None
+    now = datetime.now().astimezone()
+    until = datetime.fromisoformat(body["until"].replace("Z", "+00:00")).astimezone()
+    assert until > now
+    assert (until - now).days <= 8
+    # It is the boundary at which the command ends: the next 22:00 or 07:00.
+    assert until.strftime("%H:%M") in ("07:00", "22:00")
+
+    _set_mode(test_client, "external")
+    assert test_client.get(URL).json()["until"] is None
+
+
+@pytest.mark.integration
+def test_until_is_null_without_a_boundary_in_the_next_8_days(test_client: TestClient):
+    _register(test_client, mode="schedule")  # NO_SCHEDULE: all days disabled
+    body = test_client.put(URL, json={"power": "off"}).json()
+    assert body["held"] is True and body["until"] is None
+
+
+@pytest.mark.integration
+def test_the_key_name_is_only_for_an_admin_session(test_client: TestClient):
+    from app.security.admin_auth import COOKIE_NAME
+
+    _register(test_client, mode="schedule")
+    secret = _limited_key(test_client)
+    admin = test_client.cookies.get(COOKIE_NAME)
+    assert admin
+    test_client.cookies.clear()
+    assert (
+        test_client.put(
+            URL, json={"power": "off"}, headers={"Authorization": f"Bearer {secret}"}
+        ).status_code
+        == 200
+    )
+
+    admin_view = test_client.get(URL, headers={"cookie": f"{COOKIE_NAME}={admin}"}).json()
+    assert admin_view["by"] == "automation"
+    assert admin_view["keyName"] == "Homey"
+    # The screens.power key itself gets no name.
+    assert (
+        test_client.get(URL, headers={"Authorization": f"Bearer {secret}"}).json()["keyName"]
+        is None
+    )
+    # Neither does an anonymous caller on a screen it may read.
+    assert test_client.get(URL).json()["keyName"] is None
+
+
+@pytest.mark.integration
+def test_the_screen_itself_gets_no_key_name(test_client: TestClient):
+    from app.security.kiosk_auth import KIOSK_COOKIE, issue_kiosk_cookie
+    from app.services.kiosk_pairing import hash_secret, new_secret
+
+    _register(test_client, mode="schedule", query="kagent=v1")
+    secret = _limited_key(test_client)
+    test_client.cookies.clear()
+    assert (
+        test_client.put(
+            URL, json={"power": "off"}, headers={"Authorization": f"Bearer {secret}"}
+        ).status_code
+        == 200
+    )
+    kiosk_secret = new_secret()
+    asyncio.run(kiosk_registry_set_credential(KIOSK, hash_secret(kiosk_secret)))
+    cookie = issue_kiosk_cookie(KIOSK, hash_secret(kiosk_secret))
+    view = test_client.get(URL, headers={"cookie": f"{KIOSK_COOKIE}={cookie}"}).json()
+    assert view["by"] == "automation" and view["keyName"] is None
+
+
+def kiosk_registry_set_credential(kiosk_id: str, secret_hash: str):
+    from app.services import kiosk_registry
+
+    return kiosk_registry.set_credential(kiosk_id, secret_hash)
+
+
+@pytest.mark.integration
+def test_the_list_row_reports_the_effective_mode_and_only_a_live_command(
+    test_client: TestClient,
+):
+    _register(test_client, mode="schedule")
+    assert _listed(test_client)["screenPower"] == "schedule"
+    _set_mode(test_client, "always_on")
+    assert _listed(test_client)["screenPower"] == "always_on"
+    _set_mode(test_client, "external")
+    row = _listed(test_client)
+    assert row["screenPower"] == "external"
+    assert row["powerHold"] is None  # no command yet
+
+    test_client.put(URL, json={"power": "off"})
+    assert _listed(test_client)["powerHold"]["power"] == "off"
+
+    # A command from another mode is not in force, so the list shows none.
+    _set_mode(test_client, "schedule")
+    row = _listed(test_client)
+    assert row["screenPower"] == "schedule"
+    assert row["powerHold"] is None
+
+
+@pytest.mark.integration
+def test_an_expired_command_is_not_in_the_list(test_client: TestClient):
+    _register(test_client, mode="schedule")
+    test_client.post("/api/config", json={"screenPower": "schedule", "displaySchedule": SCHEDULE})
+    _set_command("off", "schedule", datetime(2026, 1, 1, 12, tzinfo=UTC))
+    assert _listed(test_client)["powerHold"] is None
+
+
+@pytest.mark.integration
+def test_a_gated_list_row_hides_the_mode_like_the_other_presence_fields(
+    test_client: TestClient,
+):
+    from app.services.config_service import config_service
+
+    _register(test_client, mode="external")
+    asyncio.run(config_service.set_value("kioskPairing", "required"))
+    test_client.cookies.clear()
+    row = _listed(test_client)
+    assert row["presenceHidden"] is True
+    assert "screenPower" not in row
+    assert "powerHold" not in row
+
+
 # -- projection to the agent (design decision 6) ----------------------------
 
 
