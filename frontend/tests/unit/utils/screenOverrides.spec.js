@@ -3,12 +3,15 @@ import {
   DEFAULT_COPYABLE_KEYS,
   SCREEN_SETTING_DESCRIPTORS,
   SCREEN_SETTING_LABELS,
+  changedSettingRows,
   descriptorFor,
   descriptorsForSection,
   isSettingVisible,
   normalizeSettingValue,
   settingControlOptions,
+  useAsDefaultPatch,
   visibleDescriptors,
+  withoutPromotedSettings,
 } from "@/utils/screenOverrides";
 
 // One descriptor per per-screen setting (settings-scope §7 item 2). The
@@ -328,5 +331,26 @@ describe("descriptor values", () => {
       "hotCornerSize",
       "hotCornerLongPressMs",
     ]);
+  });
+});
+
+describe("screen power as one setting (calvin-25g9)", () => {
+  it("reads a legacy layer switch as the screen power setting", () => {
+    expect(changedSettingRows({ displayScheduleEnabled: false })).toEqual([
+      { key: "screenPower", label: "screen power" },
+    ]);
+    expect(changedSettingRows({ screenPower: "external", displayScheduleEnabled: false })).toEqual([
+      { key: "screenPower", label: "screen power" },
+    ]);
+  });
+
+  it("promotes a legacy layer's derived mode and drops both mode keys", () => {
+    expect(useAsDefaultPatch({ displayScheduleEnabled: false, orientation: "portrait" })).toEqual({
+      orientation: "portrait",
+      screenPower: "always_on",
+    });
+    expect(
+      withoutPromotedSettings({ screenPower: "external", displayScheduleEnabled: false })
+    ).toEqual({});
   });
 });

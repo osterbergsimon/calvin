@@ -546,8 +546,18 @@ function dismissNote() {
   clearNoteTimer();
   editNote.value = null;
 }
+// A layer written before `screenPower` existed keeps its mode as the legacy
+// schedule switch; it still counts as a screen with its own screen power.
+const screensWithOwnPower = () =>
+  store.kiosks.filter(kiosk => {
+    const overrides = kiosk.overrides || {};
+    return "screenPower" in overrides || "displayScheduleEnabled" in overrides;
+  });
+const screensKeeping = key =>
+  key === "screenPower" ? screensWithOwnPower() : screensOverriding(store.kiosks, key);
+
 function showNote(key) {
-  const names = screensOverriding(store.kiosks, key).map(screenLabel);
+  const names = screensKeeping(key).map(screenLabel);
   if (names.length === 0) {
     editNote.value = null;
     clearNoteTimer();
@@ -572,11 +582,13 @@ function emitChange(patch) {
 
 // "Change them too" drops that key from every screen that overrides it.
 async function changeThemToo(key) {
-  const targets = screensOverriding(store.kiosks, key);
+  const targets = screensKeeping(key);
   dismissNote();
   for (const kiosk of targets) {
     const next = { ...(kiosk.overrides || {}) };
     delete next[key];
+    // The legacy switch is the same mode in an older layer.
+    if (key === "screenPower") delete next.displayScheduleEnabled;
     try {
       await store.saveOverrides(kiosk.id, next);
       store.setKioskOverrides(kiosk.id, next);

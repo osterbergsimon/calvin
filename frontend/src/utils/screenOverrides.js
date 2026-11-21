@@ -9,6 +9,7 @@
 
 import { EFFECTS_LEVEL_OPTIONS, normalizeEffectsLevel } from "./effectsLevel";
 import { normalizeLayoutMode } from "./layoutMode";
+import { effectiveScreenMode } from "./screenPower";
 import { TYPE_THEMES } from "../styles/typeThemes";
 import { UI_SIZE_OPTIONS } from "../styles/uiScale";
 
@@ -1007,9 +1008,12 @@ const NON_SETTING_KEYS = new Set(["displayName", "screenNow", "displayScheduleEn
 // count: every screen can be called something without deviating from Default.
 // The idle row writes two keys (enabled + seconds) but is one setting.
 export const changedSettingKeys = overrides => {
-  const keys = Object.keys(overrides || {}).filter(key => !NON_SETTING_KEYS.has(key));
-  const idleKey =
-    "displayTimeoutEnabled" in (overrides || {}) || "displayTimeout" in (overrides || {});
+  const source = overrides || {};
+  const keys = Object.keys(source).filter(key => !NON_SETTING_KEYS.has(key));
+  // A layer written before `screenPower` existed carries its mode as the legacy
+  // schedule switch; count it as the one screen power setting, not as nothing.
+  if ("displayScheduleEnabled" in source && !("screenPower" in source)) keys.push("screenPower");
+  const idleKey = "displayTimeoutEnabled" in source || "displayTimeout" in source;
   const settings = keys.filter(key => key !== "displayTimeoutEnabled" && key !== "displayTimeout");
   if (idleKey) settings.push("displayTimeout");
   return settings;
@@ -1050,6 +1054,13 @@ export const formatSettingList = keys =>
 export const useAsDefaultPatch = overrides => {
   const patch = {};
   for (const key of DEFAULT_COPYABLE_KEYS) {
+    if (key === "screenPower" && overrides && !("screenPower" in overrides)) {
+      // A legacy layer's mode is its schedule switch; promote the mode it reads.
+      if ("displayScheduleEnabled" in overrides) {
+        patch.screenPower = effectiveScreenMode(overrides, {});
+      }
+      continue;
+    }
     if (overrides && key in overrides) patch[key] = overrides[key];
   }
   return patch;

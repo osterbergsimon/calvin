@@ -124,6 +124,27 @@ describe("DefaultScreenSettings — Screen power", () => {
     expect(wrapper.find("[data-test='default-screen-power-guide']").exists()).toBe(false);
   });
 
+  it("counts a legacy schedule switch as its own screen power, and clears it too", async () => {
+    const store = useKiosksStore();
+    store.kiosks = [
+      { id: "hall", overrides: { displayName: "Hall", displayScheduleEnabled: false } },
+    ];
+    store.saveOverrides = vi.fn(async () => {});
+    store.setKioskOverrides = vi.fn();
+
+    const wrapper = mountDefault({ screenPower: "schedule", displayScheduleEnabled: true });
+    await nextTick();
+    powerControl(wrapper).vm.$emit("update:modelValue", "external");
+    await nextTick();
+
+    const note = wrapper.find("[data-test='default-override-note']");
+    expect(note.text()).toContain("Hall keeps its own screen power.");
+    await note.find("[data-test='default-note-change']").trigger("click");
+    await nextTick();
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("hall", { displayName: "Hall" });
+  });
+
   it("names the screens that keep their own screen power", async () => {
     useKiosksStore().kiosks = [
       { id: "hall", overrides: { displayName: "Hall", screenPower: "external" } },
