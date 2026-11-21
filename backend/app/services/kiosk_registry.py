@@ -240,6 +240,34 @@ async def kiosk_has_peer(kiosk_id: str, peer_ip: str | None, now: float | None =
     return peer_ip in _live_peers(row.peer_ips, _now() if now is None else now)
 
 
+# Whether the screen's latest browser poll carried a valid kiosk cookie
+# (calvin-0xns, design §6). Only polls from an address in the row's ``peer_ips``
+# are remembered, and only the agent's own answer reports it. In memory: a
+# restart just reads "unknown", which never restarts a browser.
+BROWSER_SEEN_TTL_S = 180
+browser_seen: dict[str, tuple[float, bool]] = {}
+
+
+def note_browser_seen(kiosk_id: str, carried_cookie: bool, now: float | None = None) -> None:
+    """Remember whether the screen's browser poll carried its own credential."""
+    browser_seen[kiosk_id] = (_now() if now is None else now, bool(carried_cookie))
+
+
+def browser_state(kiosk_id: str, now: float | None = None) -> str:
+    """``"paired"``, ``"unpaired"`` or ``"unknown"`` for the screen's browser.
+
+    ``"unknown"`` when no browser poll was accepted in the last
+    :data:`BROWSER_SEEN_TTL_S`, and when no browser poll was ever accepted.
+    """
+    entry = browser_seen.get(kiosk_id)
+    if entry is None:
+        return "unknown"
+    seen, carried_cookie = entry
+    if (_now() if now is None else now) - seen > BROWSER_SEEN_TTL_S:
+        return "unknown"
+    return "paired" if carried_cookie else "unpaired"
+
+
 async def kiosk_exists(kiosk_id: str) -> bool:
     return await KioskDB.objects.get_or_none(id=kiosk_id) is not None
 
@@ -1003,6 +1031,7 @@ async def power_status(kiosk_id: str) -> dict | None:
         return None
     return {
         "hold": _valid_hold(row.power_hold),
+        "paired": row.credential_hash is not None,
         "lastSeen": as_utc(row.last_seen) if row.last_seen is not None else None,
         "agentHolds": agent_holds(row.agent_features),
         "overrides": sanitize_overrides(row.overrides, kiosk_id=kiosk_id),

@@ -216,16 +216,31 @@ def strip_holds(merged: dict) -> None:
         merged.pop(key, None)
 
 
-def agent_view(merged: dict, agent_holds: bool | None) -> dict:
+def agent_view(
+    merged: dict,
+    agent_holds: bool | None,
+    receives_hold: bool | None = None,
+) -> dict:
     """The config as this screen's agent obeys it.
 
     An agent that reported it cannot hold ignores ``screenHold`` and follows the
     projected ``screenNow`` to the next boundary. Unknown (``None``) is taken as
-    a new agent: it is what any screen will do once it updates. Returns a copy.
+    a new agent: it is what any screen will do once it updates.
+
+    ``receives_hold`` is whether the hold reaches this screen's agent at all: a
+    gated, unpaired screen gets none (calvin-0xns), so it follows its schedule
+    and ``desiredOn`` says so. It defaults to what ``agent_holds`` implies.
+    Returns a copy.
     """
     view = dict(merged)
     if agent_holds is False:
         strip_holds(view)
+    if receives_hold is False:
+        # A gated, unpaired screen gets no hold at all, not even the projected
+        # ``screenNow`` an older agent would otherwise follow (calvin-0xns).
+        strip_holds(view)
+        for key in _NOW_KEYS:
+            view.pop(key, None)
     return view
 
 

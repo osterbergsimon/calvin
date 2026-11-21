@@ -184,6 +184,24 @@ async def _resolve_principal(request: Request) -> str | None:
     return kiosk_id
 
 
+async def kiosk_cookie_id(request: Request) -> str | None:
+    """The kiosk id a valid ``calvin_kiosk`` cookie names, if any.
+
+    The kiosk list has no kiosk id in its path, so only the cookie can unlock a
+    row there; a bearer never does (the agent never reads the list).
+    """
+    parsed = read_kiosk_cookie(request.cookies.get(KIOSK_COOKIE))
+    if parsed is None:
+        return None
+    kiosk_id, cookie_fingerprint, _issued = parsed
+    active = await get_credential_hash(kiosk_id)
+    if active is None:
+        return None
+    if not hmac.compare_digest(cookie_fingerprint, fingerprint(active)):
+        return None
+    return kiosk_id
+
+
 async def kiosk_holder(request: Request) -> tuple[str, str] | None:
     """``(kiosk_id, secret_hash)`` for an active **or** pending secret.
 
