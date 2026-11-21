@@ -9,6 +9,7 @@ import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import BrightnessGroup from "@/components/settings/shared/BrightnessGroup.vue";
 import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGrid.vue";
 import { useKiosksStore } from "@/stores/kiosks";
+import { useAuthStore } from "@/stores/auth";
 import { SAVE_DEBOUNCE_MS } from "@/utils/optimisticQueue";
 
 const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }));
@@ -84,6 +85,16 @@ const view = over => ({
   ...over,
 });
 
+const unauthorized = (code = "admin_required") => {
+  const err = new Error("unauthorized");
+  err.response = {
+    status: 401,
+    data: { detail: { code } },
+    config: { url: "/kiosks/hall/screen-power" },
+  };
+  return err;
+};
+
 function mountScreens({
   kiosks = [kiosk()],
   overrides = {},
@@ -91,6 +102,11 @@ function mountScreens({
   screenPower = null,
 } = {}) {
   setActivePinia(createPinia());
+  const auth = useAuthStore();
+  // Settings only renders its categories with an admin session; the interval
+  // now uses the same condition.
+  auth.authenticated = true;
+  auth.status = "authenticated";
   const store = useKiosksStore();
   store.kiosks = kiosks;
   store.loadKiosks = vi.fn(async () => {
@@ -127,6 +143,7 @@ function mountScreens({
   return {
     wrapper: mount(ScreensSettings, { props: { config: cfg } }),
     store,
+    auth,
   };
 }
 
@@ -833,5 +850,142 @@ describe("ScreensSettings — screen power refresh", () => {
 
     expect(store.kiosks[0].screenPowerView).toBeUndefined();
     expect(text(wrapper, "screen-now-state")).toBe("On · by the schedule");
+  });
+
+  it("does not repeat a 401 on the interval or reopen sign-in after dismissing it", async () => {
+    const { wrapper, store, auth } = mountScreens({
+      screenPower: { power: "off", by: "automation", keyName: "Homey", desiredOn: false },
+    });
+    await open(wrapper);
+
+    store.fetchScreenPower = vi.fn(async () => {
+      const err = unauthorized();
+      auth.handleUnauthorized(err);
+      throw err;
+    });
+
+    await vi.advanceTimersByTimeAsync(30000);
+    await flushPromisesNow();
+    expect(store.fetchScreenPower).toHaveBeenCalledTimes(1);
+    expect(auth.dialog.open).toBe(true);
+
+    // The person dismisses the dialog; the next tick must stay quiet.
+    auth.closeSignIn();
+    await vi.advanceTimersByTimeAsync(30000);
+    await flushPromisesNow();
+    expect(store.fetchScreenPower).toHaveBeenCalledTimes(1);
+    expect(auth.dialog.open).toBe(false);
+  });
+
+  it("skips an interval tick while a re-read is in flight", async () => {
+    const { wrapper, store } = mountScreens();
+    await open(wrapper);
+
+    let resolveRead;
+    store.fetchScreenPower = vi.fn(
+      () =>
+        new Promise(resolve => {
+          resolveRead = resolve;
+        })
+    );
+
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(store.fetchScreenPower).toHaveBeenCalledTimes(1);
+
+    // The first read has not answered yet: the next tick sends nothing.
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(store.fetchScreenPower).toHaveBeenCalledTimes(1);
+
+    resolveRead(view({ power: "on", desiredOn: true }));
+    await flushPromisesNow();
+
+    // Once it is back, the next tick reads again.
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(store.fetchScreenPower).toHaveBeenCalledTimes(2);
+  });
+
+  it("runs a sign-in re-read that arrives while a tick is in flight", async () => {
+    const { wrapper, store, auth } = mountScreens({ screenPower: { desiredOn: false } });
+    await open(wrapper);
+
+    let resolveFirst;
+    store.fetchScreenPower = vi.fn(
+      () =>
+        new Promise(resolve => {
+          resolveFirst = resolve;
+        })
+    );
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(store.fetchScreenPower).toHaveBeenCalledTimes(1);
+
+    auth.authenticated = false;
+    await flushPromisesNow();
+    auth.authenticated = true;
+    await flushPromisesNow();
+    // The forced read is queued behind the one still in flight.
+    expect(store.fetchScreenPower).toHaveBeenCalledTimes(1);
+
+    resolveFirst(view());
+    await flushPromisesNow();
+    expect(store.fetchScreenPower).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not re-read on the interval without an admin session", async () => {
+    const { wrapper, store, auth } = mountScreens();
+    await open(wrapper);
+
+    auth.authenticated = false;
+    store.fetchScreenPower = vi.fn(async () => view());
+
+    await vi.advanceTimersByTimeAsync(30000);
+    await flushPromisesNow();
+
+    expect(store.fetchScreenPower).not.toHaveBeenCalled();
+  });
+
+  it("re-reads after a reselect", async () => {
+    const { wrapper, store, auth } = mountScreens({
+      screenPower: { power: "off", by: "automation", keyName: "Homey", desiredOn: false },
+    });
+    await open(wrapper);
+
+    store.fetchScreenPower = vi.fn(async () => {
+      const err = unauthorized();
+      auth.handleUnauthorized(err);
+      throw err;
+    });
+    await vi.advanceTimersByTimeAsync(30000);
+    await flushPromisesNow();
+    expect(store.fetchScreenPower).toHaveBeenCalledTimes(1);
+    auth.closeSignIn();
+
+    await wrapper.find("[data-test='screen-card']").trigger("click");
+    await flushPromisesNow();
+
+    expect(store.fetchScreenPower).toHaveBeenCalledTimes(2);
+  });
+
+  it("re-reads after sign-in", async () => {
+    const { wrapper, store, auth } = mountScreens({
+      screenPower: { power: "off", by: "automation", keyName: "Homey", desiredOn: false },
+    });
+    await open(wrapper);
+
+    store.fetchScreenPower = vi.fn(async () => {
+      const err = unauthorized();
+      auth.handleUnauthorized(err);
+      throw err;
+    });
+    await vi.advanceTimersByTimeAsync(30000);
+    await flushPromisesNow();
+    expect(store.fetchScreenPower).toHaveBeenCalledTimes(1);
+    auth.closeSignIn();
+
+    auth.authenticated = false;
+    await flushPromisesNow();
+    auth.authenticated = true;
+    await flushPromisesNow();
+
+    expect(store.fetchScreenPower).toHaveBeenCalledTimes(2);
   });
 });

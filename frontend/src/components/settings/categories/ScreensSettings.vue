@@ -996,6 +996,7 @@ import { useRoute, useRouter } from "vue-router";
 import { SECTION_FOCUS_INDEX, useSettingsPhoneNav } from "@/composables/useSettingsPhoneNav";
 import { mdiAlert, mdiCheck } from "@mdi/js";
 import { useKiosksStore } from "@/stores/kiosks";
+import { useAuthStore } from "@/stores/auth";
 import { useNotificationsStore } from "@/stores/notifications";
 import { useIntervalWhenVisible } from "@/composables/useIntervalWhenVisible";
 import {
@@ -1086,6 +1087,7 @@ const props = defineProps({
 const emit = defineEmits(["update:config"]);
 
 const store = useKiosksStore();
+const auth = useAuthStore();
 const notifications = useNotificationsStore();
 const kiosks = computed(() => store.kiosks);
 // A browser that is itself a set-up screen has no "This browser" card: its
@@ -1824,8 +1826,8 @@ async function select(id, { fromRoute = false } = {}) {
   kioskOverridesQueue(id).confirm(fetched);
   await refreshDesiredVersion(id);
   // The power row reads the server's answer: the command in force, who and
-  // when it was set, and when it ends.
-  await refreshScreenPower();
+  // when it was set, and when it ends. A reselect always tries again.
+  await refreshScreenPower(id, { force: true });
 }
 
 // The open screen vanished from the list (removed on another device): leave its
@@ -2071,7 +2073,7 @@ function showPowerFailure(err, action) {
     const message = serverMessage(err);
     if (message) {
       say(powerMsg, message, "err");
-      refreshScreenPower();
+      refreshScreenPower(selectedId.value, { force: true });
       return;
     }
   }
@@ -2086,18 +2088,54 @@ function showPowerFailure(err, action) {
   say(powerMsg, friendlyError(err, action), "err");
 }
 
-async function refreshScreenPower() {
-  const id = selectedId.value;
+// The last 401/403 for this screen, and the read in flight. A signed-out
+// viewer of a gated screen must not make the interval ask again every 30 s:
+// each answer reopens the sign-in dialog after the person dismissed it. A
+// reselect or a new sign-in tries once more.
+let powerReadDeniedId = null;
+let powerReadInFlight = false;
+let powerReadQueuedFor = null;
+
+async function refreshScreenPower(id = selectedId.value, { force = false } = {}) {
   if (!id) return;
+  if (powerReadInFlight) {
+    // A tick is skipped, but a reselect or sign-in must not be swallowed:
+    // remember it and run once the current read lands.
+    if (force) powerReadQueuedFor = id;
+    return;
+  }
+  if (!force && (powerReadDeniedId === id || !auth.authenticated)) return;
+  powerReadInFlight = true;
   try {
     await store.fetchScreenPower(id);
+    if (powerReadDeniedId === id) powerReadDeniedId = null;
   } catch (err) {
     const status = err?.response?.status;
     // The admin-only view (and its key name) is no longer ours to show; drop
     // it rather than keep the last copy. Offline keeps the last copy.
-    if (status === 401 || status === 403) store.clearScreenPower(id);
+    if (status === 401 || status === 403) {
+      powerReadDeniedId = id;
+      store.clearScreenPower(id);
+    }
+  } finally {
+    powerReadInFlight = false;
+    const queuedId = powerReadQueuedFor;
+    powerReadQueuedFor = null;
+    if (queuedId && queuedId === selectedId.value) {
+      void refreshScreenPower(queuedId, { force: true });
+    }
   }
 }
+
+// A new admin session makes the withheld answer readable again.
+watch(
+  () => auth.authenticated,
+  authenticated => {
+    if (!authenticated) return;
+    powerReadDeniedId = null;
+    refreshScreenPower(selectedId.value, { force: true });
+  }
+);
 
 async function setScreenNow(power) {
   // aria-disabled keeps the button in the keyboard order, so the tap still
@@ -2436,14 +2474,14 @@ async function setScreenPowerMode(mode) {
   };
   const saved = await persistPower(next);
   // Changing the mode ends the command on the server (design decision 5).
-  if (saved) await refreshScreenPower();
+  if (saved) await refreshScreenPower(selectedId.value, { force: true });
 }
 async function resetScreenPower() {
   const next = { ...overrides.value };
   delete next.screenPower;
   delete next.displayScheduleEnabled;
   const saved = await persistPower(next);
-  if (saved) await refreshScreenPower();
+  if (saved) await refreshScreenPower(selectedId.value, { force: true });
 }
 // External's key notes (UI spec §5). The keys page is a Settings destination;
 // the guide opens in a new tab, except on the kiosk itself.
