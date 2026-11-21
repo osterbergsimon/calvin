@@ -13,6 +13,21 @@ function withoutScreenNow(overrides) {
   return rest;
 }
 
+// The list cache is served to any later session on this browser, and the
+// power answer carries the admin-only key name plus client-only fields. Keep
+// the view (and any key name) in memory only.
+function cacheSafeKiosks(rows) {
+  return (rows || []).map(kiosk => {
+    const copy = { ...kiosk };
+    delete copy.screenPowerView;
+    if (copy.powerHold && typeof copy.powerHold === "object") {
+      copy.powerHold = { ...copy.powerHold };
+      delete copy.powerHold.keyName;
+    }
+    return copy;
+  });
+}
+
 export const useKiosksStore = defineStore("kiosks", () => {
   const kiosks = ref([]);
   // Live pending pairings (Settings' "waiting to be paired" hint). The list has
@@ -20,14 +35,29 @@ export const useKiosksStore = defineStore("kiosks", () => {
   const pairings = ref([]);
   let refreshSequence = 0;
 
+  function cacheKiosks() {
+    setCachedData(CACHE_KEY, cacheSafeKiosks(kiosks.value));
+  }
+
+  // The power answer is client-only state from a separate request; a list
+  // response must not wipe it (the row would lie until the screen is reselected).
+  function carryScreenPower(rows) {
+    const currentById = new Map(kiosks.value.map(k => [k.id, k]));
+    return (rows || []).map(k => {
+      const current = currentById.get(k.id);
+      if (!current?.screenPowerView) return k;
+      return { ...k, screenPowerView: current.screenPowerView };
+    });
+  }
+
   // Report how the load went: callers that infer "this screen was removed"
   // must not do so from a list that never arrived. A cached list is a usable
   // (stale) answer; no network and no cache is not.
   async function loadKiosks() {
     try {
       const response = await api.get("/kiosks");
-      kiosks.value = response.data?.kiosks ?? [];
-      setCachedData(CACHE_KEY, kiosks.value);
+      kiosks.value = carryScreenPower(response.data?.kiosks ?? []);
+      cacheKiosks();
       return { ok: true, stale: false };
     } catch (err) {
       logError("[kiosks]", "Failed to load kiosks, using cache:", err);
@@ -57,9 +87,9 @@ export const useKiosksStore = defineStore("kiosks", () => {
         const holdChanged =
           JSON.stringify(k.powerHold ?? null) !== JSON.stringify(current.powerHold ?? null);
         if (holdChanged || k.powerHold) overrides = withoutScreenNow(overrides);
-        return { ...k, overrides };
+        return { ...k, overrides, screenPowerView: current.screenPowerView };
       });
-      setCachedData(CACHE_KEY, kiosks.value);
+      cacheKiosks();
       return { ok: true, stale: false };
     } catch {
       // Quietly keep the last good data; the next visible interval can retry.
@@ -104,7 +134,7 @@ export const useKiosksStore = defineStore("kiosks", () => {
     const kiosk = kiosks.value.find(k => k.id === id);
     if (!kiosk) return;
     kiosk.overrides = overrides;
-    setCachedData(CACHE_KEY, kiosks.value);
+    cacheKiosks();
   }
 
   async function fetchDeviceConfigVersion(id) {
@@ -128,13 +158,15 @@ export const useKiosksStore = defineStore("kiosks", () => {
     // Drop any in-flight refresh so it can't put the row back.
     refreshSequence++;
     kiosks.value = kiosks.value.filter(k => k.id !== id);
-    setCachedData(CACHE_KEY, kiosks.value);
+    cacheKiosks();
   }
 
-  // Screen power held from home automation or Settings (calvin-2ifv). The hold
-  // lives outside the override layer, and setting or ending it removes
-  // screenNow from the layer on the server. Keep the list's copy in step, or
-  // a later save of this page would send an old manual choice back.
+  // The screen's power mode and the command in force (calvin-25g9). The command
+  // lives outside the override layer, and setting or ending it removes screenNow
+  // from the layer on the server. Keep the list's copy in step, or a later save
+  // of this page would send an old manual choice back. The whole answer is kept
+  // as `screenPowerView`: the page reads `mode`, `power`, `by`, `setAt`, `until`
+  // and the admin-only `keyName` from it.
   function applyScreenPower(id, view, { wrote = false } = {}) {
     const kiosk = kiosks.value.find(k => k.id === id);
     if (!kiosk || !view) return;
@@ -143,9 +175,21 @@ export const useKiosksStore = defineStore("kiosks", () => {
     if (wrote || hold || JSON.stringify(hold) !== JSON.stringify(kiosk.powerHold ?? null)) {
       kiosk.overrides = withoutScreenNow(kiosk.overrides);
     }
+    kiosk.screenPowerView = view;
+    if (view.mode) kiosk.screenPower = view.mode;
     kiosk.powerHold = hold;
     kiosk.agentHolds = view.agentHolds ?? kiosk.agentHolds ?? null;
-    setCachedData(CACHE_KEY, kiosks.value);
+    if (typeof view.paired === "boolean") kiosk.paired = view.paired;
+    cacheKiosks();
+  }
+
+  // A gated or hidden row can lose its admin-only view (401/403 on the GET);
+  // drop the stale command instead of showing a state the server withheld.
+  function clearScreenPower(id) {
+    const kiosk = kiosks.value.find(k => k.id === id);
+    if (!kiosk) return;
+    delete kiosk.screenPowerView;
+    cacheKiosks();
   }
 
   async function setScreenPower(id, power) {
@@ -217,6 +261,7 @@ export const useKiosksStore = defineStore("kiosks", () => {
     triggerUpdate,
     setScreenPower,
     fetchScreenPower,
+    clearScreenPower,
     fetchAvailableAgentVersion,
     pairScreen,
     unpairScreen,

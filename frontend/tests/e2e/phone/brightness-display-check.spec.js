@@ -561,11 +561,25 @@ for (const [size, viewport] of SIZES) {
     });
 
     test("a screen that sleeps by its schedule is refused up front", async ({ page }) => {
+      const week = [0, 1, 2, 3, 4, 5, 6].map(day => ({
+        day,
+        enabled: true,
+        onTime: "06:00",
+        offTime: "22:00",
+      }));
       const api = await installApiMock(page, {
+        config: {
+          screenPower: "schedule",
+          displayScheduleEnabled: true,
+          displaySchedule: week,
+        },
         kioskExtras: { hallway: { displayStack: "cog", displayCheck: FOUND } },
       });
-      api.overridesByKiosk.hallway = {
-        screenNow: { power: "off", setAt: new Date().toISOString() },
+      // A command from Settings turns the screen off until its next boundary.
+      api.screenPowerByKiosk.hallway = {
+        power: "off",
+        setAt: new Date().toISOString(),
+        by: "settings",
       };
       const group = await openHallway(page, { kiosk: viewport ? "workshop" : null });
       await group.locator('[data-test="check-open"]').click();
@@ -582,7 +596,7 @@ for (const [size, viewport] of SIZES) {
 
       // Turn on now is the normal Screen now action; the check starts once awake.
       await dialog(page).locator('[data-test="check-turn-on"]').click();
-      await expect.poll(() => api.overridesByKiosk.hallway?.screenNow?.power).toBe("on");
+      await expect.poll(() => api.screenPowerByKiosk.hallway?.power).toBe("on");
       await expect.poll(() => api.displayCheckRuns.hallway?.step).toBe("detect");
     });
 

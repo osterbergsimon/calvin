@@ -20,7 +20,8 @@ const config = {
   orientation: "landscape",
   orientationFlipped: false,
   applyDisplayRotation: true,
-  displayScheduleEnabled: false,
+  screenPower: "schedule",
+  displayScheduleEnabled: true,
   displaySchedule: [],
   displayTimeoutEnabled: false,
   displayTimeout: 0,
@@ -35,7 +36,12 @@ const config = {
 
 const FINDINGS = { ddc: true, writes: true, checkedAt: "2026-11-04T10:00:00Z" };
 
-function mountScreens({ overrides = {}, displayCheck = FINDINGS, kioskId = null } = {}) {
+function mountScreens({
+  overrides = {},
+  displayCheck = FINDINGS,
+  kioskId = null,
+  view = null,
+} = {}) {
   setActivePinia(createPinia());
   window.localStorage.clear();
   window.sessionStorage.clear();
@@ -64,6 +70,40 @@ function mountScreens({ overrides = {}, displayCheck = FINDINGS, kioskId = null 
   });
   store.fetchDeviceConfigVersion = vi.fn(async () => null);
   store.fetchAvailableAgentVersion = vi.fn(async () => null);
+  store.fetchScreenPower = vi.fn(async id => {
+    const answer = view
+      ? {
+          id,
+          mode: "schedule",
+          held: true,
+          until: null,
+          keyName: null,
+          ...view,
+        }
+      : null;
+    const target = store.kiosks.find(item => item.id === id);
+    if (target && answer) target.screenPowerView = answer;
+    return answer;
+  });
+  store.setScreenPower = vi.fn(async (id, power) => {
+    const target = store.kiosks.find(item => item.id === id);
+    const answer = {
+      id,
+      mode: "schedule",
+      power,
+      held: true,
+      setAt: new Date().toISOString(),
+      by: "settings",
+      until: null,
+      keyName: null,
+      desiredOn: power === "on",
+      online: true,
+      agentHolds: true,
+      paired: true,
+    };
+    if (target) target.screenPowerView = answer;
+    return answer;
+  });
   return { wrapper: mount(ScreensSettings, { props: { config } }), store };
 }
 
@@ -136,11 +176,8 @@ describe("Screens › {screen} › Power › Brightness", () => {
 
   it("says Dimming… then off under Screen now while the ramp is on", async () => {
     const { wrapper } = mountScreens({
-      overrides: {
-        brightnessRampEnabled: true,
-        brightness: 19,
-        screenNow: { power: "off", setAt: new Date().toISOString() },
-      },
+      overrides: { brightnessRampEnabled: true, brightness: 19 },
+      view: { power: "off", by: "settings", setAt: new Date().toISOString() },
     });
     await flushPromises();
     await open(wrapper);
@@ -151,7 +188,7 @@ describe("Screens › {screen} › Power › Brightness", () => {
 
   it("does not say Dimming… when the ramp is off", async () => {
     const { wrapper } = mountScreens({
-      overrides: { screenNow: { power: "off", setAt: new Date().toISOString() } },
+      view: { power: "off", by: "settings", setAt: new Date().toISOString() },
     });
     await flushPromises();
     await open(wrapper);
@@ -266,13 +303,14 @@ describe("Screens › Power › Brightness limit safety", () => {
 
   it("turns the screen on from the check's asleep state with the normal Turn on now", async () => {
     const { wrapper, store } = mountScreens({
-      overrides: { screenNow: { power: "off", setAt: new Date().toISOString() } },
+      view: { power: "off", by: "settings", setAt: new Date().toISOString() },
     });
     await flushPromises();
     await open(wrapper);
     wrapper.findComponent(DisplayCheckDialog).vm.$emit("turn-on");
     await flush();
-    expect(store.saveOverrides.mock.calls.at(-1)[1].screenNow.power).toBe("on");
+    expect(store.setScreenPower).toHaveBeenCalledWith("kitchen", "on");
+    expect(store.saveOverrides).not.toHaveBeenCalled();
   });
 });
 

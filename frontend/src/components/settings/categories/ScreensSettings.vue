@@ -562,22 +562,52 @@
       </SettingsSection>
 
       <SettingsSection id="screen-power" title="Power">
-        <SettingRow label="Screen on/off schedule" :id="rowAnchorId('displayScheduleEnabled')">
+        <SettingRow stacked label="Screen power" :id="rowAnchorId('screenPower')">
           <template #description>
+            <span data-test="screen-power-hint">{{ screenPowerHint }}</span>
+            <template v-if="effScreenPower === 'external'">
+              <InlineNote data-test="screen-power-keys-note">
+                It needs an API key that can turn screens on and off.
+                <template #action>
+                  <Button
+                    variant="link"
+                    size="sm"
+                    data-test="screen-power-keys"
+                    @click="openApiKeys"
+                  >
+                    Open API keys
+                  </Button>
+                </template>
+              </InlineNote>
+              <InlineNote v-if="!onKiosk" data-test="screen-power-guide-note">
+                The home automation guide shows the steps for Homey and Home Assistant.
+                <template #action>
+                  <Button
+                    variant="link"
+                    size="sm"
+                    data-test="screen-power-guide"
+                    @click="openGuide"
+                  >
+                    Open the guide
+                  </Button>
+                </template>
+              </InlineNote>
+            </template>
             <ScopeLine
-              :overridden="scheduleEnabledOverridden"
-              reset-test="reset-schedule-enabled"
-              @reset="resetScheduleEnabled"
+              :overridden="screenPowerOverridden"
+              reset-test="reset-screen-power"
+              @reset="resetScreenPower"
             />
           </template>
-          <ToggleSwitch
-            :model-value="effScheduleEnabled"
-            aria-label="Screen on/off schedule"
-            @update:model-value="setScheduleEnabled"
+          <SegmentedControl
+            :model-value="effScreenPower"
+            aria-label="Screen power"
+            :options="SCREEN_POWER_OPTIONS"
+            @update:model-value="setScreenPowerMode"
           />
         </SettingRow>
         <DisplayScheduleGrid
-          v-if="effScheduleEnabled"
+          v-if="effScreenPower === 'schedule'"
           :id="rowAnchorId('displaySchedule')"
           :model-value="effSchedule || []"
           :week-start="config.weekStartDay ?? 1"
@@ -588,6 +618,63 @@
           @update:model-value="setSchedule"
           @reset="resetDailySchedule"
         />
+        <SettingRow v-if="effScreenPower !== 'always_on'" label="Screen now">
+          <template #description>
+            <InlineNote v-if="presenceHidden" data-test="screen-now-hidden">
+              Sign in as admin to see whether this screen is on or off, and who set it.
+            </InlineNote>
+            <template v-else>
+              <InlineNote data-test="screen-now-state">
+                {{ powerStateCopy }}
+              </InlineNote>
+              <InlineNote v-if="untilCopy" data-test="screen-now-until">
+                {{ untilCopy }}
+              </InlineNote>
+            </template>
+            <InlineNote v-if="unpairedPowerNote" tone="warn" data-test="screen-now-unpaired">
+              {{ unpairedPowerNote }}
+              <template v-if="effScreenPower === 'external'" #action>
+                <Button variant="link" size="sm" data-test="screen-now-pair" @click="goToPairField">
+                  Pair a screen
+                </Button>
+              </template>
+            </InlineNote>
+            <InlineNote v-if="offlineCopy" data-test="screen-now-offline">
+              {{ offlineCopy }}
+            </InlineNote>
+            <InlineNote v-if="dimmingSeconds !== null" data-test="screen-now-dimming">
+              Dimming… then off · about {{ dimmingSeconds }} s
+            </InlineNote>
+          </template>
+          <Button
+            ref="powerOnButton"
+            data-test="screen-now-on"
+            :loading="powerBusy && powerDirection === 'on'"
+            loading-label="Turning on…"
+            :aria-disabled="powerBusy || (!presenceHidden && desiredOnNow) ? 'true' : undefined"
+            @click="setScreenNow('on')"
+          >
+            {{ powerOnLabel }}
+          </Button>
+          <Button
+            ref="powerOffButton"
+            data-test="screen-now-off"
+            :loading="powerBusy && powerDirection === 'off'"
+            loading-label="Turning off…"
+            :aria-disabled="powerBusy || (!presenceHidden && !desiredOnNow) ? 'true' : undefined"
+            @click="setScreenNow('off')"
+          >
+            {{ powerOffLabel }}
+          </Button>
+          <Button
+            v-if="showBackToSchedule"
+            variant="link"
+            data-test="screen-now-follow"
+            @click="followSchedule"
+          >
+            Back to schedule
+          </Button>
+        </SettingRow>
         <SettingRow label="Turn off when idle" :id="rowAnchorId('displayTimeout')">
           <template #description>
             <ScopeLine
@@ -602,54 +689,6 @@
             aria-label="Turn off when idle"
             @update:model-value="setIdle"
           />
-        </SettingRow>
-        <SettingRow label="Screen now">
-          <template #description>
-            <InlineNote v-if="selectedKiosk?.presenceHidden" data-test="screen-now-hidden">
-              Sign in as admin to see whether home automation is holding this screen.
-            </InlineNote>
-            <template v-else>
-              <InlineNote data-test="screen-now-state">
-                {{ powerStateCopy }}
-              </InlineNote>
-              <InlineNote v-if="!powerHold && activeOverride" data-test="screen-now-until">
-                {{ untilCopy }}
-              </InlineNote>
-            </template>
-            <InlineNote
-              v-if="powerHold && selectedKiosk?.agentHolds === false"
-              tone="warn"
-              data-test="screen-now-old-agent"
-            >
-              This screen needs an update to stay this way. Until then, its next scheduled change
-              switches it.
-            </InlineNote>
-            <InlineNote v-if="dimmingSeconds !== null" data-test="screen-now-dimming">
-              Dimming… then off · about {{ dimmingSeconds }} s
-            </InlineNote>
-          </template>
-          <Button
-            data-test="screen-now-on"
-            :aria-disabled="powerBusy || (!presenceHidden && desiredOnNow) ? 'true' : undefined"
-            @click="setScreenNow('on')"
-          >
-            Turn on now
-          </Button>
-          <Button
-            data-test="screen-now-off"
-            :aria-disabled="powerBusy || (!presenceHidden && !desiredOnNow) ? 'true' : undefined"
-            @click="setScreenNow('off')"
-          >
-            Turn off now
-          </Button>
-          <Button
-            v-if="presenceHidden || powerHold || activeOverride"
-            variant="link"
-            data-test="screen-now-follow"
-            @click="followSchedule"
-          >
-            Back to schedule
-          </Button>
         </SettingRow>
         <BrightnessGroup
           :kiosk="selectedKiosk"
@@ -957,6 +996,7 @@ import { useRoute, useRouter } from "vue-router";
 import { SECTION_FOCUS_INDEX, useSettingsPhoneNav } from "@/composables/useSettingsPhoneNav";
 import { mdiAlert, mdiCheck } from "@mdi/js";
 import { useKiosksStore } from "@/stores/kiosks";
+import { useAuthStore } from "@/stores/auth";
 import { useNotificationsStore } from "@/stores/notifications";
 import { useIntervalWhenVisible } from "@/composables/useIntervalWhenVisible";
 import {
@@ -974,10 +1014,15 @@ import { getKioskId } from "@/utils/kioskId";
 import { screenLabel, screenLabelFallback } from "@/utils/screenLabel";
 import { joinNames } from "@/utils/screenOverrides";
 import {
-  activePowerOverride,
-  buildPowerOverride,
+  HOME_AUTOMATION_GUIDE_URL,
+  SCREEN_POWER_HINTS,
+  SCREEN_POWER_OPTIONS,
+  effectiveScreenMode,
   effectiveTimeZone,
   formatUntil,
+  formatWhen,
+  keyNameLabel,
+  nextScheduleBoundary,
   scheduleDesiredOn,
 } from "@/utils/screenPower";
 import {
@@ -1042,6 +1087,7 @@ const props = defineProps({
 const emit = defineEmits(["update:config"]);
 
 const store = useKiosksStore();
+const auth = useAuthStore();
 const notifications = useNotificationsStore();
 const kiosks = computed(() => store.kiosks);
 // A browser that is itself a set-up screen has no "This browser" card: its
@@ -1342,17 +1388,22 @@ function orientationFor(k) {
 function flippedFor(k) {
   return (k ? k.overrides?.orientationFlipped : null) ?? props.config.orientationFlipped ?? false;
 }
-function scheduleEnabledFor(k) {
-  return (k ? k.overrides?.displayScheduleEnabled : null) ?? props.config.displayScheduleEnabled;
-}
 function scheduleFor(k) {
   return (k ? k.overrides?.displaySchedule : null) ?? props.config.displaySchedule;
 }
 function scheduleLabel(k) {
-  if (!scheduleEnabledFor(k)) return "";
+  if (effectiveScreenMode(k?.overrides, props.config) !== "schedule") return "";
   const days = Array.isArray(scheduleFor(k)) ? scheduleFor(k) : [];
   const day = days.find(entry => entry?.enabled && entry.offTime && entry.onTime);
   return day ? `off ${day.offTime}–${day.onTime}` : "";
+}
+// The summary names what the mode adds (UI spec §4.3): Schedule keeps its off
+// hours, External says "External on/off", Always on adds nothing.
+function modeSummary(k) {
+  const mode = effectiveScreenMode(k?.overrides, props.config);
+  if (mode === "external") return "External on/off";
+  if (mode === "schedule") return scheduleLabel(k);
+  return "";
 }
 function idleLabelFor(seconds) {
   if (!seconds) return "Never";
@@ -1372,8 +1423,8 @@ function summaryFor(k) {
   const count = availableIds(k).length;
   const parts = [`${count} page${count === 1 ? "" : "s"}`, orientationFor(k)];
   if (flippedFor(k)) parts.push("upside down");
-  const schedule = scheduleLabel(k);
-  if (schedule) parts.push(schedule);
+  const mode = modeSummary(k);
+  if (mode) parts.push(mode);
   return parts.join(" · ");
 }
 
@@ -1381,8 +1432,8 @@ function summaryFor(k) {
 const defaultSummary = computed(() => {
   const parts = [props.config.orientation || "landscape"];
   if (props.config.orientationFlipped) parts.push("upside down");
-  const schedule = scheduleLabel(null);
-  if (schedule) parts.push(schedule);
+  const mode = modeSummary(null);
+  if (mode) parts.push(mode);
   parts.push(`keyboard ${oskLabel(props.config.onScreenKeyboard)}`);
   const own = kiosks.value.filter(k => hasOwnSettings(k.overrides)).length;
   if (own === 1) parts.push("1 screen has its own settings");
@@ -1774,6 +1825,9 @@ async function select(id, { fromRoute = false } = {}) {
   if (selectedId.value !== id) return;
   kioskOverridesQueue(id).confirm(fetched);
   await refreshDesiredVersion(id);
+  // The power row reads the server's answer: the command in force, who and
+  // when it was set, and when it ends. A reselect always tries again.
+  await refreshScreenPower(id, { force: true });
 }
 
 // The open screen vanished from the list (removed on another device): leave its
@@ -1861,133 +1915,288 @@ const previewCaption = computed(() => {
   return [selectedStartPage.value?.name || "", size].filter(Boolean).join(" · ");
 });
 
-const scheduleEnabledOverridden = computed(() => "displayScheduleEnabled" in overrides.value);
+// The screen power choice (calvin-25g9): one mode per screen, with the
+// household choice as Default. The hint under the label explains the choice.
 const scheduleOverridden = computed(() => "displaySchedule" in overrides.value);
-const effScheduleEnabled = computed(() =>
-  scheduleEnabledOverridden.value
-    ? overrides.value.displayScheduleEnabled
-    : props.config.displayScheduleEnabled
-);
 const effSchedule = computed(() =>
   scheduleOverridden.value ? overrides.value.displaySchedule : props.config.displaySchedule
 );
+const screenPowerOverridden = computed(
+  () => "screenPower" in overrides.value || "displayScheduleEnabled" in overrides.value
+);
+const effScreenPower = computed(() => effectiveScreenMode(overrides.value, props.config));
+const screenPowerHint = computed(() => SCREEN_POWER_HINTS[effScreenPower.value] || "");
+// A new tab on a wall panel is a dead end, so the guide note is not shown there.
+const onKiosk = computed(
+  () =>
+    Boolean(kioskId) ||
+    (typeof document !== "undefined" && document.documentElement.classList.contains("calvin-kiosk"))
+);
 
-// "Screen now" (calvin-ydzz): a manual choice that holds only until the first
-// schedule boundary after it was set. The agent owns that decision from the
-// stored UTC `setAt`; the row re-reads the clock so an expired override stops
-// claiming the screen without needing another config change.
+// The server's power answer holds the command in force, who and when it was
+// set, and (admin sessions only) the API key's name.
+const screenPowerView = computed(() => selectedKiosk.value?.screenPowerView ?? null);
 const powerTimeZone = computed(() => effectiveTimeZone(props.config));
+const powerTimeFormat = computed(() => props.config.timeFormat || "24h");
 const nowTick = ref(Date.now());
 const now = () => new Date(nowTick.value);
 useIntervalWhenVisible(() => {
   nowTick.value = Date.now();
 }, 15000);
-const activeOverride = computed(() =>
-  activePowerOverride(overrides.value.screenNow, {
-    enabled: effScheduleEnabled.value,
-    schedule: effSchedule.value,
-    now: now(),
-    timeZone: powerTimeZone.value,
-  })
-);
-// A hold from home automation or Settings (calvin-2ifv) lives in its own
-// registry column, not the layer, and wins until it is changed.
-const powerHold = computed(() => selectedKiosk.value?.powerHold ?? null);
-// A hidden presence row carries no hold fields at all, so the page must not
-// read their absence as "not held" (design §3.4): the controls stay neutral.
+// A hidden presence row carries no command fields at all, so the page must not
+// read their absence as "no command" (pairing spec §3.4).
 const presenceHidden = computed(() => Boolean(selectedKiosk.value?.presenceHidden));
-// "Turn on/off now" on a held screen makes two calls; both buttons wait for
-// them so a double tap cannot send the pair twice.
+const unpairedPower = computed(
+  () => selectedKiosk.value?.paired === false && props.config.kioskPairing === "required"
+);
+// A Schedule command ends at the boundary the server names in `until`; the
+// tick hides it as soon as it passes, before the next read.
+const commandNow = computed(() => {
+  const view = screenPowerView.value;
+  if (!view || (view.power !== "on" && view.power !== "off")) return null;
+  // A command belongs to the mode it was given in; a mode changed here hides
+  // the old one until the fresh read lands.
+  if (view.mode && view.mode !== effScreenPower.value) return null;
+  if (effScreenPower.value === "schedule" && view.until) {
+    const until = Date.parse(view.until);
+    if (Number.isFinite(until) && nowTick.value >= until) return null;
+  }
+  return view;
+});
 const powerBusy = ref(false);
-const POWER_CHOICE_FAILED = {
-  on: "The screen is back on its schedule, but turning it on didn't save. Try again.",
-  off: "The screen is back on its schedule, but turning it off didn't save. Try again.",
-};
+const powerDirection = ref(null);
+const powerOnButton = ref(null);
+const powerOffButton = ref(null);
+
 const desiredOnNow = computed(() => {
-  if (powerHold.value) return powerHold.value.power === "on";
-  if (activeOverride.value) return activeOverride.value.power === "on";
+  if (effScreenPower.value === "always_on") return true;
+  const view = screenPowerView.value;
+  const answeredOn = view && typeof view.desiredOn === "boolean" ? view.desiredOn : null;
+  // An unpaired screen receives no command: the answer's desiredOn is the only
+  // truth, never the stored command (server design §6).
+  if (unpairedPower.value && answeredOn !== null) return answeredOn;
+  if (commandNow.value) return commandNow.value.power === "on";
+  // With no command in force, the answer already accounts for the screen's
+  // zone and gating. A command that expired locally is the exception: the
+  // schedule takes over in the browser until the next read.
+  const hadCommand = view && (view.power === "on" || view.power === "off");
+  if (answeredOn !== null && !hadCommand) return answeredOn;
+  // External with no command yet is on.
+  if (effScreenPower.value === "external") return true;
   return scheduleDesiredOn({
-    enabled: effScheduleEnabled.value,
+    enabled: true,
     schedule: effSchedule.value,
     now: now(),
     timeZone: powerTimeZone.value,
   });
 });
 const powerStateCopy = computed(() => {
-  const hold = powerHold.value;
-  if (!hold) return desiredOnNow.value ? "On now" : "Off now";
-  const state = hold.power === "on" ? "On" : "Off";
-  return hold.by === "automation"
-    ? `${state}, set by home automation. The schedule is paused.`
-    : `${state} until someone changes it. The schedule is paused.`;
+  if (presenceHidden.value) return "";
+  const state = desiredOnNow.value ? "On" : "Off";
+  // Home automation's command is not reaching an unpaired screen, so its name
+  // and time would mislead: keep the state and drop them.
+  if (unpairedPower.value) return state;
+  const view = commandNow.value;
+  if (!view) {
+    if (effScreenPower.value === "external") return "On · no command yet";
+    return `${state} · by the schedule`;
+  }
+  const when = formatWhen(view.setAt, {
+    timeFormat: powerTimeFormat.value,
+    timezone: powerTimeZone.value,
+    now: now(),
+  });
+  const who = view.by === "settings" ? "set here" : `set by ${keyNameLabel(view.keyName)}`;
+  return `${state} · ${who}${when ? ` ${when}` : ""}`;
 });
 const untilCopy = computed(() => {
-  const override = activeOverride.value;
-  if (!override) return "";
-  const state = override.power === "on" ? "On" : "Off";
-  // The browser can only show a time when it shares the screen's zone.
-  if (override.expiry) return `${state} until ${formatUntil(override.expiry, powerTimeZone.value)}`;
-  if (override.hasSchedule) return `${state} until the next scheduled change`;
-  return `${state} until you change it`;
+  if (effScreenPower.value !== "schedule") return "";
+  // An unpaired screen receives no command, so the stored until says nothing
+  // about when this screen will change.
+  if (unpairedPower.value) return "";
+  const view = commandNow.value;
+  if (view) {
+    if (!view.until) return "";
+    return `Until the next scheduled change at ${formatUntil(
+      view.until,
+      powerTimeZone.value,
+      powerTimeFormat.value
+    )}`;
+  }
+  const boundary = nextScheduleBoundary({
+    enabled: true,
+    schedule: effSchedule.value,
+    now: now(),
+    timeZone: powerTimeZone.value,
+  });
+  if (!boundary) return "";
+  const at = formatUntil(boundary, powerTimeZone.value, powerTimeFormat.value);
+  return desiredOnNow.value ? `Turns off at ${at}` : `Turns on at ${at}`;
 });
+const unpairedPowerNote = computed(() => {
+  if (!unpairedPower.value) return "";
+  return effScreenPower.value === "external"
+    ? "Not paired, so home automation can't switch it. Pair it to use External."
+    : "Not paired, so home automation can't switch it. Its schedule still works.";
+});
+const offlineCopy = computed(() => {
+  if (!selectedKiosk.value || isOnline(selectedKiosk.value)) return "";
+  // A hidden row has no answer to say which way it will go; never guess.
+  if (presenceHidden.value) return "Offline.";
+  return desiredOnNow.value
+    ? "Offline. It turns on when it's back."
+    : "Offline. It turns off when it's back.";
+});
+const powerOnLabel = computed(() =>
+  effScreenPower.value === "external" ? "Turn on" : "Turn on now"
+);
+const powerOffLabel = computed(() =>
+  effScreenPower.value === "external" ? "Turn off" : "Turn off now"
+);
+const showBackToSchedule = computed(
+  () => effScreenPower.value === "schedule" && (presenceHidden.value || Boolean(commandNow.value))
+);
+
+function serverMessage(err) {
+  const detail = err?.response?.data?.detail;
+  if (detail && typeof detail === "object" && typeof detail.message === "string") {
+    return detail.message;
+  }
+  return "";
+}
+
+// The two 409s (UI spec §3.4): the server's own sentence, then a fresh read,
+// because the mode changed on another device. 429 names the wait.
+function showPowerFailure(err, action) {
+  const status = err?.response?.status;
+  if (status === 409) {
+    const message = serverMessage(err);
+    if (message) {
+      say(powerMsg, message, "err");
+      refreshScreenPower(selectedId.value, { force: true });
+      return;
+    }
+  }
+  if (status === 429) {
+    say(
+      powerMsg,
+      `Too many changes in a minute. Try again in ${formatWait(retryAfterSeconds(err))}.`,
+      "err"
+    );
+    return;
+  }
+  say(powerMsg, friendlyError(err, action), "err");
+}
+
+// The last 401/403 for this screen, and the read in flight. A signed-out
+// viewer of a gated screen must not make the interval ask again every 30 s:
+// each answer reopens the sign-in dialog after the person dismissed it. A
+// reselect or a new sign-in tries once more.
+let powerReadDeniedId = null;
+let powerReadInFlight = false;
+let powerReadQueuedFor = null;
+
+async function refreshScreenPower(id = selectedId.value, { force = false } = {}) {
+  if (!id) return;
+  if (powerReadInFlight) {
+    // A tick is skipped, but a reselect or sign-in must not be swallowed:
+    // remember it and run once the current read lands.
+    if (force) powerReadQueuedFor = id;
+    return;
+  }
+  if (!force && (powerReadDeniedId === id || !auth.authenticated)) return;
+  powerReadInFlight = true;
+  try {
+    await store.fetchScreenPower(id);
+    if (powerReadDeniedId === id) powerReadDeniedId = null;
+  } catch (err) {
+    const status = err?.response?.status;
+    // The admin-only view (and its key name) is no longer ours to show; drop
+    // it rather than keep the last copy. Offline keeps the last copy.
+    if (status === 401 || status === 403) {
+      powerReadDeniedId = id;
+      store.clearScreenPower(id);
+    }
+  } finally {
+    powerReadInFlight = false;
+    const queuedId = powerReadQueuedFor;
+    powerReadQueuedFor = null;
+    if (queuedId && queuedId === selectedId.value) {
+      void refreshScreenPower(queuedId, { force: true });
+    }
+  }
+}
+
+// A new admin session makes the withheld answer readable again.
+watch(
+  () => auth.authenticated,
+  authenticated => {
+    if (!authenticated) return;
+    powerReadDeniedId = null;
+    refreshScreenPower(selectedId.value, { force: true });
+  }
+);
 
 async function setScreenNow(power) {
   // aria-disabled keeps the button in the keyboard order, so the tap still
-  // arrives: do nothing while a pair of calls runs, or when it is already so.
-  // A hidden presence row cannot know what is already so.
+  // arrives: do nothing while a call runs, or when it is already so. A hidden
+  // presence row cannot know what is already so.
   if (powerBusy.value || (!presenceHidden.value && (power === "on") === desiredOnNow.value)) return;
+  const id = selectedId.value;
+  if (!id) return;
   powerBusy.value = true;
+  powerDirection.value = power;
   clear(powerMsg);
   try {
-    // A person's own choice ends a hold first, then works as always: until the
-    // next scheduled change. Ask the server first: home automation may have held
-    // the screen since this page last looked.
-    const wasHeld = await isHeldNow();
-    if (wasHeld && !(await endHold())) return;
-    const next = {
-      ...overrides.value,
-      screenNow: buildPowerOverride({ power, now: new Date() }),
-    };
-    const saved = await persist(next, powerMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
-    // The hold is already gone, so the plain save error would hide that the
-    // screen is now on its schedule.
-    if (!saved && wasHeld) say(powerMsg, POWER_CHOICE_FAILED[power], "err");
+    // One press is one call: the server owns what a command means in the mode.
+    await store.setScreenPower(id, power);
+    const online = selectedKiosk.value ? isOnline(selectedKiosk.value) : false;
+    say(powerMsg, online ? APPLIED_BY_AGENT : OFFLINE_COPY);
+  } catch (err) {
+    showPowerFailure(err, `turn ${selectedName.value} ${power}`);
   } finally {
     powerBusy.value = false;
+    powerDirection.value = null;
+    // Button's loading state disables it, which blurs it; put focus back on the
+    // choice that was pressed so the person keeps their place (UI spec §3.4).
+    await nextTick();
+    const target = power === "on" ? powerOnButton.value : powerOffButton.value;
+    target?.$el?.focus?.();
   }
 }
 
-async function isHeldNow() {
-  const kioskId = selectedId.value;
-  if (!kioskId) return false;
-  try {
-    return Boolean((await store.fetchScreenPower(kioskId))?.held);
-  } catch {
-    return Boolean(powerHold.value); // offline: go by what the page last saw
-  }
-}
-
-// Ends a hold through the screen-power call; the layer is not touched.
-async function endHold() {
-  const kioskId = selectedId.value;
-  if (!kioskId) return false;
+async function followSchedule() {
+  const id = selectedId.value;
+  if (!id || powerBusy.value) return;
+  powerBusy.value = true;
   clear(powerMsg);
+  let cleared = false;
   try {
-    await store.setScreenPower(kioskId, "schedule");
-    return true;
+    await store.setScreenPower(id, "schedule");
+    cleared = true;
+    const online = selectedKiosk.value ? isOnline(selectedKiosk.value) : false;
+    say(powerMsg, online ? APPLIED_BY_AGENT : OFFLINE_COPY);
   } catch (err) {
-    say(powerMsg, friendlyError(err, "change this screen"), "err");
-    return false;
+    showPowerFailure(err, "change this screen");
+  } finally {
+    powerBusy.value = false;
+    if (cleared) {
+      // Back to schedule leaves the DOM with the command; put focus on the
+      // Screen now choice that is still available (UI spec §3.4).
+      await nextTick();
+      const target = desiredOnNow.value ? powerOffButton.value : powerOnButton.value;
+      target?.$el?.focus?.();
+    }
   }
 }
 
-// "Dimming… then off" (calvin-29ws): with the ramp on, "Turn off now" first steps
+// "Dimming… then off" (calvin-29ws): with the ramp on, "Turn off" first steps
 // the brightness down. The agent picks the change up within its 60 s poll.
 const AGENT_POLL_S = 60;
 const dimmingSeconds = computed(() => {
-  const own = activeOverride.value;
+  const command = commandNow.value;
   const values = overrides.value;
-  if (!own || own.power !== "off") return null;
+  if (!command || command.power !== "off" || !command.setAt) return null;
   if (values.brightnessRampEnabled !== true && values.sleepMode !== "dim") return null;
   const level = values.brightness ?? firstBrightness(values.brightnessLimit ?? null);
   const seconds = dimSeconds(
@@ -1995,7 +2204,7 @@ const dimmingSeconds = computed(() => {
     values.brightnessStep ?? 2,
     values.brightnessStepSeconds ?? 1.5
   );
-  const elapsed = (nowTick.value - Date.parse(own.setAt)) / 1000;
+  const elapsed = (nowTick.value - Date.parse(command.setAt)) / 1000;
   return elapsed < seconds + AGENT_POLL_S ? seconds : null;
 });
 
@@ -2017,21 +2226,6 @@ const checkOpen = ref(false);
 function openCheck() {
   checkOpen.value = true;
 }
-async function followSchedule() {
-  // A hidden row cannot tell whether a hold is in force, so it asks the server
-  // to clear one instead of editing the layer it cannot see.
-  if (powerHold.value || presenceHidden.value) {
-    if (await endHold()) {
-      const online = selectedKiosk.value ? isOnline(selectedKiosk.value) : false;
-      say(powerMsg, online ? APPLIED_BY_AGENT : OFFLINE_COPY);
-    }
-    return;
-  }
-  const next = { ...overrides.value };
-  delete next.screenNow;
-  persist(next, powerMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
-}
-
 const idleOverridden = computed(
   () => "displayTimeoutEnabled" in overrides.value || "displayTimeout" in overrides.value
 );
@@ -2269,16 +2463,36 @@ function resetApply() {
 function persistPower(next) {
   return persist(next, powerMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
 }
-function setScheduleEnabled(value) {
-  persistPower({ ...overrides.value, displayScheduleEnabled: value });
+async function setScreenPowerMode(mode) {
+  if (mode === effScreenPower.value) return;
+  // The schedule itself is never touched. The legacy switch travels with the
+  // mode so an older backend, or a restore onto one, still reads it right.
+  const next = {
+    ...overrides.value,
+    screenPower: mode,
+    displayScheduleEnabled: mode === "schedule",
+  };
+  const saved = await persistPower(next);
+  // Changing the mode ends the command on the server (design decision 5).
+  if (saved) await refreshScreenPower(selectedId.value, { force: true });
+}
+async function resetScreenPower() {
+  const next = { ...overrides.value };
+  delete next.screenPower;
+  delete next.displayScheduleEnabled;
+  const saved = await persistPower(next);
+  if (saved) await refreshScreenPower(selectedId.value, { force: true });
+}
+// External's key notes (UI spec §5). The keys page is a Settings destination;
+// the guide opens in a new tab, except on the kiosk itself.
+function openApiKeys() {
+  router.push({ path: "/settings", query: { setting: "security-api-keys" } });
+}
+function openGuide() {
+  window.open(HOME_AUTOMATION_GUIDE_URL, "_blank", "noopener");
 }
 function setSchedule(value) {
   persistPower({ ...overrides.value, displaySchedule: value });
-}
-function resetScheduleEnabled() {
-  const next = { ...overrides.value };
-  delete next.displayScheduleEnabled;
-  persistPower(next);
 }
 function resetDailySchedule() {
   const next = { ...overrides.value };
@@ -2656,6 +2870,9 @@ const ONLINE_WINDOW_MS = 120000; // 2 minutes
 useIntervalWhenVisible(async () => {
   const refreshed = await store.refreshKiosks();
   store.loadPairings();
+  // The list carries no command; re-read the open screen's power answer so a
+  // command from home automation (or its end) shows within one interval.
+  await refreshScreenPower();
   // A failed first load left a ?screen= link unresolved. When the backend
   // comes back, this fresh list can open the screen or finally say it is gone.
   if (refreshed?.ok && !refreshed.stale) {
