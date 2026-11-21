@@ -69,3 +69,49 @@ else
     echo "FAIL: expected CALVIN_KIOSK_HOSTNAME=pi-operator, got CALVIN_KIOSK_HOSTNAME=${actual_host}"
     exit 1
 fi
+
+# --- --pair-code hands the one-time code to the agent (calvin-0xns) ----------
+PAIR_CODE="clv_pair_$(printf 'b%.0s' {1..22})"
+agent_dir="$TMPDIR_TEST/agent"
+mkdir -p "$agent_dir"
+export CALVIN_AGENT_STATE_DIR="$agent_dir"
+export CALVIN_USER=calvin
+chown() { printf '%s\n' "chown $*" >> "$TMPDIR_TEST/chown.log"; }
+
+install_pair_code "$PAIR_CODE"
+pair_file="$agent_dir/install-pair-code"
+[ "$(cat "$pair_file")" = "$PAIR_CODE" ] \
+    || { echo "FAIL: install-pair-code content is wrong"; exit 1; }
+[ "$(stat -c '%a' "$pair_file")" = "600" ] \
+    || { echo "FAIL: install-pair-code is not 0600"; exit 1; }
+grep -q "calvin:calvin $pair_file" "$TMPDIR_TEST/chown.log" \
+    || { echo "FAIL: install-pair-code is not owned by calvin"; exit 1; }
+echo "PASS: setup-kiosk.sh writes install-pair-code 0600 for calvin"
+
+# A malformed code is refused before anything is written.
+bad_dir="$TMPDIR_TEST/agent-bad"
+mkdir -p "$bad_dir"
+if ( CALVIN_AGENT_STATE_DIR="$bad_dir"; install_pair_code 'clv_pair_short' ) 2>/dev/null; then
+    echo "FAIL: install_pair_code accepted a malformed code"; exit 1; fi
+[ ! -e "$bad_dir/install-pair-code" ] \
+    || { echo "FAIL: a malformed pair code wrote install-pair-code"; exit 1; }
+echo "PASS: setup-kiosk.sh refuses a malformed pair code"
+
+# parse_args rejects a malformed --pair-code and accepts a valid one.
+if ( parse_args --backend-url http://h:8000 --pair-code 'clv_pair_short' ) 2>/dev/null; then
+    echo "FAIL: --pair-code accepted a malformed code"; exit 1; fi
+( parse_args --backend-url http://h:8000 --pair-code "$PAIR_CODE" ) \
+    || { echo "FAIL: --pair-code rejected a valid code"; exit 1; }
+echo "PASS: setup-kiosk.sh validates --pair-code"
+
+# The code is written only after bootstrap_kiosk created the agent's dir. main()
+# is defined after setup-kiosk.sh's source-only return, so pin the call order in
+# the file: bootstrap first, then install_pair_code.
+setup_src="$(dirname "$0")/../setup-kiosk.sh"
+bootstrap_line="$(grep -n 'bootstrap_kiosk "${BACKEND_URL}"' "$setup_src" | cut -d: -f1)"
+pair_line="$(grep -n 'install_pair_code "${PAIR_CODE}"' "$setup_src" | cut -d: -f1)"
+[ -n "$bootstrap_line" ] && [ -n "$pair_line" ] \
+    || { echo "FAIL: the setup-kiosk bootstrap/pair-code calls are missing"; exit 1; }
+[ "$pair_line" -gt "$bootstrap_line" ] \
+    || { echo "FAIL: install-pair-code is written before bootstrap_kiosk"; exit 1; }
+echo "PASS: setup-kiosk.sh writes install-pair-code after bootstrap_kiosk"

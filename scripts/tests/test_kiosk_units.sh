@@ -6,6 +6,8 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
 # shellcheck source=helpers/assert.sh
 . "$HERE/helpers/assert.sh"
 
@@ -40,3 +42,79 @@ for unit in calvin-cog.service calvin-kiosk-remote.service; do
 done
 assert_contains "$REPO/scripts/setup-common.sh" '/\?display=kiosk &' "openbox autostart does not mark the display as a kiosk"
 pass "every kiosk launcher marks its display for kiosk link handling"
+
+# --- the pairing secret in the start URL's fragment (calvin-0xns) -----------
+# Both browsers read the agent's 0600 secret file when they build the start URL
+# and append it ONLY after '#'. A missing or malformed file adds nothing, so a
+# garbled file can never inject shell code or a query parameter.
+credential="$tmp/kiosk-credential"
+good_secret="clv_kiosk_$(printf 'A%.0s' $(seq 1 43))"
+
+unit_start_url() {  # $1 unit file; prints the URL the browser would open
+    local unit="$1" body
+    body="$(python3 - "$unit" <<'PY'
+import re, sys
+text = open(sys.argv[1]).read()
+match = re.search(r"^ExecStart=/bin/bash -c '(.*)'$", text, re.M | re.S)
+if not match:
+    raise SystemExit("no ExecStart=/bin/bash -c '...' in " + sys.argv[1])
+print(match.group(1))
+PY
+)"
+    # systemd's own escapes, then replace the browser with a printer of its URL.
+    body="$(printf '%s\n' "$body" | sed -e 's/\$\$/$/g' -e 's/%%/%/g' \
+        -e "s|/usr/bin/chromium|printf 'URL:%s\\\\n'|" \
+        -e "s|exec /usr/bin/cog|printf 'URL:%s\\\\n'|")"
+    CALVIN_BACKEND_URL="http://tower.local:8000" \
+    CALVIN_KIOSK_ID="kitchen" CALVIN_KIOSK_HOSTNAME="pi" \
+    CALVIN_KIOSK_CREDENTIAL_FILE="$credential" \
+        bash -c "$body" 2>/dev/null | tail -n 1 | sed 's/^URL://'
+}
+
+printf '%s\n' "$good_secret" > "$credential"
+chmod 600 "$credential"
+for unit in calvin-kiosk-remote.service calvin-cog.service; do
+    url="$(unit_start_url "$REPO/deploy/systemd/$unit")"
+    case "$url" in
+        "http://tower.local:8000/?kiosk=kitchen&khost=pi#pair=$good_secret"|\
+        "http://tower.local:8000?kiosk=kitchen&khost=pi#pair=$good_secret") ;;
+        *) fail "$unit start URL is not the kiosk URL with #pair=<secret>: $url" ;;
+    esac
+    [ "${url#*#pair=}" = "$good_secret" ] || fail "$unit fragment is not the secret"
+    case "${url%%#*}" in
+        *clv_kiosk_*) fail "$unit puts the secret before '#'" ;;
+    esac
+done
+pass "both kiosk units append the secret only as #pair="
+
+# Missing file, a shell-metacharacter payload, and an embedded newline: no fragment.
+rm -f "$credential"
+for unit in calvin-kiosk-remote.service calvin-cog.service; do
+    url="$(unit_start_url "$REPO/deploy/systemd/$unit")"
+    case "$url" in *"#pair="*) fail "$unit added a fragment without a secret file" ;; esac
+done
+printf "%s\n" "clv_kiosk_x' ; rm -rf /" > "$credential"
+for unit in calvin-kiosk-remote.service calvin-cog.service; do
+    url="$(unit_start_url "$REPO/deploy/systemd/$unit")"
+    case "$url" in *"#pair="*) fail "$unit accepted a malformed secret" ;; esac
+done
+printf '%s\nEVIL\n' "$good_secret" > "$credential"
+for unit in calvin-kiosk-remote.service calvin-cog.service; do
+    url="$(unit_start_url "$REPO/deploy/systemd/$unit")"
+    case "$url" in *"#pair="*) fail "$unit accepted a secret file with an extra line" ;; esac
+done
+pass "a missing or malformed credential adds no fragment"
+
+# No new sudo rule: pairing restarts the browser by signalling it, as the crash
+# watchdog already does. The one installed fragment is byte-for-byte unchanged.
+[ "$(sha256sum "$REPO/deploy/kiosk-agent/calvin-kiosk-update.sudoers" | cut -d' ' -f1)" = \
+  "044251ea34fc81207a343d70be50d67cd507f961c8fa1535b6cfbdba06fb98d7" ] \
+    || fail "the kiosk updater sudoers fragment changed"
+for script in "$REPO/deploy/kiosk-agent/install-kiosk.sh" \
+              "$REPO/scripts/setup-kiosk.sh" \
+              "$REPO/scripts/bake-kiosk-firstrun.sh"; do
+    if grep -qiE 'sudoers.*pair|pair.*sudoers' "$script"; then
+        fail "$(basename "$script") installs a pairing sudo rule"
+    fi
+done
+pass "pairing adds no sudo rule"

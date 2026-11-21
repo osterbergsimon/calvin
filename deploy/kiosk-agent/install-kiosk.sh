@@ -25,6 +25,10 @@ set -euo pipefail
 # Replaced by the server when it serves this file; stays a placeholder otherwise.
 SERVER_URL='@CALVIN_SERVER_URL@'
 case "$SERVER_URL" in @*) SERVER_URL="" ;; esac
+# Replaced by the server (or a baked card) only with a one-time install code;
+# stays a placeholder otherwise.
+PAIR_CODE='__PAIR_CODE__'
+case "$PAIR_CODE" in __*) PAIR_CODE="" ;; esac
 
 SIGNING_ENV_FILE="${CALVIN_KIOSK_SIGNING_ENV_FILE:-/etc/default/calvin-kiosk-signing}"
 REBOOT_DELAY="${CALVIN_INSTALL_REBOOT_DELAY:-5}"
@@ -50,6 +54,8 @@ Options:
                              wayland (labwc) or cog (WPE WebKit on DRM/KMS).
                              Re-run with another value to switch an existing
                              kiosk in place; all stacks stay installed.
+  --pair-code <CODE>         One-time code from Settings > Screens > Add a
+                             screen. It pairs this screen once, for 30 minutes.
   --no-reboot                Do not reboot when done
   -h, --help                 Show this help
 EOF
@@ -73,6 +79,8 @@ while [ "$#" -gt 0 ]; do
         --signing-key-file=*) SIGNING_KEY="$(read_key_file "${1#*=}")"; shift ;;
         --display-stack) need_value "$1" "$#"; DISPLAY_STACK="$2"; shift 2 ;;
         --display-stack=*) DISPLAY_STACK="${1#*=}"; shift ;;
+        --pair-code) need_value "$1" "$#"; PAIR_CODE="$2"; shift 2 ;;
+        --pair-code=*) PAIR_CODE="${1#*=}"; shift ;;
         --no-reboot) REBOOT=0; shift ;;
         -h|--help) usage; exit 0 ;;
         *) usage >&2; die "unknown argument: $1" ;;
@@ -86,6 +94,10 @@ case "$DISPLAY_STACK" in
     ""|auto|x11|wayland|cog) ;;
     *) die "--display-stack must be auto, x11, wayland or cog (got: $DISPLAY_STACK)" ;;
 esac
+if [ -n "$PAIR_CODE" ]; then
+    printf '%s' "$PAIR_CODE" | grep -qE '^clv_pair_[A-Za-z0-9_-]{22,64}$' \
+        || die "--pair-code is not a Calvin one-time install code"
+fi
 [ "$(id -u)" -eq 0 ] || die "run as root: curl -fsSL $SERVER_URL/api/kiosks/install.sh | sudo bash"
 for cmd in curl python3 sha256sum; do
     command -v "$cmd" >/dev/null 2>&1 || die "$cmd is required but not installed"
@@ -159,6 +171,7 @@ log "running setup-kiosk.sh (installs the display stack, Chromium and the Calvin
 # prompt reading it would swallow it.
 local setup_args=(--backend-url "$SERVER_URL")
 [ -n "$DISPLAY_STACK" ] && setup_args+=(--display-stack "$DISPLAY_STACK")
+[ -n "$PAIR_CODE" ] && setup_args+=(--pair-code "$PAIR_CODE")
 (cd "$work" && bash ./setup-kiosk.sh "${setup_args[@]}") </dev/null
 
 if [ "$REBOOT" = 1 ]; then

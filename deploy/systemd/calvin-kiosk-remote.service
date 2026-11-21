@@ -40,6 +40,10 @@ ExecStart=/bin/bash -c 'q=""; \
     if [ -n "${CALVIN_KIOSK_ID:-}" ]; then q="kiosk=${CALVIN_KIOSK_ID}"; else q="display=kiosk"; fi; \
     [ -n "${CALVIN_KIOSK_HOSTNAME:-}" ] && q="$${q:+$${q}&}khost=${CALVIN_KIOSK_HOSTNAME}"; \
     url="$${CALVIN_BACKEND_URL%%/}/$${q:+?$${q}}"; \
+    cred="$${CALVIN_KIOSK_CREDENTIAL_FILE:-/var/lib/calvin/agent/kiosk-credential}"; \
+    secret=""; \
+    [ -r "$${cred}" ] && secret="$$(cat "$${cred}" 2>/dev/null || true)"; \
+    if [[ "$${secret}" =~ ^clv_kiosk_[A-Za-z0-9_-]{43}$$ ]]; then url="$${url}#pair=$${secret}"; fi; \
     /usr/bin/chromium \
     $${CALVIN_CHROMIUM_DISPLAY_FLAGS:-} \
     --kiosk \

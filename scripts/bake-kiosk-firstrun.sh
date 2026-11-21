@@ -19,6 +19,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 BACKEND_URL=""; WIFI_SSID=""; WIFI_PSK=""; WIFI_COUNTRY=""
 HOSTNAME_ARG=""; SSH_PUBKEY_FILE=""; BOOT_DIR=""; SIGNING_KEY=""
+PAIR_CODE=""
 ADMIN_USER="calvin-admin"
 
 usage() {
@@ -42,6 +43,8 @@ Options:
   --signing-key <HEX>   The server's kiosk-signing.key (hex), read out-of-band
   --signing-key-file <FILE>
                         Read the signing key from a file (preferred)
+  --pair-code <CODE>    One-time code from Settings > Screens > Add a screen,
+                        baked into the installer for this card's first boot.
 EOF
 }
 
@@ -49,6 +52,7 @@ parse_args() {
     # Reset flag-driven globals so repeated calls (and tests) don't accumulate.
     BACKEND_URL=""; WIFI_SSID=""; WIFI_PSK=""; WIFI_COUNTRY=""
     HOSTNAME_ARG=""; SSH_PUBKEY_FILE=""; BOOT_DIR=""; SIGNING_KEY=""
+    PAIR_CODE=""
     ADMIN_USER="calvin-admin"
     while [ "$#" -gt 0 ]; do
         case "$1" in
@@ -72,6 +76,8 @@ parse_args() {
             --signing-key=*) SIGNING_KEY="${1#*=}"; shift ;;
             --signing-key-file) SIGNING_KEY="$(tr -d '[:space:]' < "${2:-}")"; shift 2 ;;
             --signing-key-file=*) SIGNING_KEY="$(tr -d '[:space:]' < "${1#*=}")"; shift ;;
+            --pair-code) PAIR_CODE="${2:-}"; shift 2 ;;
+            --pair-code=*) PAIR_CODE="${1#*=}"; shift ;;
             --source-only) shift ;;
             -h|--help) usage; exit 0 ;;
             *) echo "Unknown argument: $1" >&2; usage >&2; exit 1 ;;
@@ -97,12 +103,19 @@ validate_args() {
         echo "Error: --admin-user must be a lowercase user name other than calvin or root (got: ${ADMIN_USER})" >&2; return 1; fi
     if [ -n "${SIGNING_KEY}" ] && ! printf '%s' "${SIGNING_KEY}" | grep -qE '^[0-9a-fA-F]{64}$'; then
         echo "Error: signing key must be 64 hex characters (the content of kiosk-signing.key)" >&2; return 1; fi
+    if [ -n "${PAIR_CODE}" ] && ! printf '%s' "${PAIR_CODE}" | grep -qE '^clv_pair_[A-Za-z0-9_-]{22,64}$'; then
+        echo "Error: --pair-code is not a Calvin one-time install code" >&2; return 1; fi
     return 0
 }
 
 emit_firstrun() {
     local installer_src wrapper_src unit_src
     installer_src="$(cat "${REPO_ROOT}/deploy/kiosk-agent/install-kiosk.sh")"
+    if [ -n "${PAIR_CODE}" ]; then
+        # Validated above, so a plain substitution cannot break the embedded
+        # single-quoted assignment. The card falls back to a code when it is stale.
+        installer_src="${installer_src//__PAIR_CODE__/$PAIR_CODE}"
+    fi
     wrapper_src="$(cat "${REPO_ROOT}/deploy/kiosk-agent/calvin-kiosk-firstboot.sh")"
     unit_src="$(cat "${REPO_ROOT}/deploy/systemd/calvin-kiosk-firstboot.service")"
 

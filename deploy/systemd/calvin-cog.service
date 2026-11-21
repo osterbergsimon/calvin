@@ -42,6 +42,10 @@ ExecStart=/bin/bash -c 'url="$${CALVIN_BACKEND_URL%/}"; \
     if [ -n "$${CALVIN_KIOSK_ID:-}" ]; then q="kiosk=$${CALVIN_KIOSK_ID}"; else q="display=kiosk"; fi; \
     [ -n "$${CALVIN_KIOSK_HOSTNAME:-}" ] && q="$${q:+$${q}&}khost=$${CALVIN_KIOSK_HOSTNAME}"; \
     [ -n "$${q}" ] && url="$${url}?$${q}"; \
+    cred="$${CALVIN_KIOSK_CREDENTIAL_FILE:-/var/lib/calvin/agent/kiosk-credential}"; \
+    secret=""; \
+    [ -r "$${cred}" ] && secret="$$(cat "$${cred}" 2>/dev/null || true)"; \
+    if [[ "$${secret}" =~ ^clv_kiosk_[A-Za-z0-9_-]{43}$$ ]]; then url="$${url}#pair=$${secret}"; fi; \
     exec /usr/bin/cog \
       --platform=drm \
       --platform-params="renderer=gles,rotation=$${CALVIN_COG_ROTATION:-0}" \
