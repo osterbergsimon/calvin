@@ -1,13 +1,11 @@
-// "Screen now": a manual on/off choice that overrides a screen's own schedule
-// only until that schedule's next on/off boundary (calvin-ydzz).
+// Screen power helpers (calvin-25g9): the Schedule / Always on / External mode,
+// the command in force from the server, and the words the Power section shows.
 //
-// The UI stores `{ power, setAt }` in the kiosk's override layer. `setAt` is a
-// UTC instant; the display agent owns the clock and ends the override at the
-// first schedule boundary after it, computed with its own `now_in(cfg)` zone.
-// Keeping the browser out of that decision means a phone and the Pi can never
-// disagree about when the schedule takes over. The helpers here only estimate
-// the boundary for the informational "Off until HH:MM" text, and mirror the
-// agent's schedule decision so the row can say what the screen is doing now.
+// The mode mirrors the server's `effective_mode_for`, including the legacy
+// `displayScheduleEnabled` layer. A command's `setAt` and `until` are read as
+// the server sends them, so the browser never works out an end the screen could
+// disagree with; the schedule helpers only estimate the next boundary for the
+// informational "Turns off at HH:MM" line.
 
 import { formatDataFrom } from "./connectionTime";
 
@@ -171,60 +169,6 @@ export function scheduleDesiredOn({ enabled, schedule, now = new Date(), timeZon
     : minutes >= on.minutes && minutes < off.minutes;
 }
 
-/** Whether any enabled day has a boundary the agent could act on. */
-function hasScheduleBoundary({ enabled, schedule }) {
-  if (!enabled || !Array.isArray(schedule)) return false;
-  return schedule.some(
-    day => day && day.enabled && (parseClock(day.onTime) || parseClock(day.offTime))
-  );
-}
-
-// The screen's system zone can sit up to 14 hours away from the admin
-// browser's. Its own boundary estimate is therefore only a rough lower bound:
-// keep the override until that estimate plus this slack has passed, when it
-// must be over on the screen too.
-const UNKNOWN_ZONE_SLACK_MS = 14 * 60 * 60 * 1000;
-
-/**
- * The active `{ power, setAt, expiry, hasSchedule }` override, or null when
- * absent, expired or invalid. `expiry` is null when no schedule can take over
- * (it stays until changed); `timeZone` only affects the display estimate.
- *
- * When the screen uses its system zone the browser cannot know that zone, so
- * its own estimate only ends the override after a zone's worth of slack; until
- * then the row says "until the next scheduled change" rather than a time.
- * `hasSchedule` says whether a schedule will end it eventually.
- */
-export function activePowerOverride(
-  override,
-  { enabled, schedule, now = new Date(), timeZone = null } = {}
-) {
-  if (!override || typeof override !== "object") return null;
-  const power = String(override.power || "").toLowerCase();
-  if (power !== "on" && power !== "off") return null;
-  const setAt = Date.parse(override.setAt);
-  if (!Number.isFinite(setAt)) return null;
-  const hasSchedule = hasScheduleBoundary({ enabled, schedule });
-  if (!timeZone) {
-    const estimate = firstScheduleBoundaryAfter({
-      enabled,
-      schedule,
-      moment: new Date(setAt),
-      timeZone: null,
-    });
-    if (estimate && now.getTime() >= estimate.getTime() + UNKNOWN_ZONE_SLACK_MS) return null;
-    return { power, setAt: override.setAt, expiry: null, hasSchedule };
-  }
-  const expiry = firstScheduleBoundaryAfter({
-    enabled,
-    schedule,
-    moment: new Date(setAt),
-    timeZone,
-  });
-  if (expiry && now.getTime() >= expiry.getTime()) return null;
-  return { power, setAt: override.setAt, expiry, hasSchedule };
-}
-
 /** "22:00" (or "10:00 PM") for a boundary, in the screen's timezone. */
 export function formatUntil(until, timeZone = null, timeFormat = "24h") {
   const date = until instanceof Date ? until : new Date(until);
@@ -306,9 +250,4 @@ export function keyNameLabel(keyName) {
   const name = String(keyName ?? "").trim();
   if (!name) return "home automation";
   return name.length > KEY_NAME_LIMIT ? `${name.slice(0, KEY_NAME_LIMIT - 1)}…` : name;
-}
-
-/** The object to save for a manual choice: the choice plus the UTC instant. */
-export function buildPowerOverride({ power, now = new Date() }) {
-  return { power, setAt: now.toISOString() };
 }
