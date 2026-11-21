@@ -587,6 +587,73 @@ async def clear_credential(kiosk_id: str) -> bool | None:
     return True
 
 
+# -- screens the owner removed (calvin-0xns, design §2 and §12) --------------
+
+REMOVED_KIOSK_KEY = "kioskRemoved"
+REMOVED_KIOSK_CAP = 50
+
+
+async def removed_kiosk_ids() -> list[str]:
+    """The ids of removed screens, oldest first, at most :data:`REMOVED_KIOSK_CAP`.
+
+    Absent reads as ``[]``; a value that is not a list of strings reads as ``[]``
+    (with a warning), and bad entries are dropped. It never raises, because a
+    restore must never fail on it and an upgraded server starts with nothing
+    removed.
+    """
+    from app.services.config_service import config_service
+
+    try:
+        raw = await config_service.get_value(REMOVED_KIOSK_KEY)
+    except Exception as exc:  # noqa: BLE001 - this list must never break a caller
+        logger.warning(f"Could not read {REMOVED_KIOSK_KEY}: {exc}")
+        return []
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        logger.warning(f"Ignoring malformed {REMOVED_KIOSK_KEY}: it is not a list of ids")
+        return []
+    ids: list[str] = []
+    dropped = 0
+    for entry in raw:
+        if not isinstance(entry, str) or not entry:
+            dropped += 1
+            continue
+        if entry not in ids:
+            ids.append(entry)
+    if dropped:
+        logger.warning(f"Ignoring {dropped} malformed entr(y/ies) in {REMOVED_KIOSK_KEY}")
+    return ids[-REMOVED_KIOSK_CAP:]
+
+
+@retry_on_db_locked()
+async def note_kiosk_removed(kiosk_id: str) -> list[str]:
+    """Record a removed screen's id, oldest first, dropping the oldest over the cap."""
+    from app.services.config_service import config_service
+
+    current = await removed_kiosk_ids()
+    if not valid_kiosk_id(kiosk_id) or kiosk_id in current:
+        return current
+    updated = (current + [kiosk_id])[-REMOVED_KIOSK_CAP:]
+    await config_service.set_value(REMOVED_KIOSK_KEY, updated, value_type="json")
+    return updated
+
+
+@retry_on_db_locked()
+async def forget_kiosk_removed(kiosk_id: str) -> None:
+    """A screen the owner added back is no longer called removed."""
+    from app.services.config_service import config_service
+
+    current = await removed_kiosk_ids()
+    if kiosk_id not in current:
+        return
+    await config_service.set_value(
+        REMOVED_KIOSK_KEY,
+        [entry for entry in current if entry != kiosk_id],
+        value_type="json",
+    )
+
+
 @retry_on_db_locked()
 async def remove_kiosk(kiosk_id: str) -> bool:
     """Delete a kiosk's row and with it everything keyed by it.

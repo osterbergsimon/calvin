@@ -509,6 +509,14 @@ async def update_config(config_update: ConfigUpdate, request: Request):
     if not is_admin(request) and not update_dict.keys() <= CONFIG_DISPLAY_KEYS:
         raise admin_error(get_admin_store().is_configured())
 
+    # The removed-screen list is written by Calvin itself (removal, approval,
+    # a restore), never by Settings (calvin-0xns).
+    if "kioskRemoved" in update_dict:
+        raise HTTPException(
+            status_code=422,
+            detail="kioskRemoved is managed by Calvin, not by a settings update.",
+        )
+
     # Brightness belongs to one panel, and the screen stack is a per-screen
     # choice: a household value would reach every screen.
     household_refused = sorted(PER_SCREEN_ONLY_KEYS & update_dict.keys())

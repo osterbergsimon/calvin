@@ -158,8 +158,10 @@ async def delete_kiosk(kiosk_id: str):
         )
     if not removed:
         raise HTTPException(status_code=404, detail="Unknown kiosk")
-    # A removed screen's pending pairings die with its row (calvin-0xns).
+    # A removed screen's pending pairings die with its row, and its id is
+    # remembered so an older backup restores it unpaired (calvin-0xns).
     pairing_store.drop_kiosk(kiosk_id)
+    await kiosk_registry.note_kiosk_removed(kiosk_id)
     return {"id": kiosk_id, "removed": True}
 
 

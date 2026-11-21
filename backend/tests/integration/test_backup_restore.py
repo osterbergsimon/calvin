@@ -820,3 +820,349 @@ def test_restore_does_not_refill_a_screen_reset_after_the_migration(test_client,
     assert r.status_code == 200, r.text
 
     assert _run(kr.get_overrides("kitchen-1a2b3c")) == {}
+
+
+# -- pairings and removed screens in a backup (calvin-0xns, Task 8) ----------
+
+from starlette.requests import Request  # noqa: E402
+
+
+def _hash(secret: str) -> str:
+    from app.services.kiosk_pairing import hash_secret
+
+    return hash_secret(secret)
+
+
+def _pairing(hash_value: str) -> dict:
+    return {"credentialHash": hash_value, "pairedAt": "2026-11-19T10:00:00Z"}
+
+
+def _seed(kiosks, config=None) -> dict:
+    return {
+        "format": "calvin-backup",
+        "format_version": 1,
+        "data": {"config": config or [], "kiosks": kiosks},
+    }
+
+
+def _restore_seed(client, doc: dict, mode: str = "merge"):
+    return client.post(
+        "/api/backup/restore",
+        files={"file": ("seed.json", json.dumps(doc).encode(), "application/json")},
+        data={"mode": mode},
+    )
+
+
+def _principal_request(kiosk_id: str, secret: str) -> Request:
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": f"/api/kiosks/{kiosk_id}/config",
+        "query_string": b"",
+        "headers": [(b"authorization", f"Bearer {secret}".encode())],
+        "client": ("10.0.0.2", 40000),
+        "server": ("testserver", 80),
+        "scheme": "http",
+        "path_params": {"kiosk_id": kiosk_id},
+    }
+    return Request(scope)
+
+
+def _pair_screen(kiosk_id: str) -> str:
+    from app.services import kiosk_registry
+    from app.services.kiosk_pairing import hash_secret, new_secret
+
+    secret = new_secret()
+    _run(kiosk_registry.set_credential(kiosk_id, hash_secret(secret)))
+    return secret
+
+
+def _credential(kiosk_id: str):
+    from app.services import kiosk_registry
+
+    return _run(kiosk_registry.get_credential_hash(kiosk_id))
+
+
+def _removed_ids():
+    from app.services import kiosk_registry
+
+    return _run(kiosk_registry.removed_kiosk_ids())
+
+
+def test_export_carries_pairing_and_never_a_pending_pairing(test_client):
+    from app.services import kiosk_registry
+    from app.services.kiosk_pairing import hash_secret, new_secret, pairing_store
+
+    secret = _pair_screen("kitchen")
+    _run(kiosk_registry.record_kiosk("hall", agent_version="v1"))
+    pairing_store.start("hall", hash_secret(new_secret()), "10.0.0.2")
+    test_client.post("/api/kiosks/install-codes")
+
+    doc = _doc(_export(test_client))
+    kitchen = next(k for k in doc["data"]["kiosks"] if k["id"] == "kitchen")
+    hall = next(k for k in doc["data"]["kiosks"] if k["id"] == "hall")
+    assert kitchen["pairing"] == {
+        "credentialHash": _hash(secret),
+        "pairedAt": kitchen["pairing"]["pairedAt"],
+    }
+    assert kitchen["pairing"]["pairedAt"].endswith("Z")
+    assert "pairing" not in hall
+    assert "clv_" not in json.dumps(doc)
+
+
+def test_round_trip_onto_an_empty_db_keeps_the_screen_paired(test_client):
+    from app.security.kiosk_auth import kiosk_principal
+    from app.services import kiosk_registry
+
+    secret = _pair_screen("kitchen")
+    expected = _credential("kitchen")
+    zip_bytes = _export(test_client)
+
+    assert _run(kiosk_registry.remove_kiosk("kitchen")) is True
+    assert _credential("kitchen") is None
+
+    restored = _restore(test_client, zip_bytes)
+    assert restored.status_code == 200, restored.text
+    assert _credential("kitchen") == expected
+    assert _run(kiosk_principal(_principal_request("kitchen", secret))) == "kitchen"
+
+
+def test_restore_keeps_current_pairing(test_client):
+    """Review Focus line 5: a restore never re-pairs or unpairs an existing row."""
+    from app.services import kiosk_registry
+
+    kitchen_secret = _pair_screen("kitchen")
+    kitchen_hash = _credential("kitchen")
+    _run(kiosk_registry.record_kiosk("hall", agent_version="v1"))  # unpaired
+    backup_hash = _hash("clv_kiosk_" + "z" * 43)
+
+    restored = _restore_seed(
+        test_client,
+        _seed(
+            [
+                {"id": "kitchen", "hostname": None, "pairing": _pairing(backup_hash)},
+                {"id": "hall", "pairing": _pairing(backup_hash)},
+            ]
+        ),
+    )
+    assert restored.status_code == 200, restored.text
+    assert _credential("kitchen") == kitchen_hash != backup_hash
+    assert _credential("hall") is None
+    assert kitchen_secret
+
+
+def test_removed_screen_restores_unpaired(test_client):
+    """Review Focus line 5: a removed screen comes back from an older backup dead."""
+    from app.security.kiosk_auth import kiosk_principal
+
+    secret = _pair_screen("kitchen")
+    backup_hash = _credential("kitchen")
+    assert test_client.delete("/api/kiosks/kitchen").status_code == 200
+    assert _removed_ids() == ["kitchen"]
+
+    restored = _restore_seed(
+        test_client,
+        _seed([{"id": "kitchen", "hostname": "pi", "pairing": _pairing(backup_hash)}]),
+    )
+    assert restored.status_code == 200, restored.text
+    assert _credential("kitchen") is None
+    assert _run(kiosk_principal(_principal_request("kitchen", secret))) is None
+    assert restored.json()["counts"]["removedScreens"] == 1
+
+
+@pytest.mark.parametrize("mode", ["merge", "replace"])
+def test_removed_after_the_backup_still_comes_back_unpaired(test_client, mode):
+    _pair_screen("kitchen")
+    backup_hash = _credential("kitchen")
+    assert test_client.delete("/api/kiosks/kitchen").status_code == 200
+
+    restored = _restore_seed(
+        test_client, _seed([{"id": "kitchen", "pairing": _pairing(backup_hash)}]), mode
+    )
+    assert restored.status_code == 200, restored.text
+    assert _credential("kitchen") is None
+    assert "kitchen" in _removed_ids()
+
+
+def test_re_added_screen_leaves_the_removed_list(test_client):
+    from app.services.kiosk_pairing import format_code, hash_secret, new_secret, pairing_store
+
+    # Approve a code for the removed screen: the list forgets it.
+    _pair_screen("kitchen")
+    backup_hash = _credential("kitchen")
+    assert test_client.delete("/api/kiosks/kitchen").status_code == 200
+    assert _removed_ids() == ["kitchen"]
+    new_secret_value = new_secret()
+    pending = pairing_store.start(
+        "kitchen", hash_secret(new_secret_value), "10.0.0.2", by_agent=True
+    )
+    assert (
+        test_client.post(
+            "/api/kiosks/pairings", json={"code": format_code(pending.code)}
+        ).status_code
+        == 200
+    )
+    assert _removed_ids() == []
+    assert _credential("kitchen") == _hash(new_secret_value) != backup_hash
+
+    # A restore of the same backup keeps it paired, because the row exists.
+    restored = _restore_seed(
+        test_client, _seed([{"id": "kitchen", "pairing": _pairing(backup_hash)}])
+    )
+    assert restored.status_code == 200
+    assert _credential("kitchen") == _hash(new_secret_value)
+
+    # An install code forgets the id too.
+    _pair_screen("hall")
+    assert test_client.delete("/api/kiosks/hall").status_code == 200
+    assert "hall" in _removed_ids()
+    code = test_client.post("/api/kiosks/install-codes").json()["code"]
+    install_secret = new_secret()
+    paired = test_client.post(
+        "/api/kiosks/hall/pair",
+        json={"installCode": code},
+        headers={"Authorization": f"Bearer {install_secret}"},
+    )
+    assert paired.status_code == 200, paired.text
+    assert "hall" not in _removed_ids()
+
+
+def test_existing_row_whose_id_is_listed_keeps_its_pairing(test_client):
+    from app.services import kiosk_registry
+    from app.services.config_service import config_service
+
+    current = _pair_screen("kitchen")
+    backup_hash = _hash("clv_kiosk_" + "y" * 43)
+    _run(config_service.set_value("kioskRemoved", ["kitchen"], value_type="json"))
+    assert _credential("kitchen") == _hash(current) != backup_hash
+
+    restored = _restore_seed(
+        test_client, _seed([{"id": "kitchen", "pairing": _pairing(backup_hash)}])
+    )
+    assert restored.status_code == 200
+    assert _credential("kitchen") == _hash(current)
+    assert _run(kiosk_registry.removed_kiosk_ids()) == ["kitchen"]
+
+
+def test_removed_list_keeps_last_50(test_client):
+    from app.services import kiosk_registry
+
+    for index in range(51):
+        _run(kiosk_registry.note_kiosk_removed(f"screen-{index}"))
+    assert _removed_ids() == [f"screen-{index}" for index in range(1, 51)]
+
+    backup_hash = _hash("clv_kiosk_" + "x" * 43)
+    restored = _restore_seed(
+        test_client, _seed([{"id": "screen-0", "pairing": _pairing(backup_hash)}])
+    )
+    assert restored.status_code == 200
+    assert _credential("screen-0") == backup_hash
+
+
+@pytest.mark.parametrize("mode", ["merge", "replace"])
+def test_an_older_backup_without_pairing_or_removed(test_client, mode):
+    from app.services.config_service import config_service
+
+    _run(config_service.set_value("kioskRemoved", ["hall"], value_type="json"))
+    restored = _restore_seed(test_client, _seed([{"id": "kitchen"}]), mode)
+    assert restored.status_code == 200, restored.text
+    assert _credential("kitchen") is None
+    assert _removed_ids() == ["hall"]
+
+
+def test_a_fresh_server_reads_an_older_backup_as_unpaired(test_client):
+    restored = _restore_seed(test_client, _seed([{"id": "kitchen"}]))
+    assert restored.status_code == 200
+    assert _credential("kitchen") is None
+    assert _removed_ids() == []
+
+
+def test_a_malformed_credential_hash_is_ignored_with_a_warning(test_client):
+    from loguru import logger
+
+    lines: list[str] = []
+    sink = logger.add(lambda message: lines.append(str(message)), level="WARNING")
+    try:
+        restored = _restore_seed(
+            test_client,
+            _seed([{"id": "kitchen", "pairing": {"credentialHash": "nothex"}}]),
+        )
+    finally:
+        logger.remove(sink)
+    assert restored.status_code == 200
+    assert _credential("kitchen") is None
+    assert any("credentialHash" in line or "pairing" in line for line in lines)
+
+
+def test_restore_summary_reports_paired_and_removed_counts(test_client):
+    from app.services import kiosk_registry
+
+    _run(kiosk_registry.note_kiosk_removed("hall"))
+    backup_hash = _hash("clv_kiosk_" + "w" * 43)
+    restored = _restore_seed(
+        test_client,
+        _seed(
+            [
+                {"id": "kitchen", "pairing": _pairing(backup_hash)},
+                {"id": "hall", "pairing": _pairing(backup_hash)},
+            ]
+        ),
+    )
+    assert restored.status_code == 200
+    assert restored.json()["counts"] == {"pairedScreens": 1, "removedScreens": 1}
+    assert _credential("kitchen") == backup_hash
+    assert _credential("hall") is None
+
+
+def test_existing_row_is_updated_with_hostname_and_overrides_only(test_client, monkeypatch):
+    from app.models.db_models import KioskDB
+    from app.services import kiosk_registry
+
+    _run(kiosk_registry.record_kiosk("kitchen", hostname="old", agent_version="v1"))
+    _pair_screen("kitchen")
+    calls: list[tuple[str, list[str] | None]] = []
+    original = KioskDB.update
+
+    async def spy(self, *args, **kwargs):
+        calls.append((self.id, kwargs.get("_columns")))
+        return await original(self, *args, **kwargs)
+
+    monkeypatch.setattr(KioskDB, "update", spy)
+    restored = _restore_seed(
+        test_client,
+        _seed([{"id": "kitchen", "hostname": "new", "overrides": {"orientation": "portrait"}}]),
+    )
+    assert restored.status_code == 200
+    assert ("kitchen", ["hostname", "overrides"]) in calls
+
+
+@pytest.mark.parametrize("mode", ["merge", "replace"])
+def test_a_restore_without_kiosk_pairing_keeps_the_current_mode(test_client, mode):
+    from app.services.config_service import config_service
+    from app.services.kiosk_view import pairing_mode
+
+    _run(config_service.set_value("kioskPairing", "required"))
+    restored = _restore_seed(test_client, _seed([{"id": "kitchen"}]), mode)
+    assert restored.status_code == 200
+    assert _run(pairing_mode()) == "required"
+
+    restored = _restore_seed(
+        test_client,
+        _seed(
+            [{"id": "kitchen"}],
+            config=[{"key": "kioskPairing", "value": "optional", "value_type": "string"}],
+        ),
+        mode,
+    )
+    assert restored.status_code == 200
+    assert _run(pairing_mode()) == "optional"
+
+
+def test_backup_round_trip_keeps_kiosk_removed_identical(test_client):
+    from app.services import kiosk_registry
+
+    _run(kiosk_registry.note_kiosk_removed("kitchen"))
+    _run(kiosk_registry.note_kiosk_removed("hall"))
+    doc = _doc(_export(test_client))
+    row = next(c for c in doc["data"]["config"] if c["key"] == "kioskRemoved")
+    assert json.loads(row["value"]) == ["kitchen", "hall"]
