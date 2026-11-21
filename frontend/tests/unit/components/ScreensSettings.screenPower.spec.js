@@ -452,7 +452,7 @@ describe("ScreensSettings — the Screen now status line", () => {
     expect(wrapper.find("[data-test='screen-now-until']").exists()).toBe(false);
   });
 
-  it("drops who and when on an unpaired screen", async () => {
+  it("drops who and when and takes the answer's state on an unpaired Schedule screen", async () => {
     const { wrapper } = mountScreens({
       cfg: config({ kioskPairing: "required" }),
       kiosks: [kiosk({ paired: false })],
@@ -460,11 +460,72 @@ describe("ScreensSettings — the Screen now status line", () => {
         power: "off",
         by: "automation",
         setAt: "2026-11-21T21:04:00Z",
+        until: "2026-11-21T22:00:00Z",
         keyName: "Homey",
+        desiredOn: true,
+      },
+    });
+    await open(wrapper);
+    expect(text(wrapper, "screen-now-state")).toBe("On");
+    // The command is not reaching this screen, so it cannot disable the button
+    // or promise an until.
+    expect(
+      wrapper.find("[data-test='screen-now-off']").attributes("aria-disabled")
+    ).toBeUndefined();
+    expect(wrapper.find("[data-test='screen-now-until']").exists()).toBe(false);
+  });
+
+  it("takes the answer's state on an unpaired External screen too", async () => {
+    const { wrapper } = mountScreens({
+      cfg: config({
+        screenPower: "external",
+        displayScheduleEnabled: false,
+        kioskPairing: "required",
+      }),
+      kiosks: [kiosk({ paired: false })],
+      screenPower: {
+        mode: "external",
+        power: "off",
+        by: "automation",
+        setAt: "2026-11-21T21:04:00Z",
+        keyName: "Homey",
+        desiredOn: true,
+      },
+    });
+    await open(wrapper);
+    expect(text(wrapper, "screen-now-state")).toBe("On");
+    expect(
+      wrapper.find("[data-test='screen-now-off']").attributes("aria-disabled")
+    ).toBeUndefined();
+  });
+
+  it("takes the answer's off state on an unpaired screen", async () => {
+    const { wrapper } = mountScreens({
+      cfg: config({
+        screenPower: "external",
+        displayScheduleEnabled: false,
+        kioskPairing: "required",
+      }),
+      kiosks: [kiosk({ paired: false })],
+      screenPower: {
+        mode: "external",
+        power: "on",
+        by: "automation",
+        setAt: "2026-11-21T21:04:00Z",
+        keyName: "Homey",
+        desiredOn: false,
       },
     });
     await open(wrapper);
     expect(text(wrapper, "screen-now-state")).toBe("Off");
+    expect(wrapper.find("[data-test='screen-now-on']").attributes("aria-disabled")).toBeUndefined();
+  });
+
+  it("uses the answer's desiredOn for the following-the-schedule state", async () => {
+    // At 12:00 the browser's schedule math says on; the server says off.
+    const { wrapper } = mountScreens({ screenPower: { desiredOn: false } });
+    await open(wrapper);
+    expect(text(wrapper, "screen-now-state")).toBe("Off · by the schedule");
   });
 });
 
@@ -483,6 +544,14 @@ describe("ScreensSettings — Screen now edges", () => {
       wrapper.find("[data-test='screen-now-off']").attributes("aria-disabled")
     ).toBeUndefined();
     expect(text(wrapper, "screen-now-follow")).toBe("Back to schedule");
+  });
+
+  it("says only Offline on a hidden-presence row", async () => {
+    const { wrapper } = mountScreens({
+      kiosks: [kiosk({ presenceHidden: true, lastSeen: "2026-11-20T12:00:00Z" })],
+    });
+    await open(wrapper);
+    expect(text(wrapper, "screen-now-offline")).toBe("Offline.");
   });
 
   it("warns that an unpaired screen cannot use External, with Pair a screen", async () => {
@@ -530,17 +599,17 @@ describe("ScreensSettings — Screen now edges", () => {
     const offline = kiosk({ lastSeen: "2026-11-20T12:00:00Z" });
     const on = mountScreens({
       kiosks: [offline],
-      screenPower: { power: "on", by: "settings", setAt: null },
+      screenPower: { power: "on", by: "settings", setAt: null, desiredOn: true },
     });
     await open(on.wrapper);
-    expect(text(on.wrapper, "screen-now-offline")).toBe("Offline. It turns off when it's back.");
+    expect(text(on.wrapper, "screen-now-offline")).toBe("Offline. It turns on when it's back.");
 
     const off = mountScreens({
       kiosks: [offline],
-      screenPower: { power: "off", by: "settings", setAt: null },
+      screenPower: { power: "off", by: "settings", setAt: null, desiredOn: false },
     });
     await open(off.wrapper);
-    expect(text(off.wrapper, "screen-now-offline")).toBe("Offline. It turns on when it's back.");
+    expect(text(off.wrapper, "screen-now-offline")).toBe("Offline. It turns off when it's back.");
   });
 
   it("never renders hold, held or paused in the Power section", async () => {
@@ -689,5 +758,80 @@ describe("ScreensSettings — pressing a power button", () => {
     expect(store.saveOverrides).not.toHaveBeenCalled();
     expect(text(wrapper, "screen-now-state")).toBe("On · by the schedule");
     expect(wrapper.find("[data-test='screen-now-follow']").exists()).toBe(false);
+  });
+
+  it("keeps focus on the available Screen now button after Back to schedule", async () => {
+    const { wrapper } = mountScreens({
+      screenPower: {
+        power: "off",
+        by: "settings",
+        setAt: new Date().toISOString(),
+        until: "2026-11-21T22:00:00Z",
+        desiredOn: false,
+      },
+    });
+    document.body.appendChild(wrapper.element);
+    try {
+      await open(wrapper);
+      const follow = wrapper.find("[data-test='screen-now-follow']");
+      follow.element.focus();
+      await follow.trigger("click");
+      await flushPromises();
+
+      expect(wrapper.find("[data-test='screen-now-follow']").exists()).toBe(false);
+      // At 12:00 the schedule is on, so Turn off now is the available choice.
+      const off = wrapper.find("[data-test='screen-now-off']");
+      expect(off.attributes("aria-disabled")).toBeUndefined();
+      expect(document.activeElement).toBe(off.element);
+    } finally {
+      wrapper.element.remove();
+    }
+  });
+});
+
+describe("ScreensSettings — screen power refresh", () => {
+  it("re-reads the open screen's command every 30 seconds", async () => {
+    const { wrapper, store } = mountScreens();
+    await open(wrapper);
+    expect(text(wrapper, "screen-now-state")).toBe("On · by the schedule");
+    expect(wrapper.find("[data-test='screen-now-follow']").exists()).toBe(false);
+
+    store.fetchScreenPower = vi.fn(async id => {
+      const answer = view({
+        power: "off",
+        by: "automation",
+        keyName: "Homey",
+        setAt: "2026-11-21T21:04:00Z",
+        desiredOn: false,
+      });
+      const target = store.kiosks.find(k => k.id === id);
+      if (target) target.screenPowerView = answer;
+      return answer;
+    });
+
+    await vi.advanceTimersByTimeAsync(30000);
+    await flushPromisesNow();
+
+    expect(text(wrapper, "screen-now-state")).toBe("Off · set by Homey at 21:04");
+    expect(wrapper.find("[data-test='screen-now-follow']").exists()).toBe(true);
+  });
+
+  it("clears a view the admin may no longer see on a 403", async () => {
+    const { wrapper, store } = mountScreens({
+      screenPower: { power: "off", by: "automation", keyName: "Homey", desiredOn: false },
+    });
+    await open(wrapper);
+    expect(store.kiosks[0].screenPowerView).toBeTruthy();
+
+    store.fetchScreenPower = vi.fn(async () => {
+      const err = new Error("forbidden");
+      err.response = { status: 403 };
+      throw err;
+    });
+    await vi.advanceTimersByTimeAsync(30000);
+    await flushPromisesNow();
+
+    expect(store.kiosks[0].screenPowerView).toBeUndefined();
+    expect(text(wrapper, "screen-now-state")).toBe("On · by the schedule");
   });
 });

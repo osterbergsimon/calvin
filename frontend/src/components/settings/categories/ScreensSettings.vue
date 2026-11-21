@@ -1968,7 +1968,17 @@ const powerOffButton = ref(null);
 
 const desiredOnNow = computed(() => {
   if (effScreenPower.value === "always_on") return true;
+  const view = screenPowerView.value;
+  const answeredOn = view && typeof view.desiredOn === "boolean" ? view.desiredOn : null;
+  // An unpaired screen receives no command: the answer's desiredOn is the only
+  // truth, never the stored command (server design §6).
+  if (unpairedPower.value && answeredOn !== null) return answeredOn;
   if (commandNow.value) return commandNow.value.power === "on";
+  // With no command in force, the answer already accounts for the screen's
+  // zone and gating. A command that expired locally is the exception: the
+  // schedule takes over in the browser until the next read.
+  const hadCommand = view && (view.power === "on" || view.power === "off");
+  if (answeredOn !== null && !hadCommand) return answeredOn;
   // External with no command yet is on.
   if (effScreenPower.value === "external") return true;
   return scheduleDesiredOn({
@@ -1999,6 +2009,9 @@ const powerStateCopy = computed(() => {
 });
 const untilCopy = computed(() => {
   if (effScreenPower.value !== "schedule") return "";
+  // An unpaired screen receives no command, so the stored until says nothing
+  // about when this screen will change.
+  if (unpairedPower.value) return "";
   const view = commandNow.value;
   if (view) {
     if (!view.until) return "";
@@ -2026,9 +2039,11 @@ const unpairedPowerNote = computed(() => {
 });
 const offlineCopy = computed(() => {
   if (!selectedKiosk.value || isOnline(selectedKiosk.value)) return "";
+  // A hidden row has no answer to say which way it will go; never guess.
+  if (presenceHidden.value) return "Offline.";
   return desiredOnNow.value
-    ? "Offline. It turns off when it's back."
-    : "Offline. It turns on when it's back.";
+    ? "Offline. It turns on when it's back."
+    : "Offline. It turns off when it's back.";
 });
 const powerOnLabel = computed(() =>
   effScreenPower.value === "external" ? "Turn on" : "Turn on now"
@@ -2076,8 +2091,11 @@ async function refreshScreenPower() {
   if (!id) return;
   try {
     await store.fetchScreenPower(id);
-  } catch {
-    // Hidden presence or offline: keep the last copy the page saw.
+  } catch (err) {
+    const status = err?.response?.status;
+    // The admin-only view (and its key name) is no longer ours to show; drop
+    // it rather than keep the last copy. Offline keeps the last copy.
+    if (status === 401 || status === 403) store.clearScreenPower(id);
   }
 }
 
@@ -2114,14 +2132,23 @@ async function followSchedule() {
   if (!id || powerBusy.value) return;
   powerBusy.value = true;
   clear(powerMsg);
+  let cleared = false;
   try {
     await store.setScreenPower(id, "schedule");
+    cleared = true;
     const online = selectedKiosk.value ? isOnline(selectedKiosk.value) : false;
     say(powerMsg, online ? APPLIED_BY_AGENT : OFFLINE_COPY);
   } catch (err) {
     showPowerFailure(err, "change this screen");
   } finally {
     powerBusy.value = false;
+    if (cleared) {
+      // Back to schedule leaves the DOM with the command; put focus on the
+      // Screen now choice that is still available (UI spec §3.4).
+      await nextTick();
+      const target = desiredOnNow.value ? powerOffButton.value : powerOnButton.value;
+      target?.$el?.focus?.();
+    }
   }
 }
 
@@ -2805,6 +2832,9 @@ const ONLINE_WINDOW_MS = 120000; // 2 minutes
 useIntervalWhenVisible(async () => {
   const refreshed = await store.refreshKiosks();
   store.loadPairings();
+  // The list carries no command; re-read the open screen's power answer so a
+  // command from home automation (or its end) shows within one interval.
+  await refreshScreenPower();
   // A failed first load left a ?screen= link unresolved. When the backend
   // comes back, this fresh list can open the screen or finally say it is gone.
   if (refreshed?.ok && !refreshed.stale) {

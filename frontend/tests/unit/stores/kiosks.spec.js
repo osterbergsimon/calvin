@@ -308,6 +308,65 @@ describe("kiosks store — screen power", () => {
     await store.fetchScreenPower("a/b");
     expect(api.get).toHaveBeenCalledWith("/kiosks/a%2Fb/screen-power");
   });
+
+  it("keeps the screen power view through a presence refresh", async () => {
+    api.get.mockResolvedValue({
+      data: { kiosks: [{ id: "k1", overrides: {}, powerHold: null }] },
+    });
+    const store = useKiosksStore();
+    const kept = view({ power: "off", keyName: "Homey" });
+    store.kiosks = [{ id: "k1", overrides: {}, screenPowerView: kept }];
+
+    await store.refreshKiosks();
+
+    expect(store.kiosks[0].screenPowerView).toEqual(kept);
+  });
+
+  it("keeps the screen power view through a list reload", async () => {
+    api.get.mockResolvedValue({
+      data: {
+        kiosks: [
+          { id: "k1", overrides: {} },
+          { id: "k2", overrides: {} },
+        ],
+      },
+    });
+    const store = useKiosksStore();
+    const kept = view({ power: "on" });
+    store.kiosks = [{ id: "k1", overrides: {}, screenPowerView: kept }];
+
+    await store.loadKiosks();
+
+    expect(store.kiosks[0].screenPowerView).toEqual(kept);
+    expect(store.kiosks[1].screenPowerView).toBeUndefined();
+  });
+
+  it("never caches the admin key name or the client-only view", async () => {
+    api.get.mockResolvedValue({ data: view() });
+    const store = useKiosksStore();
+    store.kiosks = [{ id: "k1", overrides: {} }];
+
+    await store.fetchScreenPower("k1");
+
+    const cached = JSON.parse(localStorage.getItem("calvin_cache_kiosks_list"));
+    expect(cached[0].screenPowerView).toBeUndefined();
+    expect(JSON.stringify(cached)).not.toContain("keyName");
+    expect(JSON.stringify(cached)).not.toContain("Homey");
+  });
+
+  it("clearScreenPower drops the view and its cached copy", async () => {
+    api.get.mockResolvedValue({ data: view() });
+    const store = useKiosksStore();
+    store.kiosks = [{ id: "k1", overrides: {} }];
+    await store.fetchScreenPower("k1");
+    expect(store.kiosks[0].screenPowerView).toBeTruthy();
+
+    store.clearScreenPower("k1");
+
+    expect(store.kiosks[0].screenPowerView).toBeUndefined();
+    const cached = JSON.parse(localStorage.getItem("calvin_cache_kiosks_list"));
+    expect(cached[0].screenPowerView).toBeUndefined();
+  });
 });
 
 describe("kiosks store — removeKiosk", () => {

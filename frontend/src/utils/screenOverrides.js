@@ -998,10 +998,10 @@ export const isSettingVisible = (descriptor, values) => {
 export const visibleDescriptors = (descriptors, values) =>
   (descriptors || []).filter(descriptor => isSettingVisible(descriptor, values));
 
-// Keys that are not durable settings, so they never make a screen "differ from
-// Default": its own name, the transient "Screen now" manual power choice (it
-// expires at the schedule's next boundary and is not copied anywhere), and the
-// legacy schedule switch the server keeps in step with `screenPower`.
+// Keys that are not settings of their own, so they never make a screen "differ
+// from Default": the screen's name; the retired `screenNow` layer key (the
+// server strips it and the command lives outside the layer); and the legacy
+// `displayScheduleEnabled` switch, which is the same setting as `screenPower`.
 const NON_SETTING_KEYS = new Set(["displayName", "screenNow", "displayScheduleEnabled"]);
 
 // Keys that make a screen's *settings* differ from Default. The name does not
