@@ -1494,16 +1494,18 @@ export interface paths {
     };
     /**
      * Get Screen Power
-     * @description A screen's power: held on or off, or following its schedule.
+     * @description A screen's power mode, and the command in force within it.
      */
     get: operations["get_screen_power_api_kiosks__kiosk_id__screen_power_get"];
     /**
      * Put Screen Power
-     * @description Hold a screen on or off until changed, or send it back to its schedule.
+     * @description Store the screen's command in its mode, or send it back to its schedule.
      *
-     *     Open to an admin session, an admin key, and a limited key with the
-     *     ``screens.power`` permission (``PERMISSION_ROUTES``). A request that changes
-     *     nothing writes nothing and does not count toward the change limit.
+     *     Schedule takes on/off or schedule; External takes on/off and refuses
+     *     schedule; Always on refuses on/off and has nothing to clear. Open to an
+     *     admin session, an admin key, and a limited key with the ``screens.power``
+     *     permission (``PERMISSION_ROUTES``). A request that changes nothing writes
+     *     nothing and does not count toward the change limit.
      */
     put: operations["put_screen_power_api_kiosks__kiosk_id__screen_power_put"];
     post?: never;
