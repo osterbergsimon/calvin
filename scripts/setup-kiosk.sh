@@ -24,6 +24,7 @@ SIGNING_KEY=""
 # auto" (auto: cog on every board).
 DISPLAY_STACK_ARG=""
 DISPLAY_STACK=""
+PAIR_CODE=""
 for _arg in "$@"; do
     if [ "$_arg" = "--source-only" ]; then
         _CALVIN_SOURCE_ONLY=1
@@ -106,6 +107,62 @@ install_kiosk_config() {
     fi
 }
 
+# Write the one-time install code the agent sends on its first pairing request.
+# It is written only after bootstrap_kiosk has created and chowned the agent's
+# state dir (design section 14): the file is 0600 and owned by calvin, because
+# only the agent may read it. A malformed code writes nothing.
+install_pair_code() {
+    local code="${1:-}"
+    local dir="${CALVIN_AGENT_STATE_DIR:-/var/lib/calvin/agent}"
+    local file="${dir}/install-pair-code"
+    local tmp="${file}.tmp"
+    local owner="${CALVIN_USER:-calvin}"
+    [ -n "$code" ] || return 0
+    # Whole-string match (grep is line-wise and would accept a multi-line value).
+    if ! [[ "$code" =~ ^clv_pair_[A-Za-z0-9_-]{22,64}$ ]]; then
+        log "Refusing a malformed install code"
+        return 1
+    fi
+    if [ ! -d "$dir" ]; then
+        log "The agent state dir ${dir} is missing; the install code was not written"
+        return 1
+    fi
+    # The dir belongs to calvin, so root must never write through a path calvin
+    # could have swapped for a symlink (review m4). install replaces a symlink
+    # destination rather than following it; the checks make that explicit.
+    if [ -L "$tmp" ]; then
+        log "Refusing to write through a symlink: ${tmp}"
+        return 1
+    fi
+    install -m 0600 /dev/null "$tmp" || return 1
+    if [ -L "$tmp" ]; then
+        log "Refusing to write through a symlink: ${tmp}"
+        return 1
+    fi
+    if ! printf '%s\n' "$code" > "$tmp"; then
+        rm -f "$tmp"
+        return 1
+    fi
+    chmod 0600 "$tmp" || true
+    # Owner and mode are set on the temp file before the rename, so root never
+    # chowns a final path that calvin could have swapped underneath it. -h never
+    # follows a symlink.
+    if ! chown -h "${owner}:${owner}" "$tmp" 2>/dev/null; then
+        log "Could not make ${file} owned by ${owner}"
+        rm -f "$tmp"
+        return 1
+    fi
+    if ! mv -f "$tmp" "$file"; then
+        rm -f "$tmp"
+        return 1
+    fi
+    if [ -L "$file" ]; then
+        log "Refusing a symlinked ${file}"
+        rm -f "$file"
+        return 1
+    fi
+}
+
 # Which stack to install: requested_display_stack (setup-common.sh), shared with
 # the all-in-one setup.sh.
 
@@ -128,6 +185,8 @@ Options:
                              wayland (labwc) or cog (WPE WebKit on DRM/KMS).
                              All stacks stay installed: re-run with another
                              value to switch an existing kiosk in place.
+  --pair-code <CODE>         One-time code from Settings > Screens > Add a
+                             screen, for the agent's first pairing request.
 EOF
 }
 
@@ -144,6 +203,8 @@ parse_args() {
                 ;;
             --display-stack) DISPLAY_STACK_ARG="${2:-}"; shift 2 ;;
             --display-stack=*) DISPLAY_STACK_ARG="${1#*=}"; shift ;;
+            --pair-code) PAIR_CODE="${2:-}"; shift 2 ;;
+            --pair-code=*) PAIR_CODE="${1#*=}"; shift ;;
             --signing-key) SIGNING_KEY="${2:-}"; shift 2 ;;
             --signing-key=*) SIGNING_KEY="${1#*=}"; shift ;;
             --signing-key-file) SIGNING_KEY="$(tr -d '[:space:]' < "${2:-}")"; shift 2 ;;
@@ -169,6 +230,11 @@ parse_args() {
 
     if ! echo "${BACKEND_URL}" | grep -qE '^https?://'; then
         echo "Error: --backend-url must start with http:// or https:// (got: ${BACKEND_URL})" >&2
+        exit 1
+    fi
+
+    if [ -n "${PAIR_CODE}" ] && ! [[ "${PAIR_CODE}" =~ ^clv_pair_[A-Za-z0-9_-]{22,64}$ ]]; then
+        echo "Error: --pair-code is not a Calvin one-time install code" >&2
         exit 1
     fi
 }
@@ -313,6 +379,10 @@ main() {
     install_signing_key "${SIGNING_KEY}"
     log "Bootstrapping kiosk bundle via update-kiosk.sh --bootstrap from ${BACKEND_URL}..."
     bootstrap_kiosk "${BACKEND_URL}"
+    if [ -n "${PAIR_CODE}" ]; then
+        install_pair_code "${PAIR_CODE}" \
+            || log "The one-time install code was not written; the screen will show a code"
+    fi
     install_sudoers_fragment calvin-kiosk-update \
         "${CALVIN_USER} ALL=(root) NOPASSWD: /bin/systemctl start --no-block calvin-kiosk-update.service"
     # Root helper for cog panel power/rotation (setup-common.sh).

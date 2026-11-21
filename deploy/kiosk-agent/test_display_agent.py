@@ -1,9 +1,14 @@
 import importlib.util
 import io
+import json
 import os
+import re
+import stat
 import subprocess
 import threading
 import time as time_module
+import urllib.error
+import urllib.request
 from datetime import datetime, time, timedelta, timezone
 from types import SimpleNamespace
 
@@ -1057,13 +1062,12 @@ def test_fetch_config_reports_the_display_stack(monkeypatch, tmp_path):
         def read(self):
             return b"{}"
 
-    def fake_urlopen(url, timeout=None):
-        seen["url"] = url
-        return FakeResponse()
+    class Recorder:
+        def urlopen(self, request, timeout=None):
+            seen["url"] = request.full_url
+            return FakeResponse()
 
-    monkeypatch.setattr(agent.urllib.request, "urlopen", fake_urlopen)
-
-    agent.fetch_config("http://s:8000")
+    agent.fetch_config("http://s:8000", opener=Recorder())
 
     assert "kstack=cog" in seen["url"]
 
@@ -1133,12 +1137,12 @@ def test_a_wired_kiosk_reports_none_so_a_stale_wifi_state_is_cleared(monkeypatch
         def read(self):
             return b"{}"
 
-    monkeypatch.setattr(
-        agent.urllib.request,
-        "urlopen",
-        lambda url, timeout=None: seen.update(url=url) or FakeResponse(),
-    )
-    agent.fetch_config("http://s:8000")
+    class Recorder:
+        def urlopen(self, request, timeout=None):
+            seen["url"] = getattr(request, "full_url", request)
+            return FakeResponse()
+
+    agent.fetch_config("http://s:8000", opener=Recorder())
     assert "kwifi=none" in seen["url"]
 
 
@@ -1172,12 +1176,12 @@ def test_fetch_config_reports_the_wifi_power_save(monkeypatch):
         def read(self):
             return b"{}"
 
-    def fake_urlopen(url, timeout=None):
-        seen["url"] = url
-        return FakeResponse()
+    class Recorder:
+        def urlopen(self, request, timeout=None):
+            seen["url"] = request.full_url
+            return FakeResponse()
 
-    monkeypatch.setattr(agent.urllib.request, "urlopen", fake_urlopen)
-    agent.fetch_config("http://s:8000")
+    agent.fetch_config("http://s:8000", opener=Recorder())
     assert "kwifi=off" in seen["url"]
 
 
@@ -5606,10 +5610,669 @@ def test_fetch_config_reports_it_can_hold(monkeypatch):
         def read(self):
             return b"{}"
 
-    def fake_urlopen(url, timeout=None):
-        seen["url"] = url
-        return FakeResponse()
+    class Recorder:
+        def urlopen(self, request, timeout=None):
+            seen["url"] = request.full_url
+            return FakeResponse()
 
-    monkeypatch.setattr(agent.urllib.request, "urlopen", fake_urlopen)
-    agent.fetch_config("http://s:8000")
+    agent.fetch_config("http://s:8000", opener=Recorder())
     assert "kfeat=hold" in seen["url"]
+
+
+# -- kiosk pairing: the secret, the bearer and the restart (Task 9, calvin-0xns)
+SECRET = "clv_kiosk_" + "A" * 43
+INSTALL_CODE = "clv_pair_" + "b" * 22
+UNPAIRED = {"kioskAuth": {"state": "unpaired", "mode": "optional", "hasAgent": True}}
+PAIRED = {"kioskAuth": {"state": "paired", "mode": "optional", "hasAgent": True}}
+
+
+@pytest.fixture(autouse=True)
+def _clear_bearer_suspension():
+    """Keep the process-wide bearer suspension from leaking between tests."""
+    if hasattr(agent, "resume_bearer"):
+        agent.resume_bearer()
+    yield
+    if hasattr(agent, "resume_bearer"):
+        agent.resume_bearer()
+
+
+class _Response:
+    status = 200
+
+    def __init__(self, payload=b"{}"):
+        self.payload = payload
+
+    def read(self):
+        return self.payload
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+class _Opener:
+    """An opener that records every Request and answers through `handler`."""
+
+    def __init__(self, handler=None):
+        self.requests = []
+        self.handler = handler or (lambda request, n: _Response())
+
+    def urlopen(self, request, timeout=None):
+        self.requests.append(request)
+        return self.handler(request, len(self.requests))
+
+
+def _http_error(code, body):
+    return urllib.error.HTTPError(
+        "http://s:8000", code, "error", {}, io.BytesIO(body.encode())
+    )
+
+
+def _pairing(root, **over):
+    root.mkdir(parents=True, exist_ok=True)
+    options = {
+        "secret_path": str(root / "kiosk-credential"),
+        "install_code_path": str(root / "install-pair-code"),
+        "marker_path": str(root / "kiosk-paired"),
+    }
+    options.update(over)
+    return agent.Pairing(**options)
+
+
+def _secret_file(root):
+    return str(root / "kiosk-credential")
+
+
+def _pending(request, n):
+    return _Response(
+        b'{"state":"pending","code":"K7Q-4MD","expiresAt":"2026-11-21T00:10:00Z"}'
+    )
+
+
+def test_secret_is_created_once_with_mode_0600(tmp_path):
+    path = tmp_path / "kiosk-credential"
+    secret = agent.load_or_create_secret(str(path))
+    assert secret is not None and agent.is_secret(secret)
+    assert re.fullmatch(r"clv_kiosk_[A-Za-z0-9_-]{43}", secret)
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    assert agent.load_or_create_secret(str(path)) == secret
+    assert path.read_text().strip() == secret
+
+
+def test_a_garbled_secret_file_is_replaced(tmp_path):
+    path = tmp_path / "kiosk-credential"
+    path.write_text("not a secret\n")
+    secret = agent.load_or_create_secret(str(path))
+    assert secret is not None and agent.is_secret(secret)
+    assert path.read_text().strip() == secret
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+
+
+def test_an_unwritable_state_dir_has_no_secret_and_sends_no_bearer(tmp_path):
+    unwritable = tmp_path / "missing" / "kiosk-credential"
+    assert agent.load_or_create_secret(str(unwritable)) is None
+    assert agent.read_secret(str(unwritable)) is None
+    assert agent.auth_headers() == {}
+
+
+def test_every_agent_request_carries_the_kiosk_bearer(monkeypatch, tmp_path):
+    path = tmp_path / "kiosk-credential"
+    path.write_text(SECRET)
+    monkeypatch.setattr(agent, "CREDENTIAL_FILE", str(path))
+    monkeypatch.setenv("CALVIN_KIOSK_ID", "kitchen")
+    monkeypatch.setenv("CALVIN_KIOSK_HOSTNAME", "pi")
+    monkeypatch.setattr(agent, "running_version", lambda: "v1")
+    monkeypatch.setattr(agent, "touch_ready", lambda: None)
+    monkeypatch.setattr(agent, "wifi_power_save_state", lambda: "off")
+
+    opener = _Opener()
+    agent.fetch_config("http://s:8000", opener=opener)
+    agent.post_screen_sleep("http://s:8000", opener=opener)
+    agent.post_display_check(
+        "http://s:8000", {"id": "c1"}, kiosk_id="kitchen", opener=opener
+    )
+
+    assert len(opener.requests) == 3
+    for request in opener.requests:
+        assert request.get_header("Authorization") == f"Bearer {SECRET}"
+    assert "kfeat=hold%2Cpair" in opener.requests[0].full_url
+
+
+@pytest.mark.parametrize("call", ["config", "sleep", "display"])
+def test_a_401_invalid_api_key_suspends_the_bearer_and_retries_once(
+    call, monkeypatch, tmp_path
+):
+    """An old server predates pairing: drop the bearer for an hour and retry."""
+    path = tmp_path / "kiosk-credential"
+    path.write_text(SECRET)
+    monkeypatch.setattr(agent, "CREDENTIAL_FILE", str(path))
+    monkeypatch.setenv("CALVIN_KIOSK_ID", "kitchen")
+    monkeypatch.setenv("CALVIN_KIOSK_HOSTNAME", "pi")
+    monkeypatch.setattr(agent, "running_version", lambda: "v1")
+    monkeypatch.setattr(agent, "touch_ready", lambda: None)
+    monkeypatch.setattr(agent, "wifi_power_save_state", lambda: "off")
+
+    def handler(request, n):
+        if n == 1:
+            raise _http_error(401, '{"detail":{"code":"invalid_api_key"}}')
+        return _Response(b"{}")
+
+    opener = _Opener(handler)
+    if call == "config":
+        assert agent.fetch_config("http://s:8000", opener=opener) == {}
+    elif call == "sleep":
+        assert agent.post_screen_sleep("http://s:8000", opener=opener) is True
+    else:
+        assert (
+            agent.post_display_check(
+                "http://s:8000", {"id": "c1"}, kiosk_id="kitchen", opener=opener
+            )
+            is True
+        )
+
+    assert len(opener.requests) == 2
+    assert opener.requests[0].get_header("Authorization") == f"Bearer {SECRET}"
+    assert opener.requests[1].get_header("Authorization") is None
+    later = _Opener()
+    agent.post_screen_sleep("http://s:8000", opener=later)
+    assert later.requests[0].get_header("Authorization") is None
+
+
+def test_pairing_starts_only_after_a_config_answer_with_kioskauth(tmp_path):
+    pairing = _pairing(tmp_path)
+    opener = _Opener()
+    assert pairing.state in ("unknown", "unsupported")
+    assert pairing.step("http://s:8000", opener=opener) is False
+    assert pairing.on_config({"display_schedule_enabled": True}, 0) is False
+    assert pairing.state == "unsupported"
+    assert pairing.step("http://s:8000", opener=opener) is False
+    assert opener.requests == []
+
+
+def test_an_unpaired_answer_posts_pair_once_per_poll(tmp_path, monkeypatch):
+    monkeypatch.setenv("CALVIN_KIOSK_ID", "kitchen")
+    pairing = _pairing(tmp_path)
+    assert pairing.ensure_secret() is True
+    pairing.on_config(UNPAIRED, 0)
+    opener = _Opener(_pending)
+
+    pairing.step("http://s:8000", opener=opener)
+    pairing.step("http://s:8000", opener=opener)
+
+    assert len(opener.requests) == 2
+    request = opener.requests[0]
+    assert request.full_url == "http://s:8000/api/kiosks/kitchen/pair"
+    assert request.get_header("Authorization") == (
+        "Bearer " + agent.read_secret(_secret_file(tmp_path))
+    )
+    body = json.loads(request.data)
+    assert "installCode" not in body
+    # m8: the pair body names this screen, so Settings can show it before the
+    # next config poll.
+    assert body["hostname"] == agent.kiosk_hostname()
+
+
+def test_an_install_code_is_sent_once_and_removed_when_it_pairs(tmp_path, monkeypatch):
+    monkeypatch.setenv("CALVIN_KIOSK_ID", "kitchen")
+    pairing = _pairing(tmp_path)
+    assert pairing.ensure_secret()
+    install = tmp_path / "install-pair-code"
+    install.write_text(INSTALL_CODE + "\n")
+    pairing.on_config(UNPAIRED, 0)
+    opener = _Opener(lambda request, n: _Response(b'{"state":"paired"}'))
+
+    pairing.step("http://s:8000", opener=opener)
+
+    body = json.loads(opener.requests[0].data)
+    assert body["installCode"] == INSTALL_CODE
+    assert body["hostname"] == agent.kiosk_hostname()
+    assert not install.exists()
+    assert pairing.state == "paired"
+    assert (tmp_path / "kiosk-paired").exists()
+
+
+def test_an_invalid_install_code_is_dropped_and_pairing_goes_on(tmp_path, monkeypatch):
+    monkeypatch.setenv("CALVIN_KIOSK_ID", "kitchen")
+    pairing = _pairing(tmp_path)
+    secret = pairing.ensure_secret()
+    install = tmp_path / "install-pair-code"
+    install.write_text(INSTALL_CODE + "\n")
+    pairing.on_config(UNPAIRED, 0)
+
+    def handler(request, n):
+        raise _http_error(409, '{"detail":{"code":"install_code_invalid"}}')
+
+    pairing.step("http://s:8000", opener=_Opener(handler))
+
+    assert not install.exists()
+    assert pairing.state == "pairing"
+    assert secret is True
+    assert agent.read_secret(_secret_file(tmp_path)) is not None
+
+
+def test_unpaired_answer_rotates_secret_once(tmp_path):
+    """Review Focus line 2: an offline unpair makes the agent start over once."""
+    pairing = _pairing(tmp_path)
+    assert pairing.ensure_secret() is True
+    first = agent.read_secret(_secret_file(tmp_path))
+    assert first is not None
+    assert pairing.on_config(PAIRED, 0) is False
+    assert (tmp_path / "kiosk-paired").exists()
+
+    assert pairing.on_config(UNPAIRED, 10) is True
+    second = agent.read_secret(_secret_file(tmp_path))
+    assert second is not None and second != first
+    assert not (tmp_path / "kiosk-paired").exists()
+    assert pairing.state == "pairing"
+
+    assert pairing.on_config(UNPAIRED, 20) is False
+    assert agent.read_secret(_secret_file(tmp_path)) == second
+
+    # A screen that never saw "paired" keeps the code it is showing.
+    pending = _pairing(tmp_path / "pending")
+    assert pending.ensure_secret() is True
+    shown = agent.read_secret(_secret_file(tmp_path / "pending"))
+    assert pending.on_config(UNPAIRED, 30) is False
+    assert agent.read_secret(_secret_file(tmp_path / "pending")) == shown
+
+
+def test_a_409_keeps_the_secret_and_tries_again(tmp_path, monkeypatch):
+    monkeypatch.setenv("CALVIN_KIOSK_ID", "kitchen")
+    for code in ("setup_required", "screen_has_agent"):
+        agent.resume_bearer()
+        pairing = _pairing(tmp_path / code)
+        pairing.ensure_secret()
+        secret = agent.read_secret(_secret_file(tmp_path / code))
+        pairing.on_config(UNPAIRED, 0)
+
+        def handler(request, n, code=code):
+            raise _http_error(409, json.dumps({"detail": {"code": code}}))
+
+        opener = _Opener(handler)
+        pairing.step("http://s:8000", opener=opener)
+        pairing.step("http://s:8000", opener=opener)
+
+        assert len(opener.requests) == 2
+        assert pairing.state == "pairing"
+        assert agent.read_secret(_secret_file(tmp_path / code)) == secret
+
+
+def test_an_answer_it_does_not_understand_changes_nothing(tmp_path):
+    pairing = _pairing(tmp_path)
+    pairing.ensure_secret()
+    secret = agent.read_secret(_secret_file(tmp_path))
+    pairing.on_config(UNPAIRED, 0)
+    assert pairing.step("http://s", opener=_Opener(lambda r, n: _Response(b"nope"))) is False
+    assert pairing.state == "pairing"
+    assert agent.read_secret(_secret_file(tmp_path)) == secret
+
+
+def test_a_network_error_changes_nothing(tmp_path):
+    pairing = _pairing(tmp_path)
+    pairing.ensure_secret()
+    secret = agent.read_secret(_secret_file(tmp_path))
+    pairing.on_config(UNPAIRED, 0)
+
+    def handler(request, n):
+        raise OSError("server down")
+
+    assert pairing.step("http://s", opener=_Opener(handler)) is False
+    assert pairing.state == "pairing"
+    assert agent.read_secret(_secret_file(tmp_path)) == secret
+
+
+def test_new_secret_restarts_browser_once(tmp_path, monkeypatch):
+    restarts = []
+    monkeypatch.setattr(agent, "restart_kiosk_browsers", lambda: restarts.append(1))
+    monkeypatch.setattr(agent, "apply_on", lambda on: "test")
+    pairing = _pairing(tmp_path, opener=_Opener(_pending))
+    agent.run(
+        "http://s",
+        60,
+        fetch=lambda url: dict(UNPAIRED),
+        sleep=lambda s: None,
+        iterations=3,
+        apply_device=lambda cfg: None,
+        pairing=pairing,
+    )
+    assert restarts == [1]
+
+
+def test_browser_unpaired_twice_restarts_once_per_cooldown():
+    """Review Focus line 3: an admin reset kills cookies, one restart per 10 min."""
+    restart = agent.BrowserRestart(cooldown=600)
+    assert restart.observe("unknown", True, 0) is False
+    assert restart.observe("unpaired", True, 100) is False
+    assert restart.observe("unpaired", True, 160) is True
+    # Two more inside the cooldown: no restart.
+    assert restart.observe("unpaired", True, 220) is False
+    assert restart.observe("unpaired", True, 280) is False
+    # After the cooldown, two polls in a row restart it again.
+    assert restart.observe("unpaired", True, 760) is False
+    assert restart.observe("unpaired", True, 820) is True
+    # "unknown" never restarts, and an unpaired screen never does either.
+    assert restart.observe("unknown", True, 1000) is False
+    assert restart.observe("unpaired", False, 1100) is False
+
+
+def test_the_browser_restart_uses_restart_kiosk_unit_and_skips_stopped_units(
+    monkeypatch,
+):
+    active = {
+        "calvin-kiosk-remote.service": True,
+        "calvin-kiosk.service": False,
+        "calvin-cog.service": True,
+    }
+    monkeypatch.setattr(
+        agent,
+        "kiosk_unit_state",
+        lambda unit: {"unit": unit, "active": active.get(unit, False)},
+    )
+    restarted = []
+    monkeypatch.setattr(
+        agent, "restart_kiosk_unit", lambda unit: restarted.append(unit) or True
+    )
+
+    def no_sudo(*args, **kwargs):
+        raise AssertionError("a pairing restart must not call sudo")
+
+    monkeypatch.setattr(agent.subprocess, "run", no_sudo)
+
+    assert agent.restart_kiosk_browsers() is True
+    assert set(restarted) == {"calvin-kiosk-remote.service", "calvin-cog.service"}
+    assert "calvin-cog.service" in agent.KIOSK_UNITS
+
+
+def test_no_log_line_contains_the_secret(tmp_path, monkeypatch):
+    """m2: drive the real request path, so the capture is never empty.
+
+    A 401 invalid_api_key (an old server) suspends the bearer and retries; the
+    retry fails, which logs the iteration error. The secret must appear in none
+    of those lines, including the logged exception text.
+    """
+    lines = []
+    monkeypatch.setattr(agent, "log", lambda message: lines.append(str(message)))
+    monkeypatch.setenv("CALVIN_KIOSK_ID", "kitchen")
+    monkeypatch.setenv("CALVIN_KIOSK_HOSTNAME", "kitchen-pi")
+    monkeypatch.setattr(agent, "running_version", lambda: "v1")
+    monkeypatch.setattr(agent, "touch_ready", lambda: None)
+    monkeypatch.setattr(agent, "wifi_power_save_state", lambda: "off")
+    monkeypatch.setattr(agent, "apply_on", lambda on: "test")
+
+    path = tmp_path / "kiosk-credential"
+    path.write_text(SECRET + "\n")
+    monkeypatch.setattr(agent, "CREDENTIAL_FILE", str(path))
+    secret = agent.read_secret(str(path))
+    assert secret == SECRET
+
+    def handler(request, n):
+        if n == 1:
+            raise _http_error(401, '{"detail":{"code":"invalid_api_key"}}')
+        raise OSError("server down")
+
+    monkeypatch.setattr(agent, "DEFAULT_OPENER", _Opener(handler))
+    pairing = _pairing(tmp_path, opener=_Opener(_pending))
+    agent.run(
+        "http://s",
+        60,
+        fetch=agent.fetch_config,
+        sleep=lambda s: None,
+        iterations=1,
+        apply_device=lambda cfg: None,
+        pairing=pairing,
+    )
+
+    # The failing request path really ran and logged its exception text.
+    assert any("server down" in line for line in lines)
+
+    # Then the pairing paths: a rotation and a POST that the server answers.
+    assert pairing.on_config(PAIRED, 0) is False
+    assert pairing.on_config(UNPAIRED, 1) is True
+    assert pairing.on_config(UNPAIRED, 2) is False
+    pairing.step("http://s", opener=_Opener(_pending))
+
+    assert all(secret not in line for line in lines)
+    assert all("clv_kiosk_" not in line for line in lines)
+    assert all("clv_pair_" not in line for line in lines)
+
+
+# -- review fixes: pairing never breaks the poll or leaks its secret ----------
+def test_a_non_utf8_credential_file_still_reconciles(tmp_path, monkeypatch):
+    """M1: a cut-write or corrupt block must not crash the agent."""
+    path = tmp_path / "kiosk-credential"
+    path.write_bytes(b"\xff\xfe")
+    monkeypatch.setattr(agent, "CREDENTIAL_FILE", str(path))
+    monkeypatch.setenv("CALVIN_KIOSK_ID", "kitchen")
+    monkeypatch.setattr(agent, "restart_kiosk_browsers", lambda: None)
+    reconciled = []
+    monkeypatch.setattr(
+        agent, "reconcile", lambda cfg, now, last: reconciled.append(1) or last
+    )
+    pairing = _pairing(tmp_path)
+
+    agent.run(
+        "http://s",
+        60,
+        fetch=lambda url: {"display_schedule_enabled": False},
+        sleep=lambda s: None,
+        iterations=1,
+        apply_device=lambda cfg: None,
+        pairing=pairing,
+    )
+
+    assert reconciled == [1]
+    # The unreadable file was replaced rather than left to break every request.
+    assert agent.read_secret(str(path)) is not None
+
+
+def test_an_incomplete_read_from_the_pair_post_still_reconciles(tmp_path, monkeypatch):
+    """M1: http.client.HTTPException is not an OSError; it must not skip reconcile."""
+    import http.client
+
+    path = tmp_path / "kiosk-credential"
+    path.write_text(SECRET + "\n")
+    monkeypatch.setattr(agent, "CREDENTIAL_FILE", str(path))
+    monkeypatch.setenv("CALVIN_KIOSK_ID", "kitchen")
+    monkeypatch.setattr(agent, "restart_kiosk_browsers", lambda: None)
+    reconciled = []
+    monkeypatch.setattr(
+        agent, "reconcile", lambda cfg, now, last: reconciled.append(1) or last
+    )
+
+    def handler(request, n):
+        raise http.client.IncompleteRead(b'{"state":')
+
+    pairing = _pairing(tmp_path, opener=_Opener(handler))
+    agent.run(
+        "http://s",
+        60,
+        fetch=lambda url: dict(UNPAIRED),
+        sleep=lambda s: None,
+        iterations=1,
+        apply_device=lambda cfg: None,
+        pairing=pairing,
+    )
+
+    assert reconciled == [1]
+    assert agent.post_pair(
+        "http://s", SECRET, opener=_Opener(handler)
+    ) is None
+
+
+def test_a_suspended_bearer_keeps_the_secret_on_an_unpaired_answer(
+    tmp_path, monkeypatch
+):
+    """M2: a bearer-less poll never means "the admin unpaired me".
+
+    Design section 11: a rollback answers 401 once, the agent polls without the
+    bearer for an hour, and an upgrade within that hour must find it still paired.
+    """
+    pairing = _pairing(tmp_path)
+    assert pairing.ensure_secret() is True
+    first = agent.read_secret(_secret_file(tmp_path))
+    assert first is not None
+    assert pairing.on_config(PAIRED, 0) is False
+    assert (tmp_path / "kiosk-paired").exists()
+
+    monkeypatch.setattr(agent, "CREDENTIAL_FILE", _secret_file(tmp_path))
+    monkeypatch.setenv("CALVIN_KIOSK_ID", "kitchen")
+    monkeypatch.setattr(agent, "restart_kiosk_browsers", lambda: None)
+    agent.suspend_bearer()
+    try:
+        reconciled = []
+        monkeypatch.setattr(
+            agent, "reconcile", lambda cfg, now, last: reconciled.append(1) or last
+        )
+        opener = _Opener(_pending)
+        agent.run(
+            "http://s",
+            60,
+            fetch=lambda url: dict(UNPAIRED),
+            sleep=lambda s: None,
+            iterations=1,
+            apply_device=lambda cfg: None,
+            pairing=agent.Pairing(
+                secret_path=_secret_file(tmp_path),
+                install_code_path=str(tmp_path / "install-pair-code"),
+                marker_path=str(tmp_path / "kiosk-paired"),
+                opener=opener,
+            ),
+        )
+    finally:
+        agent.resume_bearer()
+
+    assert reconciled == [1]
+    assert opener.requests == []  # no pair POST without the bearer
+    assert agent.read_secret(_secret_file(tmp_path)) == first
+    assert (tmp_path / "kiosk-paired").exists()
+
+
+def test_a_failed_rotation_keeps_the_marker_and_retries(tmp_path, monkeypatch):
+    """m1: an ENOSPC rotation must retry, not re-pair the old secret."""
+    import errno
+
+    pairing = _pairing(tmp_path)
+    assert pairing.ensure_secret() is True
+    old = agent.read_secret(_secret_file(tmp_path))
+    assert old is not None
+    assert pairing.on_config(PAIRED, 0) is False
+    assert (tmp_path / "kiosk-paired").exists()
+
+    real_write = agent.os.write
+
+    def full_disk(fd, data):
+        raise OSError(errno.ENOSPC, "No space left on device")
+
+    monkeypatch.setattr(agent.os, "write", full_disk)
+    assert pairing.on_config(UNPAIRED, 10) is False
+    # The marker stays, so the next poll knows it still has to rotate.
+    assert (tmp_path / "kiosk-paired").exists()
+    opener = _Opener()
+    assert pairing.step("http://s", opener=opener) is False
+    assert opener.requests == []  # the old secret is never re-paired
+    assert agent.read_secret(_secret_file(tmp_path)) == old
+
+    monkeypatch.setattr(agent.os, "write", real_write)
+    assert pairing.on_config(UNPAIRED, 20) is True
+    second = agent.read_secret(_secret_file(tmp_path))
+    assert second is not None and second != old
+    assert not (tmp_path / "kiosk-paired").exists()
+
+
+def test_the_secret_and_marker_are_synced_around_the_rename(tmp_path, monkeypatch):
+    """m7: a Pi power cut must not leave an empty secret behind."""
+    events = []
+    real_fsync = agent.os.fsync
+    real_replace = agent.os.replace
+    monkeypatch.setattr(
+        agent.os, "fsync", lambda fd: events.append("fsync") or real_fsync(fd)
+    )
+    monkeypatch.setattr(
+        agent.os, "replace", lambda a, b: events.append("replace") or real_replace(a, b)
+    )
+    path = tmp_path / "kiosk-credential"
+    assert agent.rotate_secret(str(path)) is not None
+    assert events[:3] == ["fsync", "replace", "fsync"]
+
+    events.clear()
+    assert agent._write_private_file(str(tmp_path / "kiosk-paired"), "paired\n")
+    assert events[:3] == ["fsync", "replace", "fsync"]
+
+
+def test_the_pair_body_sends_a_capped_hostname(tmp_path, monkeypatch):
+    """m8: the pair body carries the hostname, capped like the route caps it."""
+    monkeypatch.setenv("CALVIN_KIOSK_ID", "kitchen")
+    monkeypatch.setenv("CALVIN_KIOSK_HOSTNAME", "h" * 400)
+    pairing = _pairing(tmp_path)
+    pairing.ensure_secret()
+    pairing.on_config(UNPAIRED, 0)
+    opener = _Opener(_pending)
+    pairing.step("http://s:8000", opener=opener)
+
+    body = json.loads(opener.requests[0].data)
+    assert body["hostname"] == "h" * 255
+
+
+def test_the_bearer_is_not_forwarded_across_an_origin_redirect():
+    """m3: urllib copies Authorization on redirect; a hostile hop must not get it."""
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    seen = {}
+
+    class Sink(BaseHTTPRequestHandler):
+        def do_GET(self):
+            seen["authorization"] = self.headers.get("Authorization")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b"{}")
+
+        def log_message(self, *args):
+            pass
+
+    class Redirect(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(302)
+            self.send_header("Location", seen["sink_url"])
+            self.end_headers()
+
+        def log_message(self, *args):
+            pass
+
+    sink = HTTPServer(("127.0.0.1", 0), Sink)
+    redirect = HTTPServer(("127.0.0.1", 0), Redirect)
+    threads = [
+        threading.Thread(target=server.serve_forever, daemon=True)
+        for server in (sink, redirect)
+    ]
+    for thread in threads:
+        thread.start()
+    try:
+        seen["sink_url"] = f"http://127.0.0.1:{sink.server_address[1]}/"
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{redirect.server_address[1]}/",
+            headers={"Authorization": f"Bearer {SECRET}"},
+        )
+        with agent.DEFAULT_OPENER.urlopen(request) as response:
+            response.read()
+    finally:
+        for server in (sink, redirect):
+            server.shutdown()
+            server.server_close()
+
+    # A different port is a different origin: the secret stays on the first hop.
+    assert seen["authorization"] is None
+
+
+def test_the_cdp_watchdog_never_watches_cog():
+    """Nit: cog has no DevTools port, so it can only ever look unreachable."""
+    cog_only = lambda unit: _unit(  # noqa: E731
+        unit=unit, active=unit == "calvin-cog.service"
+    )
+    assert agent.watched_kiosk_unit(state=cog_only) is None
+    assert "calvin-cog.service" in agent.KIOSK_UNITS
+    assert "calvin-cog.service" not in agent.WATCHDOG_UNITS
+
+

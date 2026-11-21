@@ -8,9 +8,11 @@ Python 3 stdlib — no third-party deps (the kiosk Pi has no venv).
 
 import base64
 import hashlib
+import http.client
 import json
 import os
 import re
+import secrets
 import signal
 import socket
 import struct
@@ -18,6 +20,7 @@ import subprocess
 import sys
 import threading
 import time as time_module
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, time, timedelta, timezone
@@ -132,8 +135,442 @@ def _first_boundary_after(cfg, moment):
 
 
 # What this agent understands, reported on its config poll as ``kfeat`` so the
-# server can tell which screens can hold a screen-power choice (calvin-2ifv).
-AGENT_FEATURES = ("hold",)
+# server can tell which screens can hold a screen-power choice (calvin-2ifv) and
+# which can pair themselves with their own secret (calvin-0xns).
+AGENT_FEATURES = ("hold", "pair")
+
+
+# -- kiosk pairing: the secret, the bearer and the pairing state --------------
+# The agent makes one secret, keeps it in a 0600 file in its own state dir, and
+# sends it as a bearer. Only its SHA-256 is stored on the server. The file is
+# written atomically (temp file, then rename) so a crash never leaves half a
+# secret behind; the agent runs as calvin, so the file is calvin's.
+SECRET_PREFIX = "clv_kiosk_"
+INSTALL_PREFIX = "clv_pair_"
+SECRET_RE = re.compile(r"^clv_kiosk_[A-Za-z0-9_-]{43}$")
+INSTALL_CODE_RE = re.compile(r"^clv_pair_[A-Za-z0-9_-]{22,64}$")
+CREDENTIAL_FILE = os.path.join(RUNTIME_STATE_DIR, "kiosk-credential")
+INSTALL_CODE_FILE = os.path.join(RUNTIME_STATE_DIR, "install-pair-code")
+PAIRED_MARKER = os.path.join(RUNTIME_STATE_DIR, "kiosk-paired")
+# An old backend answers a kiosk bearer with 401 invalid_api_key: drop the bearer
+# for an hour and poll as the old agent did (design section 11).
+AUTH_FAILURE_COOLDOWN_SECONDS = 3600
+BROWSER_UNPAIRED_POLLS = 2
+BROWSER_RESTART_COOLDOWN_SECONDS = 600
+
+_bearer_suspended_until = 0.0
+
+
+def new_secret():
+    """A kiosk secret: the prefix plus 32 random bytes, URL-safe (43 chars)."""
+    return SECRET_PREFIX + secrets.token_urlsafe(32)
+
+
+def is_secret(value):
+    return isinstance(value, str) and SECRET_RE.fullmatch(value) is not None
+
+
+def is_install_code(value):
+    return isinstance(value, str) and INSTALL_CODE_RE.fullmatch(value) is not None
+
+
+def read_secret(path=CREDENTIAL_FILE):
+    """The secret in `path`, or None when it is missing or not secret-shaped.
+
+    A cut write or a corrupt block can leave bytes that are not UTF-8: that is a
+    missing secret, not a crash (the next poll replaces the file).
+    """
+    try:
+        with open(path) as f:
+            value = f.read().strip()
+    except (OSError, ValueError):
+        return None
+    return value if is_secret(value) else None
+
+
+def _write_private_file(path, text, mode=0o600):
+    """Write `text` atomically with `mode`; False when the directory is unusable.
+
+    The temp file lives beside the target, so the rename stays on one filesystem
+    and a reader never sees a partial secret. Both the file and the directory
+    are fsynced: a Pi power cut right after the rename must not leave a
+    zero-length secret or marker behind.
+    """
+    directory = os.path.dirname(path) or "."
+    if not os.path.isdir(directory):
+        return False
+    tmp = path + ".tmp"
+    try:
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+        try:
+            os.fchmod(fd, mode)
+            os.write(fd, text.encode())
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        os.replace(tmp, path)
+    except (OSError, ValueError):
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        return False
+    try:
+        dir_fd = os.open(directory, os.O_RDONLY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
+    except OSError:
+        # Some filesystems refuse a directory fsync; the rename already happened.
+        pass
+    return True
+
+
+def rotate_secret(path=CREDENTIAL_FILE):
+    """Replace the secret with a fresh one; None when the file cannot be written."""
+    secret = new_secret()
+    if not _write_private_file(path, secret + "\n"):
+        return None
+    return secret
+
+
+def load_or_create_secret(path=CREDENTIAL_FILE):
+    """The existing secret, or a new one; None when the state dir is not writable."""
+    secret = read_secret(path)
+    if secret is not None:
+        return secret
+    return rotate_secret(path)
+
+
+def read_install_code(path=INSTALL_CODE_FILE):
+    """The one-time install code written by setup-kiosk.sh, if it is valid."""
+    try:
+        with open(path) as f:
+            value = f.read().strip()
+    except (OSError, ValueError):
+        return None
+    return value if is_install_code(value) else None
+
+
+def _paired_marker_exists(path=PAIRED_MARKER):
+    try:
+        return os.path.exists(path)
+    except (OSError, ValueError):
+        return False
+
+
+def _remove_file(path):
+    try:
+        os.unlink(path)
+    except (OSError, ValueError):
+        pass
+
+
+def suspend_bearer(seconds=AUTH_FAILURE_COOLDOWN_SECONDS, now=None):
+    """Stop sending the bearer for a while (an old server does not know it)."""
+    global _bearer_suspended_until
+    current = time_module.time() if now is None else now
+    _bearer_suspended_until = current + seconds
+
+
+def resume_bearer():
+    """Send the bearer again (tests, and a future rotation could re-arm it)."""
+    global _bearer_suspended_until
+    _bearer_suspended_until = 0.0
+
+
+def auth_headers(now=None):
+    """The bearer header for this agent, or {} while it is suspended/unreadable."""
+    current = time_module.time() if now is None else now
+    if _bearer_suspended_until > current:
+        return {}
+    secret = read_secret(CREDENTIAL_FILE)
+    if secret is None:
+        return {}
+    return {"Authorization": f"Bearer {secret}"}
+
+
+def kiosk_hostname():
+    """The name this screen is known by, for the config poll and the pair body."""
+    return os.environ.get("CALVIN_KIOSK_HOSTNAME", "").strip() or socket.gethostname()
+
+
+def _origin(url):
+    parts = urllib.parse.urlsplit(url)
+    try:
+        return (parts.scheme.lower(), (parts.hostname or "").lower(), parts.port)
+    except ValueError:
+        return (parts.scheme.lower(), (parts.hostname or "").lower(), None)
+
+
+class _SameOriginRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Drop the kiosk bearer when a redirect leaves the request's origin.
+
+    urllib copies Authorization onto the redirected request. The backend URL is
+    trusted, but a misconfigured proxy or a plain-http hop must never receive the
+    secret (review m3).
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if new is not None and _origin(newurl) != _origin(req.full_url):
+            new.remove_header("Authorization")
+        return new
+
+
+class _UrlOpener:
+    """The agent's default opener: same API as urllib.request.urlopen."""
+
+    def __init__(self):
+        self._opener = urllib.request.build_opener(_SameOriginRedirectHandler())
+
+    def urlopen(self, request, timeout=None):
+        return self._opener.open(request, timeout=timeout)
+
+
+DEFAULT_OPENER = _UrlOpener()
+
+
+def _http_error_code(exc):
+    """The server's error code in an HTTPError body, or None."""
+    try:
+        body = json.loads(exc.read())
+    except (OSError, TypeError, ValueError):
+        return None
+    if not isinstance(body, dict):
+        return None
+    detail = body.get("detail")
+    if isinstance(detail, dict):
+        return detail.get("code")
+    if isinstance(detail, str):
+        return detail
+    return body.get("code")
+
+
+def _request(url, *, data=None, method=None, headers=None, opener=None,
+             timeout=None):
+    """Open one request with the kiosk bearer.
+
+    An old backend predates pairing and answers the bearer with 401
+    invalid_api_key. That is not this screen's fault: the bearer is suspended
+    for an hour and the request is repeated once without it. Every other answer
+    is returned or raised unchanged.
+    """
+    opener = opener or DEFAULT_OPENER
+    extra = dict(headers or {})
+    auth = auth_headers()
+    timeout = HTTP_TIMEOUT if timeout is None else timeout
+    request = urllib.request.Request(
+        url, data=data, headers={**extra, **auth}, method=method
+    )
+    try:
+        return opener.urlopen(request, timeout=timeout)
+    except urllib.error.HTTPError as exc:
+        if not auth or exc.code != 401 or _http_error_code(exc) != "invalid_api_key":
+            raise
+        suspend_bearer()
+        retry = urllib.request.Request(url, data=data, headers=extra, method=method)
+        return opener.urlopen(retry, timeout=timeout)
+
+
+def _post_pair(backend_url, secret, install_code=None, opener=None,
+               timeout=None):
+    """One POST .../pair. Returns (payload | None, error code | None)."""
+    kiosk_id = os.environ.get("CALVIN_KIOSK_ID", "").strip()
+    if not kiosk_id:
+        return None, None
+    base = backend_url.rstrip("/")
+    url = f"{base}/api/kiosks/{urllib.parse.quote(kiosk_id)}/pair"
+    body = {}
+    host = kiosk_hostname().strip()[:255]
+    if host:
+        body["hostname"] = host
+    if install_code is not None:
+        body["installCode"] = install_code
+    data = json.dumps(body).encode()
+    timeout = HTTP_TIMEOUT if timeout is None else timeout
+    request = urllib.request.Request(
+        url,
+        data=data,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {secret}",
+        },
+        method="POST",
+    )
+    opener = opener or DEFAULT_OPENER
+    try:
+        with opener.urlopen(request, timeout=timeout) as response:
+            raw = response.read()
+            payload = json.loads(raw or b"{}")
+        return (payload if isinstance(payload, dict) else None), None
+    except urllib.error.HTTPError as exc:
+        return None, _http_error_code(exc)
+    except (OSError, TypeError, ValueError, http.client.HTTPException):
+        return None, None
+
+
+def post_pair(backend_url, secret, install_code=None, opener=None):
+    """Start or continue pairing; the server's answer, or None. Never raises."""
+    return _post_pair(backend_url, secret, install_code=install_code, opener=opener)[0]
+
+
+class Pairing:
+    """The agent's side of pairing, driven by each config poll.
+
+    `state` is "unknown" before the first answer, "unsupported" when the server
+    answers without `kioskAuth` (an old backend, design section 11), "pairing"
+    while the screen is unpaired, and "paired" once the server confirms it.
+
+    It rotates the secret exactly once when a screen it had paired (marker
+    present) is told it is unpaired: an old copy of the file must never work
+    again. A pending screen keeps its secret, so the code it shows stays put.
+    """
+
+    def __init__(self, *, secret_path=CREDENTIAL_FILE,
+                 install_code_path=INSTALL_CODE_FILE,
+                 marker_path=PAIRED_MARKER, opener=None):
+        self.secret_path = secret_path
+        self.install_code_path = install_code_path
+        self.marker_path = marker_path
+        self.opener = opener
+        self.state = "unknown"
+        self.secret = None
+        self._rotated_for_this_unpair = False
+        self._install_code_sent = False
+        # A rotation that could not be written is retried on the next poll; until
+        # it succeeds, step() must not offer the old secret again (review m1).
+        self._awaiting_rotation = False
+
+    def ensure_secret(self, now=None):
+        """Create the secret on first start. Returns a bool: True when created."""
+        existing = read_secret(self.secret_path)
+        if existing is not None:
+            self.secret = existing
+            return False
+        secret = rotate_secret(self.secret_path)
+        self.secret = secret
+        created = secret is not None
+        return created
+
+    def on_config(self, cfg, now=None, auth_sent=True):
+        """Read one config answer. True when the secret was rotated.
+
+        `auth_sent` says whether the request this answer replies to carried the
+        kiosk bearer. An "unpaired" answer to a bearer-less request (the bearer
+        is suspended after an old server's 401, or the file is unreadable) says
+        nothing about this screen: rotating then would lose a pairing the
+        design promises survives a rollback (design section 11, review M2).
+        """
+        auth = cfg.get("kioskAuth") if isinstance(cfg, dict) else None
+        if not isinstance(auth, dict):
+            self.state = "unsupported"
+            return False
+        state = auth.get("state")
+        if state == "paired":
+            self.state = "paired"
+            self._rotated_for_this_unpair = False
+            self._awaiting_rotation = False
+            self._install_code_sent = False
+            if not _paired_marker_exists(self.marker_path):
+                _write_private_file(self.marker_path, "paired\n")
+            return False
+        if state == "unpaired":
+            if not auth_sent:
+                return False
+            self.state = "pairing"
+            if _paired_marker_exists(self.marker_path) and not (
+                self._rotated_for_this_unpair
+            ):
+                secret = rotate_secret(self.secret_path)
+                self.secret = secret
+                if secret is None:
+                    # Keep the marker so the next poll tries again, and stay out
+                    # of step(): the old secret must never be re-paired.
+                    self._awaiting_rotation = True
+                    return False
+                _remove_file(self.marker_path)
+                self._rotated_for_this_unpair = True
+                self._awaiting_rotation = False
+                self._install_code_sent = False
+                return True
+            return False
+        # An answer this agent does not understand: keep the state as it was.
+        return False
+
+    def step(self, backend_url, opener=None, now=None):
+        """POST .../pair once for this poll. True when the screen became paired."""
+        if self.state != "pairing" or self._awaiting_rotation:
+            return False
+        secret = read_secret(self.secret_path)
+        if secret is None:
+            self.ensure_secret(now)
+            secret = self.secret
+        if secret is None:
+            return False
+        install_code = None
+        if not self._install_code_sent:
+            install_code = read_install_code(self.install_code_path)
+        payload, error = _post_pair(
+            backend_url,
+            secret,
+            install_code=install_code,
+            opener=opener or self.opener,
+        )
+        if payload is None:
+            if error == "install_code_invalid":
+                _remove_file(self.install_code_path)
+                self._install_code_sent = True
+            return False
+        state = payload.get("state")
+        if state == "paired":
+            self.state = "paired"
+            self._rotated_for_this_unpair = False
+            self._install_code_sent = True
+            _remove_file(self.install_code_path)
+            _write_private_file(self.marker_path, "paired\n")
+            return True
+        if state == "pending":
+            # The server kept a pending entry for this secret. An install code
+            # that was sent once is not sent again.
+            self._install_code_sent = True
+            return False
+        return False
+
+
+class BrowserRestart:
+    """Decide when the browser should be restarted to pick the secret up again.
+
+    The server says "unpaired" for a paired screen whose browser has lost its
+    cookie (an admin password reset, a cog without a cookie store, a re-pair).
+    Two such polls in a row restart it, at most once per cooldown, so a screen
+    that never gets a cookie cannot be restarted in a loop. "unknown" is never
+    evidence of anything.
+    """
+
+    def __init__(self, cooldown=BROWSER_RESTART_COOLDOWN_SECONDS,
+                 polls_needed=BROWSER_UNPAIRED_POLLS):
+        self.cooldown = cooldown
+        self.polls_needed = polls_needed
+        self._streak = 0
+        self._last_restart = None
+
+    def observe(self, browser_state, paired, now):
+        """Feed one poll; True means "restart the browser now"."""
+        if not paired or browser_state != "unpaired":
+            self._streak = 0
+            return False
+        self._streak += 1
+        if self._streak < self.polls_needed:
+            return False
+        if self._last_restart is not None and now - self._last_restart < self.cooldown:
+            self._streak = 0
+            return False
+        self._last_restart = now
+        self._streak = 0
+        return True
+
 
 # A touch can wake a panel the agent turned off (on X11 an input event undoes a
 # forced DPMS off) and the agent cannot see that happen. While a hold keeps the
@@ -1386,11 +1823,14 @@ def post_display_check(backend_url, payload, *, kiosk_id=None, opener=None):
     opener = opener or urllib.request
     url = display_check_report_url(backend_url, kiosk_id)
     data = json.dumps(payload).encode()
-    request = urllib.request.Request(
-        url, data=data, headers={"Content-Type": "application/json"}, method="POST"
-    )
     try:
-        with opener.urlopen(request, timeout=HTTP_TIMEOUT) as response:
+        with _request(
+            url,
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+            opener=opener,
+        ) as response:
             return 200 <= getattr(response, "status", 200) < 300
     except (OSError, ValueError) as e:
         log(f"display check: report failed ({e})")
@@ -1416,9 +1856,8 @@ def post_screen_sleep(backend_url, *, opener=None):
     else:
         url = f"{base}/api/screen-sleep"
     opener = opener or urllib.request
-    request = urllib.request.Request(url, data=b"", method="POST")
     try:
-        with opener.urlopen(request, timeout=HTTP_TIMEOUT) as response:
+        with _request(url, data=b"", method="POST", opener=opener) as response:
             return 200 <= getattr(response, "status", 200) < 300
     except (OSError, ValueError) as e:
         log(f"screen sleep: report failed ({e})")
@@ -2642,9 +3081,9 @@ def _config_url(
     return base + "/api/config"
 
 
-def fetch_config(backend_url, kstat=None, kmsg=None, timeout=HTTP_TIMEOUT):
+def fetch_config(backend_url, kstat=None, kmsg=None, timeout=HTTP_TIMEOUT, opener=None):
     kiosk_id = os.environ.get("CALVIN_KIOSK_ID", "").strip()
-    host = os.environ.get("CALVIN_KIOSK_HOSTNAME", "").strip() or socket.gethostname()
+    host = kiosk_hostname()
     if kstat is None:
         kstat, kmsg = update_report()
     url = _config_url(
@@ -2660,7 +3099,7 @@ def fetch_config(backend_url, kstat=None, kmsg=None, timeout=HTTP_TIMEOUT):
         kwifi=wifi_power_save_state() or "none",
         kfeat=",".join(AGENT_FEATURES),
     )
-    with urllib.request.urlopen(url, timeout=timeout) as r:
+    with _request(url, timeout=timeout, opener=opener) as r:
         cfg = json.load(r)
     touch_ready()
     return cfg
@@ -2687,6 +3126,7 @@ def run(
     iterations=None,
     apply_device=None,
     brightness=None,
+    pairing=None,
 ):
     if apply_device is None:
         apply_device = apply_device_physical
@@ -2698,6 +3138,29 @@ def run(
     check_thread = None
     handled_check_id = None
     recovered = False
+    if pairing is None:
+        pairing = Pairing()
+    browser_restart = BrowserRestart()
+
+    def restart_browser_once():
+        try:
+            restart_kiosk_browsers()
+        except Exception as e:
+            # Never the message: it is not the pairing code's business to reach a
+            # log, and the class is all a reader needs (review M1).
+            log(f"pairing: {type(e).__name__}")
+
+    created = False
+    try:
+        created = pairing.ensure_secret()
+    except Exception as e:
+        # A credential file is not allowed to keep the agent from polling: the
+        # screen keeps its schedule even when pairing is unusable (review M1).
+        log(f"pairing: {type(e).__name__}")
+    if created:
+        # The browser has never had this secret: one restart lets its unit
+        # rebuild the start URL with #pair=, so a pending screen shows its code.
+        restart_browser_once()
 
     def maybe_start_check(cfg, check_thread, handled_check_id):
         job = display_check_job(cfg)
@@ -2773,6 +3236,29 @@ def run(
                 last = controller.reconcile(
                     cfg, now, last, cancel=ramp_cancel(desired)
                 )
+            # Pairing rides the config poll, but only after the screen is
+            # reconciled: no pairing trouble may skip turning the display on or
+            # off for this poll (review M1). It is isolated from the loop for the
+            # same reason; only the exception class is logged (never a secret).
+            try:
+                # An "unpaired" answer counts only when the request it answers
+                # actually carried the bearer (review M2).
+                bearer_sent = bool(auth_headers())
+                if pairing.on_config(cfg, now, auth_sent=bearer_sent):
+                    restart_browser_once()
+                if bearer_sent and pairing.state == "pairing":
+                    pairing.step(backend_url)
+                auth_info = cfg.get("kioskAuth")
+                if isinstance(auth_info, dict):
+                    paired = (
+                        auth_info.get("state") == "paired" or pairing.state == "paired"
+                    )
+                    if browser_restart.observe(
+                        auth_info.get("browser"), paired, time_module.monotonic()
+                    ):
+                        restart_browser_once()
+            except Exception as e:
+                log(f"pairing: {type(e).__name__}")
             if first_pass:
                 # Recover an interrupted check only once the first reconcile
                 # has powered the panel and let it settle.
@@ -3236,7 +3722,19 @@ def apply_device_physical(
 # --remote-debugging-port, bound to 127.0.0.1) and restarts the kiosk unit when
 # the page stops answering. The probe talks to Chromium, never to X11 or Wayland,
 # so it covers both display stacks unchanged.
-KIOSK_UNITS = ("calvin-kiosk-remote.service", "calvin-kiosk.service")
+KIOSK_UNITS = (
+    "calvin-kiosk-remote.service",
+    "calvin-kiosk.service",
+    "calvin-cog.service",
+)
+# The two units that actually draw a kiosk page. Pairing restarts one of them so
+# its start URL is rebuilt with the secret in the fragment (calvin-0xns). The
+# all-in-one calvin-kiosk.service has no kiosk id and never pairs.
+BROWSER_UNITS = ("calvin-kiosk-remote.service", COG_UNIT)
+# The CDP watchdog probes Chromium's DevTools port; cog/WPE has none, so cog is
+# never watched there (it would look unreachable forever). BROWSER_UNITS still
+# covers the pairing restart.
+WATCHDOG_UNITS = ("calvin-kiosk-remote.service", "calvin-kiosk.service")
 PAGE_OK = "ok"
 PAGE_DEAD = "dead"
 PAGE_UNREACHABLE = "unreachable"
@@ -3583,7 +4081,7 @@ def kiosk_unit_state(unit, run=None, monotonic=None):
     }
 
 
-def watched_kiosk_unit(units=KIOSK_UNITS, state=None):
+def watched_kiosk_unit(units=WATCHDOG_UNITS, state=None):
     """State of the running kiosk unit (remote first, then all-in-one), or None."""
     if state is None:
         state = kiosk_unit_state
@@ -3694,6 +4192,30 @@ def restart_kiosk_unit(
         log(f"watchdog: could not SIGKILL {unit}: {e}")
         return False
     return True
+
+
+def restart_kiosk_browsers(*, units=BROWSER_UNITS, state=None, restart=None):
+    """Restart each running kiosk browser so it re-reads its start URL.
+
+    A stopped unit (cog's "off") is skipped: pairing must never switch a screen
+    on. No sudo is involved; the agent already owns the browser process.
+    """
+    state = state or kiosk_unit_state
+    restart = restart or restart_kiosk_unit
+    restarted = False
+    for unit in units:
+        try:
+            info = state(unit)
+        except Exception:
+            continue
+        if not info or not info.get("active"):
+            continue
+        try:
+            if restart(unit):
+                restarted = True
+        except Exception as e:
+            log(f"pairing: could not restart {unit} ({e})")
+    return restarted
 
 
 # -- the decision and the loop ------------------------------------------------

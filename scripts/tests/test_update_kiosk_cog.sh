@@ -80,7 +80,22 @@ export CALVIN_AGENT_READY_MARKER="$tmp/run/agent-ready"
 export CALVIN_UPDATE_HEALTH_TIMEOUT=2
 
 write_manifest v1
+# A reinstall/update must keep the agent's pairing files byte for byte: an
+# update must never delete the screen's secret or its one-time install code.
+printf 'clv_kiosk_%s\n' "$(printf 'A%.0s' {1..43})" > "$tmp/state/kiosk-credential"
+printf 'clv_pair_%s\n' "$(printf 'b%.0s' {1..22})" > "$tmp/state/install-pair-code"
+chmod 600 "$tmp/state/kiosk-credential" "$tmp/state/install-pair-code"
+credential_before="$(sha256sum "$tmp/state/kiosk-credential" | cut -d' ' -f1)"
+install_code_before="$(sha256sum "$tmp/state/install-pair-code" | cut -d' ' -f1)"
 bash "$SCRIPT" >/dev/null
+
+[ "$(sha256sum "$tmp/state/kiosk-credential" | cut -d' ' -f1)" = "$credential_before" ] \
+    || fail "an update changed or deleted kiosk-credential"
+[ "$(sha256sum "$tmp/state/install-pair-code" | cut -d' ' -f1)" = "$install_code_before" ] \
+    || fail "an update changed or deleted install-pair-code"
+assert_mode "$tmp/state/kiosk-credential" 600
+assert_mode "$tmp/state/install-pair-code" 600
+pass "an update keeps the agent's pairing files byte for byte"
 
 # The cog unit + root helper are installed at their pinned paths and modes.
 [ -f "$tmp/systemd/calvin-cog.service" ] || fail "calvin-cog.service not installed"

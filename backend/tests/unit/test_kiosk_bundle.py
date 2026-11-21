@@ -93,6 +93,22 @@ def test_cog_bundle_files_never_switch_the_stack(tmp_path):
     assert by_name["calvin-cog-panel.sh"]["mode"] == "0755"
 
 
+def test_bundle_carries_both_kiosk_browser_units(tmp_path):
+    """The start URL with #pair= arrives with the units, not a separate install.
+
+    One Update brings the new agent and both browser units, so the agent's own
+    one-time restart (not the Update, which never restarts cog) applies the new
+    start URL to whichever browser the screen runs (design section 6).
+    """
+    _seed(tmp_path)
+    by_name = {f["name"]: f for f in kiosk_bundle.build_manifest(tmp_path)["files"]}
+    for name in ("calvin-kiosk-remote.service", "calvin-cog.service"):
+        assert name in by_name, name
+        assert by_name[name]["target_path"] == f"/etc/systemd/system/{name}"
+        assert by_name[name]["mode"] == "0644"
+    assert by_name["calvin-cog.service"]["restart_unit"] is None
+
+
 def test_enable_does_not_change_version(tmp_path):
     # The version hash must depend on file contents only, not the enable field.
     import hashlib

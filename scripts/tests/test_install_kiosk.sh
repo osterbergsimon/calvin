@@ -224,4 +224,35 @@ if bash "$tmp/served.sh" --no-reboot --display-stack cage 2>/dev/null; then
 [ ! -f "$RUN_LOG" ] || { echo "FAIL: setup ran with an invalid display stack"; exit 1; }
 echo "PASS install-rejects-invalid-display-stack"
 
+# --- 13. The one-time pair code reaches setup-kiosk.sh (calvin-0xns) ---------
+PAIR_CODE="clv_pair_$(printf 'a%.0s' {1..22})"
+sed -e "s|@CALVIN_SERVER_URL@|http://tower.local:8000|" \
+    -e "s|__PAIR_CODE__|$PAIR_CODE|" "$INSTALLER" > "$tmp/served-pair.sh"
+reset
+bash "$tmp/served-pair.sh" --no-reboot >/dev/null
+grep -qx "SETUP --backend-url http://tower.local:8000 --pair-code $PAIR_CODE" "$RUN_LOG" \
+    || { echo "FAIL: baked pair code not passed to setup-kiosk.sh"; cat "$RUN_LOG"; exit 1; }
+echo "PASS install-forwards-baked-pair-code"
+
+reset
+bash "$tmp/served.sh" --no-reboot --pair-code "$PAIR_CODE" >/dev/null
+grep -qx "SETUP --backend-url http://tower.local:8000 --pair-code $PAIR_CODE" "$RUN_LOG" \
+    || { echo "FAIL: --pair-code not passed to setup-kiosk.sh"; cat "$RUN_LOG"; exit 1; }
+echo "PASS install-forwards-pair-code-flag"
+
+reset
+if bash "$tmp/served.sh" --no-reboot --pair-code 'clv_pair_short' 2>/dev/null; then
+    echo "FAIL: malformed --pair-code accepted"; exit 1; fi
+[ ! -f "$RUN_LOG" ] || { echo "FAIL: setup ran with a malformed pair code"; exit 1; }
+echo "PASS install-rejects-malformed-pair-code"
+
+# The value is checked as a whole string: grep is line-wise, so a multi-line
+# value used to pass and then be embedded in the generated installer (review m5).
+MULTILINE=$'x; echo pwned\n'"clv_pair_$(printf 'a%.0s' {1..22})"
+reset
+if bash "$tmp/served.sh" --no-reboot --pair-code "$MULTILINE" 2>/dev/null; then
+    echo "FAIL: multi-line --pair-code accepted"; exit 1; fi
+[ ! -f "$RUN_LOG" ] || { echo "FAIL: setup ran with a multi-line pair code"; exit 1; }
+echo "PASS install-rejects-multiline-pair-code"
+
 echo "PASS"

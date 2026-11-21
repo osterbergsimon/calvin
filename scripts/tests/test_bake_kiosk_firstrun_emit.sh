@@ -58,4 +58,17 @@ parse_args --backend-url http://h:8000 --boot-dir /tmp
 out4="$(emit_firstrun)"
 echo "$out4" | grep -qF "SIGNING_KEY=''" || { echo "FAIL: empty signing key not baked"; exit 1; }
 
+# --- a one-time pair code is baked into the installer (calvin-0xns) ---------
+PAIR_CODE="clv_pair_$(printf 'c%.0s' {1..22})"
+parse_args --backend-url http://h:8000 --boot-dir /tmp --pair-code "$PAIR_CODE"
+out5="$(emit_firstrun)"
+echo "$out5" | grep -qF "PAIR_CODE='$PAIR_CODE'" \
+    || { echo "FAIL: pair code not baked into the installer"; exit 1; }
+if echo "$out5" | grep -qF '__PAIR_CODE__'; then
+    echo "FAIL: the pair placeholder survived a baked code"; exit 1; fi
+# The code lives on the world-readable FAT partition only until boot 1 removes
+# the script it is embedded in (review m6).
+echo "$out5" | grep -qF 'rm -f /boot/firmware/firstrun.sh' \
+    || { echo "FAIL: firstrun.sh with a pair code does not delete itself"; exit 1; }
+
 echo "PASS"

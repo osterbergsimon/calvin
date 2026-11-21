@@ -40,4 +40,19 @@ if ( parse_args --backend-url http://h:8000 --boot-dir "$tmp" --signing-key noth
 if ( parse_args --backend-url http://h:8000 --boot-dir "$tmp" --git-branch develop ) 2>/dev/null; then
     echo "FAIL: retired --git-branch still accepted"; exit 1; fi
 
+# A one-time pair code is accepted in either form and refused when malformed.
+PAIR_CODE="clv_pair_$(printf 'c%.0s' {1..22})"
+( parse_args --backend-url http://h:8000 --boot-dir "$tmp" --pair-code "$PAIR_CODE"; validate_args ) \
+    || { echo "FAIL: valid --pair-code rejected"; exit 1; }
+( parse_args --backend-url=http://h:8000 --boot-dir="$tmp" --pair-code="$PAIR_CODE"; validate_args ) \
+    || { echo "FAIL: --pair-code=value form rejected"; exit 1; }
+if ( parse_args --backend-url http://h:8000 --boot-dir "$tmp" --pair-code 'clv_pair_short'; validate_args ) 2>/dev/null; then
+    echo "FAIL: malformed --pair-code accepted"; exit 1; fi
+
+# The whole string is checked: a multi-line value is refused, never embedded in
+# PAIR_CODE='...' of the generated installer (review m5).
+MULTILINE=$'x\n'"clv_pair_$(printf 'c%.0s' {1..22})"
+if ( parse_args --backend-url http://h:8000 --boot-dir "$tmp" --pair-code "$MULTILINE"; validate_args ) 2>/dev/null; then
+    echo "FAIL: multi-line --pair-code accepted"; exit 1; fi
+
 echo "PASS"

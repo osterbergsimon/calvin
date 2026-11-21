@@ -22,8 +22,12 @@ chmod +x "$tmp/bin/curl" "$tmp/bin/systemctl"
 export PATH="$tmp/bin:$PATH"
 
 # Stub installer (the real one is baked to /usr/local/bin/calvin-kiosk-install.sh).
+# It carries a one-time pair code like the baked copy does, so the wrapper's
+# clearing step can be checked (review m6).
+PAIR_CODE="clv_pair_$(printf 'b%.0s' {1..22})"
 cat > "$tmp/installer.sh" <<EOF
 #!/usr/bin/env bash
+PAIR_CODE='$PAIR_CODE'
 echo "INSTALL \$*" >> "$tmp/install.log"
 EOF
 export CALVIN_KIOSK_INSTALLER="$tmp/installer.sh"
@@ -61,6 +65,14 @@ grep -q "disable calvin-kiosk-firstboot.service" "$tmp/systemctl.log" \
 grep -qw "reboot" "$tmp/systemctl.log" || { echo "FAIL: no reboot requested"; exit 1; }
 grep -q 'Installing' "$tmp/console" || { echo "FAIL: no on-screen install status"; exit 1; }
 echo "PASS firstboot-runs-installer"
+
+# A successful install clears the one-time code from the world-readable baked
+# installer: it has done its work, so leave no copy behind (review m6).
+grep -qx "PAIR_CODE=''" "$tmp/installer.sh" \
+    || { echo "FAIL: pair code not cleared after a successful install"; cat "$tmp/installer.sh"; exit 1; }
+if grep -q "clv_pair_" "$tmp/installer.sh"; then
+    echo "FAIL: the baked installer still holds a pair code"; exit 1; fi
+echo "PASS firstboot-clears-pair-code"
 
 # Second run: sentinel present => no new install, exits 0.
 rm -f "$tmp/install.log"
