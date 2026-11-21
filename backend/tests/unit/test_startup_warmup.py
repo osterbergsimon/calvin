@@ -105,6 +105,11 @@ async def test_lifespan_schedules_the_warmups(monkeypatch):
     # The per-screen startup migrations read the kiosks table this test never
     # creates; they are covered by their own tests.
     monkeypatch.setattr("app.services.kiosk_registry.migrate_strip_screen_now", noop)
+    monkeypatch.setattr("app.services.kiosk_registry.migrate_drop_invalid_modes", noop)
+    monkeypatch.setattr("app.services.kiosk_registry.clear_mode_mismatched_commands", noop)
+    from app.services.config_service import config_service
+
+    monkeypatch.setattr(config_service, "get_config", AsyncMock(return_value={}))
 
     image_scan = AsyncMock()
     monkeypatch.setattr(main, "_initialize_image_service", image_scan)
@@ -116,3 +121,48 @@ async def test_lifespan_schedules_the_warmups(monkeypatch):
 
     assert scheduled == [True]
     image_scan.assert_not_awaited()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_lifespan_retries_the_screen_power_cleanup(monkeypatch):
+    """The restore warning says a restart retries the mode cleanup; startup does."""
+    from unittest.mock import AsyncMock
+
+    async def noop(*_args, **_kwargs):
+        return None
+
+    for step in (
+        "_initialize_database",
+        "_initialize_plugins",
+        "_restore_on_start",
+        "_initialize_keyboard_mappings",
+        "_initialize_default_config",
+        "_start_schedulers",
+        "_sync_display_orientation",
+        "_shutdown_services",
+    ):
+        monkeypatch.setattr(main, step, noop)
+    monkeypatch.setattr(main, "_ensure_kiosk_signing_key", lambda: None)
+    monkeypatch.setattr("app.database.connect_db", noop)
+    monkeypatch.setattr("app.database.disconnect_db", noop)
+    monkeypatch.setattr("app.utils.legacy_data.migrate_legacy_data", lambda _settings: None)
+    strip = AsyncMock()
+    drop = AsyncMock()
+    clear = AsyncMock()
+    monkeypatch.setattr("app.services.kiosk_registry.migrate_strip_screen_now", strip)
+    monkeypatch.setattr("app.services.kiosk_registry.migrate_drop_invalid_modes", drop)
+    monkeypatch.setattr("app.services.kiosk_registry.clear_mode_mismatched_commands", clear)
+    from app.services.config_service import config_service
+
+    household = {"screen_power": "external"}
+    monkeypatch.setattr(config_service, "get_config", AsyncMock(return_value=household))
+    monkeypatch.setattr(main, "_initialize_image_service", AsyncMock())
+    monkeypatch.setattr(main, "_start_warmup_tasks", lambda: [])
+
+    async with main.lifespan(main.app):
+        pass
+
+    strip.assert_awaited_once()
+    drop.assert_awaited_once()
+    clear.assert_awaited_once_with(household)
