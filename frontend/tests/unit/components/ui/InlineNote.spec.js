@@ -79,4 +79,35 @@ describe("InlineNote", () => {
     expect(STYLE).toMatch(/color:\s*var\(--err-text\)/);
     expect(STYLE).toMatch(/color:\s*var\(--ok-text\)/);
   });
+
+  // calvin-cdva: a long note used to wrap its text onto a new flex line, leaving
+  // the icon alone above it. The text and its action now share a body beside
+  // the icon; only the body wraps.
+  it("keeps the icon beside a body that holds the text and the action", () => {
+    const w = mount(InlineNote, {
+      props: { tone: "warn" },
+      slots: {
+        default: "Couldn't get a one-time code. This command still works.",
+        action: '<button type="button">Try again</button>',
+      },
+    });
+    const children = [...w.element.children].map(child => child.className);
+    expect(children).toEqual(["inline-note__icon", "inline-note__body"]);
+    const body = w.find(".inline-note__body");
+    expect(body.find(".inline-note__text").text()).toBe(
+      "Couldn't get a one-time code. This command still works."
+    );
+    expect(body.find(".inline-note__action button").text()).toBe("Try again");
+  });
+
+  it("wraps inside the body, never between the icon and the text", () => {
+    const note = STYLE.match(/\.inline-note\s*\{[^}]*\}/s)[0];
+    expect(note).not.toMatch(/flex-wrap:\s*wrap/);
+    const body = STYLE.match(/\.inline-note__body\s*\{[^}]*\}/s)[0];
+    expect(body).toMatch(/flex-wrap:\s*wrap/);
+    expect(body).toMatch(/min-width:\s*0/);
+    // It shrinks to the room beside the icon but does not grow, so a short or
+    // centred note keeps its own width.
+    expect(body).toMatch(/flex:\s*0 1 auto/);
+  });
 });

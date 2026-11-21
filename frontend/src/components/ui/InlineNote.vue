@@ -5,8 +5,12 @@
         <path :d="toneIcon" fill="currentColor" />
       </svg>
     </span>
-    <span class="inline-note__text"><slot /></span>
-    <span v-if="$slots.action" class="inline-note__action"><slot name="action" /></span>
+    <!-- The text and its action share a body beside the icon, so a long note
+         wraps beside the icon instead of leaving it on a line of its own. -->
+    <span class="inline-note__body">
+      <span class="inline-note__text"><slot /></span>
+      <span v-if="$slots.action" class="inline-note__action"><slot name="action" /></span>
+    </span>
   </p>
 </template>
 
@@ -47,14 +51,27 @@ const toneIcon = computed(() => TONE_ICONS[toneClass.value] || null);
 <style scoped>
 .inline-note {
   display: flex;
-  flex-wrap: wrap;
   align-items: flex-start;
-  gap: var(--gap-tight) var(--gap-inline);
+  gap: var(--gap-inline);
   margin: 0;
   font-family: var(--font-ui);
   font-size: var(--text-meta);
   line-height: 1.4;
   color: var(--ink-2);
+}
+
+/* The icon never wraps away from the text: the row itself does not wrap, and
+   the body shrinks to the room beside the icon and wraps inside itself. A
+   short note keeps its own width (a centred note stays centred). The action
+   sits at the end of a short text and drops below a long one, lined up with
+   the text, not the icon. */
+.inline-note__body {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--gap-tight) var(--gap-inline);
+  min-width: 0;
 }
 
 .inline-note__text {
