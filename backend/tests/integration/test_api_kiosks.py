@@ -230,29 +230,28 @@ def test_overrides_get_unknown_404(test_client: TestClient):
 
 
 @pytest.mark.integration
-def test_screen_now_override_is_stored_and_returned_in_config(test_client: TestClient):
-    """Settings › Screens › "Screen now" rides in the kiosk override layer.
+def test_screen_now_is_no_longer_a_layer_setting(test_client: TestClient):
+    """The command column replaced a Screen now in the layer (calvin-25g9).
 
-    The UI writes camelCase; the agent reads snake_case first, so the merged
-    config must carry the same object under both spellings.
+    A stale Settings page still sends one; the server strips it from the write,
+    so it is neither stored nor returned nor projected.
     """
     screen_now = {"power": "off", "setAt": "2026-11-01T20:00:00Z"}
     put = test_client.put(
         "/api/kiosks/hall-now/overrides",
-        json={"overrides": {"screenNow": screen_now}},
+        json={"overrides": {"displayName": "Hall", "screenNow": screen_now}},
     )
     assert put.status_code == 200
     stored = dict(test_client.get("/api/kiosks/hall-now/overrides").json()["overrides"])
     stored.pop("showUI", None)  # per-screen control migrated on first touch
-    assert stored == {"screenNow": screen_now}
+    assert stored == {"displayName": "Hall"}
 
     body = test_client.get("/api/kiosks/hall-now/config").json()
-    assert body["screenNow"] == screen_now
-    assert body["screen_now"] == screen_now
+    assert "screenNow" not in body and "screen_now" not in body
 
     listed = test_client.get("/api/kiosks").json()["kiosks"]
     kiosk = next(k for k in listed if k["id"] == "hall-now")
-    assert kiosk["overrides"]["screenNow"] == screen_now
+    assert "screenNow" not in kiosk["overrides"]
 
 
 @pytest.mark.integration

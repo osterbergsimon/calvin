@@ -1,4 +1,4 @@
-"""The kiosk power hold and the agent feature report (calvin-2ifv)."""
+"""The kiosk power command and the agent feature report (calvin-2ifv, calvin-25g9)."""
 
 import json
 from datetime import UTC, datetime
@@ -8,12 +8,13 @@ import pytest
 from app.models.db_models import KioskDB
 from app.services import kiosk_registry
 from app.services.kiosk_registry import (
-    clear_power_hold,
+    clear_power_command,
     get_overrides,
-    get_power_hold,
-    power_state,
+    get_power_command,
+    merge_into_overrides,
+    power_status,
     set_overrides,
-    set_power_hold,
+    set_power_command,
 )
 
 pytestmark = [pytest.mark.asyncio, pytest.mark.unit]
@@ -35,61 +36,80 @@ async def _listed(kiosk_id: str = KIOSK) -> dict:
 
 async def test_set_get_clear_round_trip(test_db):
     await _register()
-    assert await get_power_hold(KIOSK) is None
-    hold = await set_power_hold(KIOSK, "off", "automation")
-    assert hold is not None
-    assert hold["power"] == "off" and hold["by"] == "automation"
-    assert hold["setAt"].endswith("Z")
-    assert await get_power_hold(KIOSK) == hold
-    assert await clear_power_hold(KIOSK) is True
-    assert await get_power_hold(KIOSK) is None
-    assert await clear_power_hold(KIOSK) is False
+    assert await get_power_command(KIOSK) is None
+    command = await set_power_command(KIOSK, "off", "automation", mode="schedule")
+    assert command is not None
+    assert command["power"] == "off"
+    assert command["by"] == "automation"
+    assert command["mode"] == "schedule"
+    assert "keyName" not in command
+    assert command["setAt"].endswith("Z")
+    assert await get_power_command(KIOSK) == command
+    assert await clear_power_command(KIOSK) is True
+    assert await get_power_command(KIOSK) is None
+    assert await clear_power_command(KIOSK) is False
 
 
-async def test_set_hold_removes_screen_now_but_keeps_other_keys(test_db):
+async def test_the_key_name_is_stored_and_only_shown_by_the_admin_answer(test_db):
+    await _register()
+    command = await set_power_command(KIOSK, "on", "automation", mode="external", key_name="Homey")
+    assert command["keyName"] == "Homey"
+    assert (await get_power_command(KIOSK))["keyName"] == "Homey"
+    # The kiosk list is public: it never carries the name.
+    listed = await _listed()
+    assert listed["powerHold"]["power"] == "on"
+    assert "keyName" not in listed["powerHold"]
+    assert "Homey" not in json.dumps(listed)
+
+
+async def test_set_command_removes_screen_now_but_keeps_other_keys(test_db):
     await _register()
     await set_overrides(
         KIOSK,
         {"displayName": "Kitchen", "screenNow": {"power": "on", "setAt": "2026-11-18T10:00:00Z"}},
     )
-    await set_power_hold(KIOSK, "off", "automation")
+    await set_power_command(KIOSK, "off", "automation", mode="schedule")
     assert await get_overrides(KIOSK) == {"displayName": "Kitchen"}
 
 
-async def test_clear_hold_also_removes_screen_now(test_db):
+async def test_clear_command_also_removes_screen_now(test_db):
     await _register()
     await set_overrides(KIOSK, {"screen_now": {"power": "on", "setAt": "2026-11-18T10:00:00Z"}})
-    assert await clear_power_hold(KIOSK) is True
+    await set_power_command(KIOSK, "off", "settings", mode="schedule")
+    assert await clear_power_command(KIOSK) is True
     assert await get_overrides(KIOSK) == {}
 
 
 async def test_unknown_kiosk_creates_nothing(test_db):
-    assert await set_power_hold("ghost", "off", "automation") is None
-    assert await clear_power_hold("ghost") is None
-    assert await get_power_hold("ghost") is None
+    assert await set_power_command("ghost", "off", "automation", mode="schedule") is None
+    assert await clear_power_command("ghost") is None
+    assert await get_power_command("ghost") is None
     assert await KioskDB.objects.count() == 0
 
 
-async def test_invalid_power_or_writer_is_refused(test_db):
+async def test_invalid_power_writer_or_mode_is_refused(test_db):
     await _register()
     with pytest.raises(ValueError):
-        await set_power_hold(KIOSK, "dim", "automation")
+        await set_power_command(KIOSK, "dim", "automation", mode="schedule")
     with pytest.raises(ValueError):
-        await set_power_hold(KIOSK, "off", "Homey key")
+        await set_power_command(KIOSK, "off", "Homey key", mode="schedule")
+    # A command belongs to Schedule or External; Always on has none.
+    with pytest.raises(ValueError):
+        await set_power_command(KIOSK, "off", "automation", mode="always_on")
 
 
-async def test_layer_replace_leaves_the_hold(test_db):
+async def test_layer_replace_leaves_the_command(test_db):
     await _register()
-    await set_power_hold(KIOSK, "off", "automation")
+    await set_power_command(KIOSK, "off", "automation", mode="schedule")
     await set_overrides(KIOSK, {"displayName": "Kitchen"})
-    assert (await get_power_hold(KIOSK))["power"] == "off"
+    assert (await get_power_command(KIOSK))["power"] == "off"
 
 
-async def test_heartbeat_leaves_the_hold(test_db):
+async def test_heartbeat_leaves_the_command(test_db):
     await _register()
-    await set_power_hold(KIOSK, "off", "automation")
+    await set_power_command(KIOSK, "off", "automation", mode="schedule")
     await kiosk_registry.record_kiosk(KIOSK, hostname="pi-renamed", agent_version="v2")
-    assert (await get_power_hold(KIOSK))["power"] == "off"
+    assert (await get_power_command(KIOSK))["power"] == "off"
 
 
 async def test_agent_feature_report(test_db):
@@ -115,71 +135,51 @@ async def test_unknown_features_are_ignored(test_db):
     assert row.agent_features == "hold"
 
 
-async def test_list_shows_the_hold_without_a_key_name(test_db):
-    await _register()
-    assert (await _listed())["powerHold"] is None
-    await set_power_hold(KIOSK, "on", "automation")
-    listed = await _listed()
-    assert listed["powerHold"]["power"] == "on"
-    assert listed["powerHold"]["by"] == "automation"
-    assert set(listed["powerHold"]) == {"power", "setAt", "by"}
-    assert "Homey" not in json.dumps(listed)
-
-
-async def test_malformed_stored_hold_reads_as_none(test_db):
+async def test_a_malformed_stored_command_reads_as_none(test_db):
     await _register()
     row = await KioskDB.objects.get(id=KIOSK)
-    row.power_hold = {"power": "dim"}
+    # A hold written by a backend before the mode existed has no mode: absent.
+    row.power_hold = {"power": "off", "setAt": "2026-11-18T10:00:00Z", "by": "automation"}
     await row.update(_columns=["power_hold"])
-    assert await get_power_hold(KIOSK) is None
+    assert await get_power_command(KIOSK) is None
     assert (await _listed())["powerHold"] is None
-    assert (await power_state(KIOSK))[0] is None
+    assert (await power_status(KIOSK))["command"] is None
 
 
-async def test_clearing_a_hold_leaves_a_tombstone_that_is_not_a_hold(test_db):
-    """The column keeps the change time, but no reader sees a hold (calvin-ldeu)."""
+async def test_the_oldest_readers_get_no_key_name_from_the_status(test_db):
     await _register()
-    await set_power_hold(KIOSK, "off", "automation", now=_at(10))
-    assert await clear_power_hold(KIOSK, now=_at(11)) is True
-    row = await KioskDB.objects.get(id=KIOSK)
-    assert row.power_hold == {"power": None, "setAt": "2026-11-18T11:00:00Z"}
-    assert await get_power_hold(KIOSK) is None
-    assert (await _listed())["powerHold"] is None
-    hold, changed_at = await power_state(KIOSK)
-    assert hold is None and changed_at == _at(11)
-    # Nothing left to clear: the next "schedule" keeps the change time.
-    assert await clear_power_hold(KIOSK, now=_at(12)) is False
-    assert (await power_state(KIOSK))[1] == _at(11)
+    await set_power_command(KIOSK, "on", "automation", mode="external", key_name="Homey")
+    status = await power_status(KIOSK)
+    assert status["command"]["keyName"] == "Homey"
+    assert status["command"]["mode"] == "external"
 
 
-async def test_power_state_reports_a_live_hold_and_its_time(test_db):
+async def test_every_layer_write_strips_screen_now(test_db):
     await _register()
-    assert await power_state(KIOSK) == (None, None)
-    hold = await set_power_hold(KIOSK, "on", "automation", now=_at(10))
-    assert await power_state(KIOSK) == (hold, _at(10))
+    await set_overrides(
+        KIOSK, {"displayName": "Kitchen", "screenNow": {"power": "on", "setAt": "x"}}
+    )
+    assert await get_overrides(KIOSK) == {"displayName": "Kitchen"}
+    await merge_into_overrides(
+        KIOSK, {"screen_now": {"power": "off", "setAt": "x"}, "orientation": "portrait"}
+    )
+    assert await get_overrides(KIOSK) == {"displayName": "Kitchen", "orientation": "portrait"}
 
 
-async def test_schedule_after_a_lone_screen_now_records_the_change(test_db):
-    """Removing a plain "Screen now" (no hold) is a power change too (calvin-ldeu)."""
-    await _register()
-    await set_overrides(KIOSK, {"screenNow": {"power": "on", "setAt": "2026-11-18T09:00:00Z"}})
-    assert await clear_power_hold(KIOSK, now=_at(11)) is True
-    assert await get_overrides(KIOSK) == {}
-    hold, changed_at = await power_state(KIOSK)
-    assert hold is None and changed_at == _at(11)
+async def test_the_startup_migration_drops_a_stored_screen_now_once(test_db):
+    await _register("kitchen")
+    await _register("hall")
+    row = await KioskDB.objects.get(id="kitchen")
+    row.overrides = {
+        "displayName": "Kitchen",
+        "screenNow": {"power": "off", "setAt": "2026-11-18T10:00:00Z"},
+        "screen_now": {"power": "on", "setAt": "2026-11-18T10:00:00Z"},
+    }
+    await row.update(_columns=["overrides"])
 
-
-async def test_heartbeat_never_writes_back_the_layer(test_db, monkeypatch):
-    """A poll must not put back a screenNow that a hold change just removed."""
-    await _register()
-    await set_overrides(KIOSK, {"screenNow": {"power": "on", "setAt": "2026-11-18T10:00:00Z"}})
-    written: list[list[str]] = []
-    original = KioskDB.update
-
-    async def spy(self, _columns=None, **kwargs):
-        written.append(list(_columns or []))
-        return await original(self, _columns=_columns, **kwargs)
-
-    monkeypatch.setattr(KioskDB, "update", spy)
-    await kiosk_registry.record_kiosk(KIOSK, hostname="pi-new", agent_version="v3")
-    assert written and all("overrides" not in columns for columns in written)
+    assert await kiosk_registry.migrate_strip_screen_now() == 1
+    assert await get_overrides("kitchen") == {"displayName": "Kitchen"}
+    assert await get_overrides("hall") == {}
+    # Idempotent: the second run finds nothing to change.
+    assert await kiosk_registry.migrate_strip_screen_now() == 0
+    assert await get_overrides("kitchen") == {"displayName": "Kitchen"}

@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Screen power mode</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<!--
+  Mock for the Screen power choice (spec: ../../2026-11-21-screen-power-mode.md).
+  Role tokens copied from frontend/src/styles/theme.css (light and Backlit). Screen names, key names and times
+  are placeholders. Frames: a 390px phone and the 800x480 wall panel. Each frame has an id (P1, K1, E1, …) the
+  spec refers to. ?only=<section id> shows one section (used to make the PNGs).
+-->
+<style>
+:root {
+  --bg-0:#eef1f4; --bg-1:#ffffff; --bg-2:#ffffff; --line:#dde3e8; --line-soft:#e8edf1;
+  --ink:#1b242b; --ink-2:#5d6b75; --ink-3:#636e77; --focus:#e08a1e; --focus-ink:#1b242b;
+  --focus-text:#875c24; --ok:#2e9e6b; --ok-text:#25674e; --warn:#b38f00; --warn-text:#7f6a0f;
+  --err:#c0392b; --err-text:#76302b;
+  --font-ui:"IBM Plex Sans",system-ui,sans-serif; --font-data:"IBM Plex Mono",ui-monospace,monospace;
+  --text-caption:.75rem; --text-meta:.8rem; --text-body:.9rem; --text-label:1rem; --text-title:1.15rem;
+  --weight-body:400; --weight-strong:500; --weight-title:600;
+  --gap-1:.25rem; --gap-2:.5rem; --gap-3:.75rem; --gap-4:1rem; --gap-5:1.25rem; --gap-6:1.5rem; --gap-8:2rem;
+  --radius-control:8px; --radius-card:12px; --radius-panel:16px; --radius-round:999px;
+  --touch-target:2.75rem; --control-height:3rem;
+}
+.dark {
+  --bg-0:#0e1316; --bg-1:#151c21; --bg-2:#1d262d; --line:#27313a; --line-soft:#1e272e;
+  --ink:#eaf0f3; --ink-2:#9aa7b0; --ink-3:#818d96; --focus:#f3b052; --focus-ink:#151c21;
+  --focus-text:#efcd9a; --ok:#5bd0a0; --ok-text:#9bdec5; --warn:#ffd84d; --warn-text:#ffd84d;
+  --err:#ef6b5e; --err-text:#eda7a1;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:#d9dee3; font-family:var(--font-ui); color:#1b242b; }
+.board { padding:32px 16px; max-width:1260px; margin:0 auto; }
+h1 { font-size:1.4rem; font-weight:600; margin:0 0 8px; }
+h2 { font-size:1.1rem; font-weight:600; margin:40px 0 12px; }
+.board > p { max-width:76ch; margin:0 0 20px; line-height:1.5; }
+.row { display:flex; flex-wrap:wrap; gap:32px; align-items:flex-start; }
+figure { margin:0 0 24px; }
+figcaption { font-size:.85rem; color:#5d6b75; margin-top:8px; max-width:420px; line-height:1.4; }
+figcaption b { color:#1b242b; }
+body.only .board > h1, body.only .board > p { display:none; }
+body.only section[hidden] { display:none; }
+
+/* frames */
+.settings { background:var(--bg-0); color:var(--ink); padding:var(--gap-4); border-radius:var(--radius-panel); }
+.p390 { width:390px; }
+.k800 { width:812px; height:492px; overflow:hidden; border:6px solid #11161a; border-radius:10px; padding:var(--gap-4) var(--gap-5); }
+.head { display:flex; align-items:baseline; gap:var(--gap-3); margin:0 0 var(--gap-4); }
+.head .back { font-size:var(--text-body); text-decoration:underline; color:var(--ink); }
+.head h3 { margin:0; font-size:var(--text-title); font-weight:var(--weight-title); }
+.eyebrow { font-family:var(--font-data); font-size:var(--text-caption); text-transform:uppercase; letter-spacing:.14em; color:var(--ink-3); margin:0 0 var(--gap-2); }
+.panel { background:var(--bg-1); border:1px solid var(--line); border-radius:var(--radius-panel); }
+.panel > * { padding:var(--gap-3) var(--gap-5); }
+.panel > * + * { border-top:1px solid var(--line-soft); }
+.srow { display:flex; align-items:center; justify-content:space-between; gap:var(--gap-4); }
+.srow--stacked { flex-direction:column; align-items:stretch; gap:var(--gap-3); }
+.srow__text { display:flex; flex-direction:column; gap:var(--gap-1); min-width:0; }
+.srow__label { font-size:var(--text-label); font-weight:var(--weight-strong); margin:0; }
+.srow__desc { font-size:var(--text-meta); color:var(--ink-2); margin:0; line-height:1.4; display:flex; flex-direction:column; gap:var(--gap-1); }
+.srow__ctrl { display:flex; flex-wrap:wrap; gap:var(--gap-2); align-items:center; }
+.note { font-size:var(--text-meta); color:var(--ink-2); margin:0; line-height:1.4; }
+.note--warn { display:flex; gap:var(--gap-2); }
+.note svg { flex:none; width:16px; height:16px; margin-top:1px; }
+.note--warn { color:var(--warn-text); }
+.note--strong { color:var(--ink); font-weight:var(--weight-strong); }
+.note .link { margin-left:var(--gap-1); }
+.scope { font-size:var(--text-meta); color:var(--ink-3); margin:0; }
+.scope b { color:var(--ink); font-weight:var(--weight-strong); }
+.link { font:inherit; color:var(--ink); text-decoration:underline; background:none; border:0; padding:0; cursor:pointer; white-space:nowrap; }
+.btn { font:inherit; font-size:var(--text-body); font-weight:var(--weight-strong); min-height:var(--control-height); padding:0 var(--gap-4);
+  border-radius:var(--radius-control); border:1px solid var(--line); background:var(--bg-2); color:var(--ink); white-space:nowrap; }
+.btn--sm { min-height:var(--touch-target); }
+.btn[aria-disabled="true"] { opacity:.5; }
+.btn--link { border:0; background:none; text-decoration:underline; padding:0 var(--gap-1); min-height:var(--touch-target); }
+.seg { display:inline-flex; align-self:flex-start; background:var(--bg-0); border:1px solid var(--line); border-radius:12px; padding:3px; }
+.seg span { font-size:var(--text-body); font-weight:var(--weight-strong); color:var(--ink-2); padding:.625rem 1.05rem; border-radius:8px;
+  min-height:var(--touch-target); display:flex; align-items:center; white-space:nowrap; }
+.seg span.on { background:var(--focus); color:var(--focus-ink); }
+.sched-sum { font-size:var(--text-meta); color:var(--ink-2); }
+.select { font-size:var(--text-body); border:1px solid var(--line); border-radius:var(--radius-round); padding:.55rem 1rem; background:var(--bg-2); white-space:nowrap; }
+.saved { font-size:var(--text-meta); color:var(--ink-2); }
+.default-note { font-size:var(--text-meta); color:var(--ink-2); display:flex; flex-wrap:wrap; gap:var(--gap-1) var(--gap-2); align-items:baseline; }
+.lrow { display:flex; gap:var(--gap-3); align-items:flex-start; }
+.lrow__thumb { flex:none; width:56px; height:36px; border-radius:6px; border:1px solid var(--line); background:var(--bg-0); }
+.lrow__name { font-size:var(--text-label); font-weight:var(--weight-strong); margin:0 0 2px; }
+.lrow__meta { font-size:var(--text-meta); color:var(--ink-2); margin:0; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-alert" viewBox="0 0 24 24"><path fill="currentColor" d="M13,14H11V10H13M13,18H11V16H13M1,21H23L12,2L1,21Z"/></symbol>
+</svg>
+
+<div class="board">
+  <h1>Screen power mode</h1>
+  <p>Each screen's Power section starts with one choice, <b>Screen power: Schedule · Always on · External</b>.
+  The hint under it explains the choice. The schedule shows only in Schedule. <b>Screen now</b> says whether the
+  screen is on or off, and who set it and when. Always on has no Screen now row. The household default lives on the
+  Default screen page, and a screen that differs says <b>Changed here</b>.</p>
+
+  <section id="modes">
+    <h2>P. The three modes on a phone (390 px)</h2>
+    <div class="row" id="row-modes"></div>
+  </section>
+  <section id="kiosk">
+    <h2>K. The wall panel (800×480)</h2>
+    <div class="row" id="row-kiosk"></div>
+  </section>
+  <section id="edges">
+    <h2>E. Edge cases</h2>
+    <div class="row" id="row-edges"></div>
+  </section>
+  <section id="default">
+    <h2>D. The Default screen page, and the Screens list</h2>
+    <div class="row" id="row-default"></div>
+  </section>
+</div>
+
+<script>
+const HINT = {
+  schedule: "Turns on and off at the times below.",
+  always: "Never turns off on a schedule. Turn off when idle still applies.",
+  external: "Homey, Home Assistant or a script with an API key turns it on and off.",
+};
+const LABEL = { schedule: "Schedule", always: "Always on", external: "External" };
+const alert = '<svg aria-hidden="true"><use href="#i-alert"/></svg>';
+
+function seg(mode) {
+  return `<div class="seg" role="radiogroup" aria-label="Screen power">${["schedule", "always", "external"]
+    .map(m => `<span role="radio" aria-checked="${m === mode}" class="${m === mode ? "on" : ""}">${LABEL[m]}</span>`)
+    .join("")}</div>`;
+}
+function keyNotes(onKiosk) {
+  let html = `<p class="note">It needs an API key that can turn screens on and off. <button class="link">Open API keys</button></p>`;
+  if (!onKiosk)
+    html += `<p class="note">The home automation guide shows the steps for Homey and Home Assistant. <button class="link">Open the guide</button></p>`;
+  return html;
+}
+function scope(own) {
+  return own
+    ? `<p class="scope"><b>Changed here</b> · <button class="link">Reset to default</button></p>`
+    : `<p class="scope">Same as Default</p>`;
+}
+function modeRow(s) {
+  return `<div class="srow srow--stacked">
+    <div class="srow__text"><p class="srow__label">Screen power</p>
+      <div class="srow__desc"><span>${HINT[s.mode]}</span>${s.mode === "external" ? keyNotes(s.kiosk) : ""}${s.page === "default" ? "" : scope(s.own)}</div></div>
+    ${seg(s.mode)}</div>`;
+}
+function schedule(s) {
+  return `<div class="srow"><div class="srow__text"><p class="srow__label">Schedule</p>
+    <div class="srow__desc"><span class="sched-sum">Every day: on 06:30, off 22:00</span>${s.page === "default" ? "" : scope(false)}</div></div>
+    <button class="btn btn--sm">Change</button></div>`;
+}
+function screenNow(s) {
+  const external = s.mode === "external";
+  const on = s.on;
+  const btnOn = external ? "Turn on" : "Turn on now";
+  const btnOff = external ? "Turn off" : "Turn off now";
+  let desc = "";
+  if (s.hidden) {
+    desc += `<p class="note">Sign in as admin to see whether this screen is on or off, and who set it.</p>`;
+  } else {
+    desc += `<p class="note note--strong">${s.status}</p>`;
+    if (s.until) desc += `<p class="note">${s.until}</p>`;
+  }
+  for (const n of s.notes || []) desc += n;
+  const disabledOn = !s.hidden && on ? ' aria-disabled="true"' : "";
+  const disabledOff = !s.hidden && !on ? ' aria-disabled="true"' : "";
+  const follow = !external && (s.hidden || s.choice) ? `<button class="btn btn--link">Back to schedule</button>` : "";
+  return `<div class="srow srow--stacked"><div class="srow__text"><p class="srow__label">Screen now</p>
+    <div class="srow__desc">${desc}</div></div>
+    <div class="srow__ctrl"><button class="btn"${disabledOn}>${btnOn}</button><button class="btn"${disabledOff}>${btnOff}</button>${follow}</div></div>`;
+}
+function idle() {
+  return `<div class="srow"><div class="srow__text"><p class="srow__label">Turn off when idle</p>
+    <div class="srow__desc"><p class="scope">Same as Default</p></div></div><span class="select">Never ▾</span></div>`;
+}
+function powerSection(s) {
+  let rows = modeRow(s);
+  if (s.page === "default" && s.editNote)
+    rows += `<p class="default-note">Hall keeps its own screen power. <button class="link">Change them too</button> <button class="link" aria-label="Dismiss">×</button></p>`;
+  if (s.mode === "schedule") {
+    rows += schedule(s);
+    if (s.page === "default")
+      rows += `<div class="srow"><div class="srow__text"><p class="srow__label">Timezone</p><div class="srow__desc"><span>Used by the schedule.</span></div></div><span class="select">Europe/Stockholm ▾</span></div>`;
+  }
+  if (s.page !== "default" && s.mode !== "always") rows += screenNow(s);
+  if (s.page === "default") rows += `<div class="srow"><div class="srow__text"><p class="srow__label">Turn off when idle</p></div><span class="select">Never ▾</span></div>`;
+  else rows += idle();
+  if (s.saved) rows += `<p class="saved" role="status">${s.saved}</p>`;
+  return `<p class="eyebrow">Power</p><div class="panel">${rows}</div>`;
+}
+function frame(s) {
+  const cls = s.kiosk ? "settings k800" : "settings p390";
+  const head = s.page === "default"
+    ? `<div class="head"><span class="back">‹ Screens</span><h3>Default</h3></div>`
+    : `<div class="head"><span class="back">‹ Screens</span><h3>${s.name || "Hall"}</h3></div>`;
+  return `<figure id="${s.id}"><div class="${cls}${s.dark ? " dark" : ""}">${head}${powerSection(s)}</div>
+    <figcaption><b>${s.id}</b> ${s.caption}</figcaption></figure>`;
+}
+
+const warn = (text, action) =>
+  `<p class="note note--warn">${alert}<span>${text}${action ? ` <button class="link">${action}</button>` : ""}</span></p>`;
+const neutral = text => `<p class="note">${text}</p>`;
+
+const MODES = [
+  { id: "P1", mode: "schedule", own: true, on: false, choice: true,
+    status: "Off · set by Homey at 21:04", until: "Until the next scheduled change at 06:30",
+    caption: "Schedule, light. Homey turned the screen off at 21:04. That lasts until the next scheduled change, and Back to schedule undoes it early. This screen has its own mode (Changed here)." },
+  { id: "P2", mode: "external", own: false, on: false, dark: true,
+    status: "Off · set by Homey at 21:04",
+    caption: "External, Backlit. The schedule is hidden. The last command stands, so there is no until line, and the buttons drop “now”. Two notes point to API keys and the guide." },
+  { id: "P3", mode: "always", own: true, on: true,
+    caption: "Always on, light. No schedule and no Screen now row: there is nothing to turn on, and turning off would be a hold." },
+  { id: "P4", mode: "schedule", own: false, on: true, dark: true,
+    status: "On · by the schedule", until: "Turns off at 22:00",
+    caption: "Schedule, Backlit, following the schedule. No Back to schedule, because nothing is in force." },
+];
+const KIOSK = [
+  { id: "K1", kiosk: true, mode: "external", own: true, on: true,
+    status: "On · set here at 07:12",
+    caption: "External on the wall panel, light, after Turn on was pressed here (the Saved line sits at the end of the section, below the fold). There is no guide link on the kiosk itself (a new tab is a dead end there)." },
+  { id: "K2", kiosk: true, dark: true, mode: "schedule", own: false, on: false, choice: true,
+    status: "Off · set here at 19:30", until: "Until the next scheduled change at 22:00",
+    caption: "Schedule on the wall panel, Backlit. A choice made here, until the next scheduled change." },
+];
+const EDGES = [
+  { id: "E1", mode: "schedule", own: false, hidden: true,
+    caption: "Hidden presence, light. The state isn't sent, so the line says so. Both buttons stay enabled, and Back to schedule shows, as today." },
+  { id: "E2", mode: "external", own: false, on: true,
+    status: "On",
+    notes: [warn("Not paired, so home automation can't switch it. Pair it to use External.", "Pair a screen")],
+    caption: "Not paired while Only paired screens is on, External, light. The status drops who and when: the command isn't reaching the screen." },
+  { id: "E3", mode: "external", own: true, on: false, dark: true,
+    status: "Off · set by home automation on Tue at 21:04",
+    notes: [neutral("Offline. It turns off when it's back.")],
+    caption: "Offline, and a command whose key name isn't sent, Backlit. Old screen software needs no note: the server sends External in a form it obeys." },
+  { id: "E4", mode: "schedule", own: false, on: true,
+    status: "On · by the schedule", until: "Turns off at 22:00",
+    notes: [warn("Not paired, so home automation can't switch it. Its schedule still works.")],
+    caption: "Not paired while Only paired screens is on, Schedule, light." },
+];
+const DEFAULTS = [
+  { id: "D1", page: "default", mode: "external", editNote: true, dark: true,
+    caption: "The Default screen page, Backlit, after choosing External. Hall has its own mode, so the note offers Change them too. No Screen now: the Default isn't a screen." },
+  { id: "D2", page: "default", mode: "schedule",
+    caption: "The Default screen page, light, in Schedule: the schedule and the Timezone row, as today." },
+];
+
+document.getElementById("row-modes").innerHTML = MODES.map(frame).join("");
+document.getElementById("row-kiosk").innerHTML = KIOSK.map(frame).join("");
+document.getElementById("row-edges").innerHTML = EDGES.map(frame).join("");
+document.getElementById("row-default").innerHTML = DEFAULTS.map(frame).join("") +
+  `<figure id="L1"><div class="settings p390"><p class="eyebrow">Screens</p><div class="panel">
+    <div class="lrow"><div class="lrow__thumb"></div><div><p class="lrow__name">Default</p><p class="lrow__meta">landscape · External on/off · keyboard Auto · 1 screen has its own settings</p></div></div>
+    <div class="lrow"><div class="lrow__thumb"></div><div><p class="lrow__name">Hall</p><p class="lrow__meta">3 pages · landscape · off 22:00–06:30</p></div></div>
+    <div class="lrow"><div class="lrow__thumb"></div><div><p class="lrow__name">Kitchen</p><p class="lrow__meta">2 pages · portrait · External on/off</p></div></div>
+  </div></div><figcaption><b>L1</b> The Screens list summaries: Schedule keeps its off hours, External adds “External on/off”, Always on adds nothing.</figcaption></figure>`;
+
+const only = new URLSearchParams(location.search).get("only");
+if (only) {
+  document.body.classList.add("only");
+  document.querySelectorAll("section").forEach(s => { s.hidden = s.id !== only; });
+}
+</script>
+</body>
+</html>

@@ -151,7 +151,7 @@ test.describe("phone: Screens", () => {
     expect(consoleErrors).toEqual([]);
   });
 
-  test("turns a screen on and off now without calling a host route", async ({
+  test("turns a screen on or off with one call and returns it to its schedule", async ({
     page,
     consoleErrors,
   }) => {
@@ -164,6 +164,7 @@ test.describe("phone: Screens", () => {
     const api = await installApiMock(page, {
       config: {
         timezone: "Europe/Stockholm",
+        screenPower: "schedule",
         displayScheduleEnabled: true,
         displaySchedule: week,
       },
@@ -183,32 +184,50 @@ test.describe("phone: Screens", () => {
     const turningOff = (await offButton.getAttribute("aria-disabled")) !== "true";
     await (turningOff ? offButton : onButton).click();
     const power = turningOff ? "off" : "on";
-    const state = turningOff ? "Off now" : "On now";
-    await expect.poll(() => api.overridesByKiosk.hallway?.screenNow?.power).toBe(power);
-    // The choice carries the UTC instant; the agent computes the boundary.
-    expect(api.overridesByKiosk.hallway.screenNow.setAt).toBeTruthy();
-    expect(Number.isNaN(Date.parse(api.overridesByKiosk.hallway.screenNow.setAt))).toBe(false);
-    await expect(page.locator('[data-test="screen-now-state"]')).toHaveText(state);
+    const state = turningOff ? "Off · set here at " : "On · set here at ";
+    await expect.poll(() => api.screenPowerRequests).toEqual([power]);
+    // One press is one call: the choice is a command, not a layer write.
+    expect(api.overridesRequests).toEqual([]);
+    await expect(page.locator('[data-test="screen-now-state"]')).toContainText(state);
     await expect(page.locator('[data-test="screen-now-until"]')).toHaveText(
-      /^(On|Off) until \d{2}:\d{2}$/
+      /^Until the next scheduled change at /
     );
 
     await page.getByRole("button", { name: "Back to schedule" }).click();
-    await expect.poll(() => api.overridesByKiosk.hallway?.screenNow).toBeUndefined();
+    await expect.poll(() => api.screenPowerRequests).toEqual([power, "schedule"]);
+    await expect(page.locator('[data-test="screen-now-state"]')).toHaveText(
+      /^(On|Off) · by the schedule$/
+    );
 
-    // The manual choice is a kiosk override, never a host-acting route.
+    // The command is the power route, never a host-acting route.
     expect(api.hostActions).toEqual([]);
     expect(api.unmatched).toEqual([]);
     expect(consoleErrors).toEqual([]);
   });
-  test("a screen held by home automation goes back to its schedule", async ({
+  test("a command from home automation names the key and goes back to the schedule", async ({
     page,
     consoleErrors,
   }) => {
-    const hold = { power: "off", setAt: "2026-11-18T21:00:00Z", by: "automation" };
+    const command = {
+      power: "off",
+      setAt: "2026-11-18T21:00:00Z",
+      by: "automation",
+      keyName: "Homey",
+    };
     const api = await installApiMock(page, {
-      kioskExtras: { hallway: { powerHold: hold, agentHolds: true } },
-      screenPower: { hallway: hold },
+      config: {
+        timezone: "UTC",
+        screenPower: "schedule",
+        displayScheduleEnabled: true,
+        displaySchedule: [0, 1, 2, 3, 4, 5, 6].map(day => ({
+          day,
+          enabled: true,
+          onTime: "06:00",
+          offTime: "22:00",
+        })),
+      },
+      kioskExtras: { hallway: { agentHolds: true } },
+      screenPower: { hallway: command },
     });
     await gotoSettings(page);
     await expectSettingsReady(page);
@@ -218,11 +237,13 @@ test.describe("phone: Screens", () => {
     await openSection(page, "screen-power");
 
     await expect(page.locator('[data-test="screen-now-state"]')).toHaveText(
-      "Off, set by home automation. The schedule is paused."
+      /^Off · set by Homey (at|on )/
     );
     await page.getByRole("button", { name: "Back to schedule" }).click();
     await expect.poll(() => api.screenPowerRequests).toEqual(["schedule"]);
-    await expect(page.locator('[data-test="screen-now-state"]')).toHaveText("On now");
+    await expect(page.locator('[data-test="screen-now-state"]')).toHaveText(
+      /^(On|Off) · by the schedule$/
+    );
     expect(api.overridesRequests).toEqual([]);
     expect(api.hostActions).toEqual([]);
     expect(api.unmatched).toEqual([]);

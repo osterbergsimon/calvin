@@ -79,6 +79,20 @@ const kiosk = (over = {}) => ({
   ...over,
 });
 
+const POWER_VIEW = {
+  mode: "schedule",
+  power: "schedule",
+  held: false,
+  setAt: null,
+  by: null,
+  until: null,
+  keyName: null,
+  desiredOn: true,
+  online: true,
+  agentHolds: true,
+  paired: true,
+};
+
 function mountScreens({
   kiosks = [kiosk()],
   overrides = {},
@@ -87,6 +101,7 @@ function mountScreens({
   narrow,
   initialSection = null,
   initialSetting = null,
+  screenPower = null,
 } = {}) {
   setActivePinia(createPinia());
   if (narrow === undefined) {
@@ -111,6 +126,26 @@ function mountScreens({
   });
   store.fetchDeviceConfigVersion = vi.fn(async () => null);
   store.fetchAvailableAgentVersion = vi.fn(async () => availableVersion);
+  store.fetchScreenPower = vi.fn(async id => {
+    const view = screenPower ? { id, ...POWER_VIEW, ...screenPower } : null;
+    const target = store.kiosks.find(k => k.id === id);
+    if (target && view) target.screenPowerView = view;
+    return view;
+  });
+  store.setScreenPower = vi.fn(async (id, power) => {
+    const target = store.kiosks.find(k => k.id === id);
+    const view = {
+      id,
+      ...POWER_VIEW,
+      mode: target?.screenPowerView?.mode ?? "schedule",
+      power,
+      held: power !== "schedule",
+      setAt: power === "schedule" ? null : new Date().toISOString(),
+      by: power === "schedule" ? null : "settings",
+    };
+    if (target) target.screenPowerView = view;
+    return view;
+  });
   return {
     wrapper: mount(ScreensSettings, { props: { config: cfg, initialSection, initialSetting } }),
     store,
@@ -899,35 +934,61 @@ describe("ScreensSettings — Display", () => {
 describe("ScreensSettings — Power", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("saves the schedule toggle and grid, and the idle timeout", async () => {
+  const week = [
+    { day: 0, enabled: false, onTime: "07:00", offTime: "23:00" },
+    { day: 1, enabled: true, onTime: "06:30", offTime: "22:00" },
+  ];
+
+  it("saves the screen power mode, keeps the schedule, and hides it outside Schedule", async () => {
     const { wrapper, store } = mountScreens({
-      cfg: config({ displayScheduleEnabled: false }),
+      cfg: config({
+        screenPower: "schedule",
+        displayScheduleEnabled: true,
+        displaySchedule: week,
+      }),
     });
     await flushPromises();
     await selectFirst(wrapper);
 
-    const schedule = wrapper
-      .findAllComponents(ToggleSwitch)
-      .find(t => t.props("ariaLabel") === "Screen on/off schedule");
-    schedule.vm.$emit("update:modelValue", true);
-    await flushPromises();
-    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
-      displayScheduleEnabled: true,
-    });
+    expect(wrapper.find("[data-test='screen-power-hint']").text()).toBe(
+      "Turns on and off at the times below."
+    );
+    expect(wrapper.findComponent(DisplayScheduleGrid).exists()).toBe(true);
 
-    // The grid appears once the effective schedule is on.
-    const { wrapper: w2, store: store2 } = mountScreens({
+    const power = wrapper
+      .findAllComponents(SegmentedControl)
+      .find(c => c.props("ariaLabel") === "Screen power");
+    power.vm.$emit("update:modelValue", "external");
+    await flushPromises();
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      screenPower: "external",
+      displayScheduleEnabled: false,
+    });
+    // The schedule itself is never touched.
+    expect(store.saveOverrides.mock.calls.at(-1)[1].displaySchedule).toBeUndefined();
+    expect(wrapper.findComponent(DisplayScheduleGrid).exists()).toBe(false);
+    expect(wrapper.find("[data-test='screen-power-hint']").text()).toBe(
+      "Homey, Home Assistant or a script with an API key turns it on and off."
+    );
+    // Changing the mode re-reads the command the server ended.
+    expect(store.fetchScreenPower).toHaveBeenCalledWith("kitchen");
+  });
+
+  it("saves the schedule grid in Schedule", async () => {
+    const { wrapper, store } = mountScreens({
       cfg: config({
+        screenPower: "schedule",
         displayScheduleEnabled: true,
-        displaySchedule: [{ day: 0, enabled: true, onTime: "06:00", offTime: "22:00" }],
+        displaySchedule: week,
       }),
     });
     await flushPromises();
-    await selectFirst(w2);
+    await selectFirst(wrapper);
     const next = [{ day: 0, enabled: false, onTime: "07:00", offTime: "23:00" }];
-    w2.findComponent(DisplayScheduleGrid).vm.$emit("update:modelValue", next);
+    wrapper.findComponent(DisplayScheduleGrid).vm.$emit("update:modelValue", next);
     await flushPromises();
-    expect(store2.saveOverrides).toHaveBeenCalledWith("kitchen", { displaySchedule: next });
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", { displaySchedule: next });
   });
 
   it("writes Never as timeout off and any other choice as seconds", async () => {
@@ -966,190 +1027,25 @@ describe("ScreensSettings — Power", () => {
     expect(idle.props("options").map(o => o.label)).toContain("7 min");
   });
 
-  it("Reset to default removes only the power keys", async () => {
+  it("Reset to default removes only the screen power mode, keeping the schedule", async () => {
     const { wrapper, store } = mountScreens({
       overrides: {
         orientation: "portrait",
-        displayScheduleEnabled: true,
-        displaySchedule: [{ day: 0, enabled: false, onTime: "07:00", offTime: "23:00" }],
+        screenPower: "external",
+        displayScheduleEnabled: false,
+        displaySchedule: week,
       },
     });
     await flushPromises();
     await selectFirst(wrapper);
 
-    await wrapper.find("[data-test='reset-schedule-enabled']").trigger("click");
+    await wrapper.find("[data-test='reset-screen-power']").trigger("click");
     await flushPromises();
     expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
       orientation: "portrait",
-      displaySchedule: [{ day: 0, enabled: false, onTime: "07:00", offTime: "23:00" }],
+      displaySchedule: week,
     });
   });
-
-  it("shows the current state, when the schedule takes over, and Back to schedule", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-07-11T09:00:00+02:00"));
-    try {
-      const { wrapper, store } = mountScreens({
-        cfg: config({
-          timezone: "Europe/Stockholm",
-          displayScheduleEnabled: true,
-          displaySchedule: [
-            { day: 5, enabled: true, onTime: "06:00", offTime: "22:00" },
-            { day: 6, enabled: true, onTime: "06:00", offTime: "22:00" },
-          ],
-        }),
-        overrides: {
-          screenNow: { power: "off", setAt: "2026-07-11T07:00:00.000Z" }, // 09:00 local
-        },
-      });
-      await flushPromises();
-      await selectFirst(wrapper);
-
-      expect(wrapper.find("[data-test='screen-now-state']").text()).toBe("Off now");
-      expect(wrapper.find("[data-test='screen-now-until']").text()).toBe("Off until 22:00");
-      expect(wrapper.find("[data-test='screen-now-off']").attributes("aria-disabled")).toBe("true");
-      expect(
-        wrapper.find("[data-test='screen-now-on']").attributes("aria-disabled")
-      ).toBeUndefined();
-      // One action, one name: a manual choice goes back the same way a hold does.
-      expect(wrapper.find("[data-test='screen-now-follow']").text()).toBe("Back to schedule");
-
-      await wrapper.find("[data-test='screen-now-follow']").trigger("click");
-      await flushPromises();
-      expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {});
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("Turn off now saves the choice with the UTC set time, not a computed boundary", async () => {
-    const { wrapper, store } = mountScreens({ cfg: config({ displayScheduleEnabled: false }) });
-    await flushPromises();
-    await selectFirst(wrapper);
-
-    await wrapper.find("[data-test='screen-now-off']").trigger("click");
-    await flushPromises();
-    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
-      screenNow: { power: "off", setAt: expect.any(String) },
-    });
-    const saved = store.saveOverrides.mock.calls[0][1].screenNow;
-    expect(Number.isNaN(Date.parse(saved.setAt))).toBe(false);
-  });
-
-  it("says 'until the next scheduled change' when the screen uses the system timezone", async () => {
-    const { wrapper } = mountScreens({
-      cfg: config({
-        timezone: "system",
-        displayScheduleEnabled: true,
-        displaySchedule: [0, 1, 2, 3, 4, 5, 6].map(day => ({
-          day,
-          enabled: true,
-          onTime: "06:00",
-          offTime: "22:00",
-        })),
-      }),
-      overrides: { screenNow: { power: "off", setAt: new Date().toISOString() } },
-    });
-    await flushPromises();
-    await selectFirst(wrapper);
-
-    expect(wrapper.find("[data-test='screen-now-until']").text()).toBe(
-      "Off until the next scheduled change"
-    );
-  });
-
-  it("keeps the note when the admin browser's zone runs ahead of the screen's", async () => {
-    vi.useFakeTimers();
-    // The Pi uses its system zone (Stockholm, +01:00); this browser is in
-    // Athens (+02:00), so its own 22:00-06:00 window ended at 04:00Z while the
-    // Pi's ends at 05:00Z. The browser must not end the override for the Pi.
-    vi.setSystemTime(new Date("2026-11-02T04:30:00Z"));
-    const originalTz = process.env.TZ;
-    process.env.TZ = "Europe/Athens";
-    try {
-      const { wrapper } = mountScreens({
-        cfg: config({
-          timezone: "system",
-          displayScheduleEnabled: true,
-          displaySchedule: [0, 1, 2, 3, 4, 5, 6].map(day => ({
-            day,
-            enabled: true,
-            onTime: "06:00",
-            offTime: "22:00",
-          })),
-        }),
-        overrides: { screenNow: { power: "on", setAt: "2026-11-01T21:48:25.107Z" } },
-      });
-      await flushPromises();
-      await selectFirst(wrapper);
-
-      expect(wrapper.find("[data-test='screen-now-state']").text()).toBe("On now");
-      expect(wrapper.find("[data-test='screen-now-until']").text()).toBe(
-        "On until the next scheduled change"
-      );
-    } finally {
-      if (originalTz === undefined) delete process.env.TZ;
-      else process.env.TZ = originalTz;
-      vi.useRealTimers();
-    }
-  });
-
-  it("drops the override at its boundary as the clock ticks", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-07-11T21:59:00+02:00"));
-    try {
-      const { wrapper } = mountScreens({
-        cfg: config({
-          timezone: "Europe/Stockholm",
-          displayScheduleEnabled: true,
-          displaySchedule: [
-            { day: 5, enabled: true, onTime: "06:00", offTime: "22:00" },
-            { day: 6, enabled: true, onTime: "06:00", offTime: "22:00" },
-          ],
-        }),
-        overrides: { screenNow: { power: "on", setAt: "2026-07-11T07:00:00.000Z" } },
-      });
-      await flushPromises();
-      await selectFirst(wrapper);
-      expect(wrapper.find("[data-test='screen-now-state']").text()).toBe("On now");
-      expect(wrapper.find("[data-test='screen-now-until']").text()).toBe("On until 22:00");
-
-      vi.setSystemTime(new Date("2026-07-11T22:00:01+02:00"));
-      vi.advanceTimersByTime(30000);
-      await flushPromises();
-      expect(wrapper.find("[data-test='screen-now-state']").text()).toBe("Off now");
-      expect(wrapper.find("[data-test='screen-now-until']").exists()).toBe(false);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("ignores an expired Screen now override and follows the schedule again", async () => {
-    // Pin the clock to a Friday (day 5) inside the schedule, or this fails on other days.
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-11-06T12:00:00Z"));
-    try {
-      await expiredScreenNowFollowsSchedule();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  async function expiredScreenNowFollowsSchedule() {
-    const { wrapper } = mountScreens({
-      cfg: config({
-        displayScheduleEnabled: true,
-        displaySchedule: [{ day: 5, enabled: true, onTime: "06:00", offTime: "22:00" }],
-      }),
-      overrides: { screenNow: { power: "off", setAt: "2020-01-01T00:00:00.000Z" } },
-    });
-    await flushPromises();
-    await selectFirst(wrapper);
-
-    expect(wrapper.find("[data-test='screen-now-state']").text()).toBe("On now");
-    expect(wrapper.find("[data-test='screen-now-until']").exists()).toBe(false);
-    expect(wrapper.find("[data-test='screen-now-follow']").exists()).toBe(false);
-  }
 });
 
 describe("ScreensSettings — Touch & keyboard", () => {
@@ -1216,8 +1112,8 @@ describe("ScreensSettings — save messages name the real wait", () => {
     await flushPromises();
     await selectFirst(wrapper);
 
-    // The agent polls its merged config every 60 s. Screen now, Follow
-    // schedule, the schedule rows and the physical orientation all ride it.
+    // The agent polls its merged config every 60 s. Screen now, the screen power
+    // mode, the schedule rows and the physical orientation all ride it.
     const onButton = wrapper.find("[data-test='screen-now-on']");
     const offButton = wrapper.find("[data-test='screen-now-off']");
     await (onButton.attributes("aria-disabled") === undefined ? onButton : offButton).trigger(
@@ -1226,7 +1122,10 @@ describe("ScreensSettings — save messages name the real wait", () => {
     await flushPromises();
     expect(savedIn(wrapper, "screen-power")).toBe("Saved. This screen updates within a minute.");
 
-    await wrapper.find("[data-test='screen-now-follow']").trigger("click");
+    const power = wrapper
+      .findAllComponents(SegmentedControl)
+      .find(c => c.props("ariaLabel") === "Screen power");
+    power.vm.$emit("update:modelValue", "external");
     await flushPromises();
     expect(savedIn(wrapper, "screen-power")).toBe("Saved. This screen updates within a minute.");
 
@@ -1237,10 +1136,14 @@ describe("ScreensSettings — save messages name the real wait", () => {
     await flushPromises();
     expect(savedIn(wrapper, "screen-display")).toBe("Saved. This screen updates within a minute.");
 
-    const schedule = wrapper
-      .findAllComponents(ToggleSwitch)
-      .find(c => c.props("ariaLabel") === "Screen on/off schedule");
-    schedule.vm.$emit("update:modelValue", false);
+    // Back to Schedule shows the grid, then edits it.
+    power.vm.$emit("update:modelValue", "schedule");
+    await flushPromises();
+    wrapper
+      .findComponent(DisplayScheduleGrid)
+      .vm.$emit("update:modelValue", [
+        { day: 1, enabled: false, onTime: "06:30", offTime: "22:00" },
+      ]);
     await flushPromises();
     expect(savedIn(wrapper, "screen-power")).toBe("Saved. This screen updates within a minute.");
   });

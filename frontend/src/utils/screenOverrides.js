@@ -9,6 +9,7 @@
 
 import { EFFECTS_LEVEL_OPTIONS, normalizeEffectsLevel } from "./effectsLevel";
 import { normalizeLayoutMode } from "./layoutMode";
+import { effectiveScreenMode } from "./screenPower";
 import { TYPE_THEMES } from "../styles/typeThemes";
 import { UI_SIZE_OPTIONS } from "../styles/uiScale";
 
@@ -514,16 +515,34 @@ export const SCREEN_SETTING_DESCRIPTORS = [
     keywords: ["faster page switching", "page switching", "pages ready", "slow screen", "speed"],
   },
   {
-    key: "displayScheduleEnabled",
-    label: "Screen on/off schedule",
+    // The screen power choice (calvin-25g9): Schedule, Always on or External.
+    // Its row is hand-written in the Power section so the hint can change with
+    // the choice; the descriptor drives the Changed here label and the notes
+    // that name the screens keeping their own mode.
+    key: "screenPower",
+    label: "screen power",
     section: "power",
-    description: "Turns the screen off and on at set times.",
-    control: { kind: "toggle" },
-    defaultValue: false,
+    control: {
+      kind: "segmented",
+      options: [
+        { value: "schedule", label: "Schedule" },
+        { value: "always_on", label: "Always on" },
+        { value: "external", label: "External" },
+      ],
+    },
+    defaultValue: "schedule",
     browserLayer: false,
     copyable: true,
-    resetTest: "reset-schedule-enabled",
-    keywords: ["power", "schedule", "screen off", "screen on", "night", "display"],
+    resetTest: "reset-screen-power",
+    keywords: [
+      "screen power",
+      "schedule",
+      "always on",
+      "external",
+      "home automation",
+      "homey",
+      "home assistant",
+    ],
   },
   {
     key: "displaySchedule",
@@ -894,7 +913,7 @@ const SCREEN_PAGE_ROW_ORDER = [
   "hotCornerOpacity",
   "hotCornerSize",
   "hotCornerLongPressMs",
-  "displayScheduleEnabled",
+  "screenPower",
   "displaySchedule",
   "displayTimeout",
   "brightnessRampEnabled",
@@ -979,18 +998,22 @@ export const isSettingVisible = (descriptor, values) => {
 export const visibleDescriptors = (descriptors, values) =>
   (descriptors || []).filter(descriptor => isSettingVisible(descriptor, values));
 
-// Keys that are not durable settings, so they never make a screen "differ from
-// Default": its own name, and the transient "Screen now" manual power choice
-// (it expires at the schedule's next boundary and is not copied anywhere).
-const NON_SETTING_KEYS = new Set(["displayName", "screenNow"]);
+// Keys that are not settings of their own, so they never make a screen "differ
+// from Default": the screen's name; the retired `screenNow` layer key (the
+// server strips it and the command lives outside the layer); and the legacy
+// `displayScheduleEnabled` switch, which is the same setting as `screenPower`.
+const NON_SETTING_KEYS = new Set(["displayName", "screenNow", "displayScheduleEnabled"]);
 
 // Keys that make a screen's *settings* differ from Default. The name does not
 // count: every screen can be called something without deviating from Default.
 // The idle row writes two keys (enabled + seconds) but is one setting.
 export const changedSettingKeys = overrides => {
-  const keys = Object.keys(overrides || {}).filter(key => !NON_SETTING_KEYS.has(key));
-  const idleKey =
-    "displayTimeoutEnabled" in (overrides || {}) || "displayTimeout" in (overrides || {});
+  const source = overrides || {};
+  const keys = Object.keys(source).filter(key => !NON_SETTING_KEYS.has(key));
+  // A layer written before `screenPower` existed carries its mode as the legacy
+  // schedule switch; count it as the one screen power setting, not as nothing.
+  if ("displayScheduleEnabled" in source && !("screenPower" in source)) keys.push("screenPower");
+  const idleKey = "displayTimeoutEnabled" in source || "displayTimeout" in source;
   const settings = keys.filter(key => key !== "displayTimeoutEnabled" && key !== "displayTimeout");
   if (idleKey) settings.push("displayTimeout");
   return settings;
@@ -1031,6 +1054,13 @@ export const formatSettingList = keys =>
 export const useAsDefaultPatch = overrides => {
   const patch = {};
   for (const key of DEFAULT_COPYABLE_KEYS) {
+    if (key === "screenPower" && overrides && !("screenPower" in overrides)) {
+      // A legacy layer's mode is its schedule switch; promote the mode it reads.
+      if ("displayScheduleEnabled" in overrides) {
+        patch.screenPower = effectiveScreenMode(overrides, {});
+      }
+      continue;
+    }
     if (overrides && key in overrides) patch[key] = overrides[key];
   }
   return patch;
@@ -1039,6 +1069,9 @@ export const useAsDefaultPatch = overrides => {
 export const withoutPromotedSettings = overrides => {
   const next = { ...(overrides || {}) };
   for (const key of DEFAULT_COPYABLE_KEYS) delete next[key];
+  // The server's legacy mode switch travels with `screenPower`; leaving it
+  // behind would derive an old mode for a screen that now follows Default.
+  delete next.displayScheduleEnabled;
   return next;
 };
 

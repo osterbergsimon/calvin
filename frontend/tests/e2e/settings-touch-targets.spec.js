@@ -79,7 +79,19 @@ for (const c of CASES) {
       page,
       consoleErrors,
     }) => {
-      const api = await installApiMock(page);
+      const week = [0, 1, 2, 3, 4, 5, 6].map(day => ({
+        day,
+        enabled: true,
+        onTime: "06:00",
+        offTime: "22:00",
+      }));
+      const api = await installApiMock(page, {
+        config: {
+          screenPower: "schedule",
+          displayScheduleEnabled: true,
+          displaySchedule: week,
+        },
+      });
       await gotoSettings(page);
       await expectSettingsReady(page);
       await selectCategory(page, "Screens");
@@ -87,10 +99,6 @@ for (const c of CASES) {
       await page.locator('[data-test="screen-default-card"]').click();
       await expect(page.locator('[data-test="default-screen-page"]')).toBeVisible();
       await openSection(page, "device-power");
-
-      const schedule = page.getByRole("switch", { name: "Screen on/off schedule" });
-      if ((await schedule.getAttribute("aria-checked")) !== "true") await schedule.click();
-      await expect(schedule).toHaveAttribute("aria-checked", "true");
 
       await page.locator('[data-test="schedule-change"]').click();
       const table = page.locator('[data-test="field-table"]');

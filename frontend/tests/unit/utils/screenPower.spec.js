@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
-  activePowerOverride,
-  buildPowerOverride,
+  HOME_AUTOMATION_GUIDE_URL,
+  effectiveScreenMode,
   firstScheduleBoundaryAfter,
   formatUntil,
+  formatWhen,
+  keyNameLabel,
   nextScheduleBoundary,
   scheduleDesiredOn,
 } from "@/utils/screenPower";
@@ -124,128 +126,92 @@ describe("scheduleDesiredOn", () => {
   });
 });
 
-describe("activePowerOverride", () => {
-  const now = at("2026-07-11T09:00:00+02:00");
-  const options = { enabled: true, schedule: schedule(), now, timeZone: TZ };
-
-  it("honours an override until the first boundary after setAt", () => {
-    expect(
-      activePowerOverride({ power: "off", setAt: "2026-07-11T07:00:00.000Z" }, options)
-    ).toEqual({
-      power: "off",
-      setAt: "2026-07-11T07:00:00.000Z",
-      expiry: at("2026-07-11T20:00:00.000Z"), // 22:00 local
-      hasSchedule: true,
-    });
-  });
-
-  it("expires exactly on the boundary", () => {
-    const override = { power: "off", setAt: "2026-07-11T07:00:00.000Z" };
-    expect(
-      activePowerOverride(override, { ...options, now: at("2026-07-11T21:59:59+02:00") })
-    ).not.toBeNull();
-    expect(
-      activePowerOverride(override, { ...options, now: at("2026-07-11T22:00:00+02:00") })
-    ).toBeNull();
-  });
-
-  it("stays until changed without a schedule", () => {
-    expect(
-      activePowerOverride(
-        { power: "on", setAt: "2026-07-11T07:00:00.000Z" },
-        { ...options, enabled: false }
-      )
-    ).toEqual({
-      power: "on",
-      setAt: "2026-07-11T07:00:00.000Z",
-      expiry: null,
-      hasSchedule: false,
-    });
-  });
-
-  it("ignores an expired or malformed override", () => {
-    expect(
-      activePowerOverride(
-        { power: "on", setAt: "2026-07-11T06:00:00.000Z" },
-        { ...options, now: at("2026-07-11T23:00:00+02:00") }
-      )
-    ).toBeNull();
-    expect(activePowerOverride({ power: "on", setAt: "not a date" }, options)).toBeNull();
-    expect(
-      activePowerOverride({ power: "sideways", setAt: "2026-07-11T07:00:00Z" }, options)
-    ).toBeNull();
-    // The retired shape (until) is no longer an override.
-    expect(activePowerOverride({ power: "on", until: null }, options)).toBeNull();
-    expect(activePowerOverride(null, options)).toBeNull();
-  });
-});
-
-describe("activePowerOverride with an unknown screen zone", () => {
-  const now = at("2026-11-02T04:30:00Z");
-  const setAt = "2026-11-01T21:48:25.107Z";
-  const options = { enabled: true, schedule: schedule(), now, timeZone: null };
-
-  // The config says "system", so the screen's zone is the Pi's, not the
-  // browser's. Pretend the admin browser is an hour ahead: its own 22:00 to
-  // 06:00 window already ended at 04:00Z, while the Pi's ends at 05:00Z.
-  const withBrowserZone = (timeZone, run) => {
-    const original = process.env.TZ;
-    process.env.TZ = timeZone;
-    try {
-      return run();
-    } finally {
-      if (original === undefined) delete process.env.TZ;
-      else process.env.TZ = original;
-    }
-  };
-
-  it("stays active past the browser's own boundary, with no time to show", () => {
-    withBrowserZone("Europe/Athens", () => {
-      expect(activePowerOverride({ power: "on", setAt }, options)).toEqual({
-        power: "on",
-        setAt,
-        expiry: null,
-        hasSchedule: true,
-      });
-    });
-  });
-
-  it("ends 14 hours after the browser's own boundary", () => {
-    withBrowserZone("Europe/Athens", () => {
-      // The browser's 06:00 boundary is 04:00Z; after 14 h of zone slack the
-      // override must be over on the screen too.
-      expect(
-        activePowerOverride({ power: "on", setAt }, { ...options, now: at("2026-11-02T17:59:59Z") })
-      ).not.toBeNull();
-      expect(
-        activePowerOverride({ power: "on", setAt }, { ...options, now: at("2026-11-02T18:00:00Z") })
-      ).toBeNull();
-    });
-  });
-
-  it("says the choice lasts until changed when no schedule can end it", () => {
-    expect(activePowerOverride({ power: "off", setAt }, { ...options, enabled: false })).toEqual({
-      power: "off",
-      setAt,
-      expiry: null,
-      hasSchedule: false,
-    });
-  });
-});
-
-describe("buildPowerOverride", () => {
-  it("stores the choice and the UTC instant, not a browser-computed boundary", () => {
-    const now = at("2026-07-11T09:00:00+02:00");
-    expect(buildPowerOverride({ power: "off", now })).toEqual({
-      power: "off",
-      setAt: "2026-07-11T07:00:00.000Z",
-    });
-  });
-});
-
 describe("formatUntil", () => {
   it("shows the boundary's wall-clock time in the screen's timezone", () => {
     expect(formatUntil("2026-07-11T20:00:00.000Z", TZ)).toBe("22:00");
     expect(formatUntil("2026-01-11T05:00:00.000Z", TZ)).toBe("06:00");
+  });
+
+  it("follows the household's 12/24-hour choice", () => {
+    expect(formatUntil("2026-07-11T20:00:00.000Z", TZ, "12h")).toBe("10:00 PM");
+    expect(formatUntil("2026-07-11T04:30:00.000Z", TZ, "12h")).toBe("6:30 AM");
+    expect(formatUntil("2026-07-11T20:00:00.000Z", TZ, "24h")).toBe("22:00");
+  });
+});
+
+describe("effectiveScreenMode", () => {
+  it("uses the screen's own mode when it has one", () => {
+    expect(effectiveScreenMode({ screenPower: "external" }, { screenPower: "schedule" })).toBe(
+      "external"
+    );
+  });
+
+  it("derives a legacy layer switch before the household choice", () => {
+    expect(
+      effectiveScreenMode({ displayScheduleEnabled: false }, { screenPower: "schedule" })
+    ).toBe("always_on");
+    expect(effectiveScreenMode({ displayScheduleEnabled: true }, { screenPower: "external" })).toBe(
+      "schedule"
+    );
+  });
+
+  it("follows the household mode, then its legacy switch", () => {
+    expect(effectiveScreenMode({}, { screenPower: "external" })).toBe("external");
+    expect(effectiveScreenMode({}, { displayScheduleEnabled: true })).toBe("schedule");
+    expect(effectiveScreenMode({}, { displayScheduleEnabled: false })).toBe("always_on");
+    expect(effectiveScreenMode(null, {})).toBe("always_on");
+  });
+});
+
+describe("formatWhen", () => {
+  const now = at("2026-11-21T12:00:00Z"); // Saturday
+  const opts = { timeFormat: "24h", timezone: "UTC", now };
+
+  it("says at the clock time for today", () => {
+    expect(formatWhen("2026-11-21T21:04:00Z", opts)).toBe("at 21:04");
+  });
+
+  it("names the weekday in the last 6 days", () => {
+    expect(formatWhen("2026-11-18T21:04:00Z", opts)).toBe("on Wed at 21:04");
+  });
+
+  it("drops the time for an older command", () => {
+    expect(formatWhen("2026-11-01T21:04:00Z", opts)).toBe("on 1 Nov");
+  });
+
+  it("follows the household's 12/24-hour choice", () => {
+    const twelve = { ...opts, timeFormat: "12h" };
+    expect(formatWhen("2026-11-21T21:04:00Z", twelve)).toBe("at 9:04 PM");
+    expect(formatWhen("2026-11-18T21:04:00Z", twelve)).toBe("on Wed at 9:04 PM");
+  });
+
+  it("is empty without a set time", () => {
+    expect(formatWhen(null, opts)).toBe("");
+    expect(formatWhen("not a date", opts)).toBe("");
+  });
+});
+
+describe("keyNameLabel", () => {
+  it("uses the API key's name as given", () => {
+    expect(keyNameLabel("Homey")).toBe("Homey");
+  });
+
+  it("falls back to home automation without a name", () => {
+    expect(keyNameLabel(null)).toBe("home automation");
+    expect(keyNameLabel("")).toBe("home automation");
+  });
+
+  it("cuts a long name to 40 characters with an ellipsis", () => {
+    const label = keyNameLabel("A very long API key name that keeps going past forty characters");
+    expect(label).toHaveLength(40);
+    expect(label.endsWith("…")).toBe(true);
+  });
+});
+
+describe("HOME_AUTOMATION_GUIDE_URL", () => {
+  it("points at the published guide", () => {
+    expect(HOME_AUTOMATION_GUIDE_URL).toBe(
+      "https://osterbergsimon.github.io/calvin/integrations/HOME_AUTOMATION/"
+    );
   });
 });

@@ -34,7 +34,7 @@ const WEEK = [0, 1, 2, 3, 4, 5, 6].map(day => ({
 
 async function openSettings(page, category = null) {
   const api = await installApiMock(page, {
-    config: { displayScheduleEnabled: true, displaySchedule: WEEK },
+    config: { screenPower: "schedule", displayScheduleEnabled: true, displaySchedule: WEEK },
   });
   await gotoSettings(page);
   await expectSettingsReady(page);
@@ -120,7 +120,6 @@ for (const [name, viewport] of [
       await page.locator("[data-test='screen-default-card']").click();
       await expect(page.locator("[data-test='default-screen-page']")).toBeVisible();
       await openSection(page, "device-power");
-      await openSection(page, "device-power");
       await expect(page.locator("#section-device-keyboard .setting-row").first()).toBeVisible();
 
       await page.evaluate(() => document.fonts.ready);
@@ -201,11 +200,10 @@ for (const [name, viewport] of [
       await page.locator("[data-test='screen-default-card']").click();
       await expect(page.locator("[data-test='default-screen-page']")).toBeVisible();
       await openSection(page, "device-power");
-      await openSection(page, "device-power");
 
       const height = await page.evaluate(() => {
         const toggleRow = [...document.querySelectorAll("#section-device-power .setting-row")].find(
-          row => row.textContent.includes("Screen on/off schedule")
+          row => row.textContent.includes("Screen power")
         );
         const schedule = document.querySelector("[data-test='display-schedule']");
         if (!toggleRow || !schedule) return null;

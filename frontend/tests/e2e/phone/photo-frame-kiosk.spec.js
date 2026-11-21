@@ -80,3 +80,55 @@ test("kiosk: the photo frame enters after idle and the first tap only wakes it",
   expect(api.unmatched).toEqual([]);
   expect(consoleErrors).toEqual([]);
 });
+
+test("kiosk: an empty source is retried without any input", async ({ page, consoleErrors }) => {
+  // The frame's first fetch of its chosen source comes back empty (the plugin
+  // is still loading, say). The idle wait must arm again on its own, so the
+  // untouched wall enters the frame on the next cycle (calvin-agnx).
+  let emptySourceFetches = 0;
+  const api = await installApiMock(page, {
+    overrides: [
+      [
+        /^\/api\/kiosks\/[^/]+\/config$/,
+        (route, { state }) =>
+          route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              ...state.config,
+              photoFrameEnabled: true,
+              photoFrameTimeout: 1,
+              photoFrameSourceIds: ["quiet-album"],
+            }),
+          }),
+      ],
+      [
+        /^\/api\/images\/list$/,
+        (route, { url }) => {
+          const sourceIds = (url.searchParams.get("source_ids") || "").split(",");
+          if (!sourceIds.includes("quiet-album")) return false;
+          emptySourceFetches += 1;
+          if (emptySourceFetches > 1) return false; // the next cycle has photos
+          return route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ images: [] }),
+          });
+        },
+      ],
+    ],
+  });
+
+  await page.goto(`/?kiosk=${encodeURIComponent(KIOSK_ID)}`);
+  await expect(page.locator("#app")).toBeVisible();
+  await expect(page.locator("html")).toHaveClass(/calvin-kiosk/);
+
+  // The first cycle found nothing; the retried cycle enters with no tap.
+  const frame = page.locator(".photo-slideshow.fullscreen");
+  await expect(frame).toBeVisible({ timeout: 15_000 });
+  expect(emptySourceFetches).toBeGreaterThanOrEqual(2);
+
+  expect(api.hostActions).toEqual([]);
+  expect(api.unmatched).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});

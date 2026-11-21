@@ -496,6 +496,60 @@ async def _migrate_photo_frame(out: _Outcome, doc: BackupDocument) -> None:
         )
 
 
+async def _migrate_screen_now(out: _Outcome) -> None:
+    """Drop a restored layer's stored ``screenNow`` (calvin-25g9).
+
+    Settings used to write a "Screen now" choice into the layer; the screen's
+    command column replaced it, so a restored one would be projected and could
+    switch a screen invisibly. The whole-database migration is idempotent and
+    also runs at startup. Runs after the kiosks are restored. Best effort: the
+    restore has already been applied, so a failure is a warning.
+    """
+    from app.services.kiosk_registry import migrate_strip_screen_now
+
+    try:
+        await migrate_strip_screen_now()
+    except Exception as exc:  # noqa: BLE001 - the restore itself succeeded
+        logger.warning(f"Could not drop a restored Screen now from the screens: {exc}")
+        out.warnings.append(
+            "The backup's Screen now choices could not be removed from the screens; "
+            "it will be retried at the next restart."
+        )
+
+
+async def _migrate_screen_modes(out: _Outcome) -> None:
+    """Drop an invalid restored mode and clear a command the mode no longer allows.
+
+    A backup can carry a ``screen_power`` that is not one of the three modes:
+    remove it (the mode derives from the schedule switch) and warn, rather than
+    failing the restore. The command column is not in a backup, so a command
+    that stood before the restore can belong to a mode the restored config no
+    longer has; clear it so it cannot revive when the mode later returns
+    (calvin-25g9 review). Best effort: the restore has already been applied.
+    """
+    from app.services.config_service import config_service
+    from app.services.kiosk_registry import (
+        clear_mode_mismatched_commands,
+        migrate_drop_invalid_modes,
+    )
+
+    try:
+        dropped = await migrate_drop_invalid_modes()
+        if dropped:
+            out.warnings.append(
+                "A stored screen power value was not one of Schedule, Always on or "
+                "External; it was ignored and the screen follows its schedule switch."
+            )
+        household = await config_service.get_config()
+        await clear_mode_mismatched_commands(household)
+    except Exception as exc:  # noqa: BLE001 - the restore itself succeeded
+        logger.warning(f"Could not settle the restored screen power modes: {exc}")
+        out.warnings.append(
+            "The backup's screen power modes could not be checked; the next restart "
+            "retries the cleanup."
+        )
+
+
 async def _stop_and_unregister(instance_id: str) -> None:
     from app.plugins.manager import plugin_manager
     from app.plugins.protocols import BackendPlugin
@@ -697,6 +751,8 @@ async def apply_restore(
         await _migrate_room_name(out)
         await _migrate_screen_controls(out)
         await _migrate_photo_frame(out, doc)
+        await _migrate_screen_now(out)
+        await _migrate_screen_modes(out)
 
         if loaded.signing_key and restore_signing_key:
             _write_signing_key(loaded.signing_key)

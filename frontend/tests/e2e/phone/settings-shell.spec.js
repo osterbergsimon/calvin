@@ -180,13 +180,24 @@ test.describe("phone: first run and sign-in", () => {
     await expect(note).toContainText("That screen was removed");
     expect(new URL(page.url()).searchParams.has("screen")).toBe(false);
     // Not on the card's top border: clear of the panel's edge on every side.
-    const gaps = await page.evaluate(() => {
-      const n = document.querySelector('[data-test="screen-removed-note"]').getBoundingClientRect();
-      const p = document.querySelector(".settings-section__panel").getBoundingClientRect();
-      return { top: n.top - p.top, left: n.left - p.left };
-    });
-    expect(gaps.top).toBeGreaterThanOrEqual(8);
-    expect(gaps.left).toBeGreaterThanOrEqual(8);
+    // Poll: the note is visible a frame before its panel's padding settles.
+    const gaps = () =>
+      page.evaluate(() => {
+        const n = document
+          .querySelector('[data-test="screen-removed-note"]')
+          .getBoundingClientRect();
+        const p = document.querySelector(".settings-section__panel").getBoundingClientRect();
+        return { top: n.top - p.top, left: n.left - p.left };
+      });
+    await expect
+      .poll(
+        async () => {
+          const { top, left } = await gaps();
+          return { top, left, inset: top >= 8 && left >= 8 };
+        },
+        { message: "the removed note is inset from the panel on every side" }
+      )
+      .toMatchObject({ inset: true });
     await expectPhoneLayout(page, "removed screen note");
     expect(consoleErrors).toEqual([]);
   });

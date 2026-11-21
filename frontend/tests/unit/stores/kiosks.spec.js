@@ -24,19 +24,29 @@ describe("kiosks store", () => {
       },
     });
     const store = useKiosksStore();
-    await store.loadKiosks();
+    const result = await store.loadKiosks();
     expect(store.kiosks.map(k => k.id)).toEqual(["k1"]);
     expect(api.get).toHaveBeenCalledWith("/kiosks");
+    expect(result).toEqual({ ok: true, stale: false });
   });
 
-  it("loadKiosks falls back to cache on network error", async () => {
+  it("loadKiosks falls back to cache on network error and reports a stale load", async () => {
     api.get.mockResolvedValueOnce({ data: { kiosks: [{ id: "k1" }] } });
     const store = useKiosksStore();
     await store.loadKiosks(); // seeds cache
     api.get.mockRejectedValueOnce(new Error("offline"));
     store.kiosks = [];
-    await store.loadKiosks(); // falls back
+    const result = await store.loadKiosks(); // falls back
     expect(store.kiosks.map(k => k.id)).toEqual(["k1"]);
+    expect(result).toEqual({ ok: true, stale: true });
+  });
+
+  it("loadKiosks reports a failed load when the network and the cache both miss", async () => {
+    api.get.mockRejectedValueOnce(new Error("offline"));
+    const store = useKiosksStore();
+    const result = await store.loadKiosks();
+    expect(store.kiosks).toEqual([]);
+    expect(result).toEqual({ ok: false, stale: false });
   });
 
   it("loadKiosks serves expired cache when the request fails", async () => {
@@ -48,8 +58,9 @@ describe("kiosks store", () => {
       vi.advanceTimersByTime(60 * 60 * 1000); // well past the 5 minute TTL
       api.get.mockRejectedValueOnce(new Error("offline"));
       store.kiosks = [];
-      await store.loadKiosks();
+      const result = await store.loadKiosks();
       expect(store.kiosks.map(k => k.id)).toEqual(["k1"]);
+      expect(result).toEqual({ ok: true, stale: true });
     } finally {
       vi.useRealTimers();
     }
@@ -224,6 +235,137 @@ describe("kiosks store — triggerUpdate", () => {
     const store = useKiosksStore();
     await store.triggerUpdate("a/b");
     expect(api.post).toHaveBeenCalledWith("/kiosks/a%2Fb/update");
+  });
+});
+
+describe("kiosks store — screen power", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+  });
+
+  const view = over => ({
+    id: "k1",
+    mode: "schedule",
+    power: "off",
+    held: true,
+    setAt: "2026-11-21T21:04:00Z",
+    by: "automation",
+    until: "2026-11-21T22:00:00Z",
+    keyName: "Homey",
+    desiredOn: false,
+    online: true,
+    agentHolds: true,
+    paired: true,
+    ...over,
+  });
+
+  it("reads the mode, who and when, until and the key's name", async () => {
+    api.get.mockResolvedValue({ data: view() });
+    const store = useKiosksStore();
+    store.kiosks = [{ id: "k1", overrides: { screenNow: { power: "on" } } }];
+
+    const answer = await store.fetchScreenPower("k1");
+
+    expect(api.get).toHaveBeenCalledWith("/kiosks/k1/screen-power");
+    expect(answer).toMatchObject({
+      mode: "schedule",
+      power: "off",
+      until: "2026-11-21T22:00:00Z",
+      keyName: "Homey",
+    });
+    const kiosk = store.kiosks[0];
+    expect(kiosk.screenPower).toBe("schedule");
+    expect(kiosk.screenPowerView).toMatchObject({
+      power: "off",
+      by: "automation",
+      setAt: "2026-11-21T21:04:00Z",
+      until: "2026-11-21T22:00:00Z",
+      keyName: "Homey",
+    });
+    // The server owns the command now: a stored Screen now is gone.
+    expect(kiosk.overrides.screenNow).toBeUndefined();
+  });
+
+  it("sends one PUT for a button press and stores its answer", async () => {
+    api.put.mockResolvedValue({ data: view({ mode: "external", power: "on", until: null }) });
+    const store = useKiosksStore();
+    store.kiosks = [{ id: "k1", overrides: { brightness: 20 } }];
+
+    const answer = await store.setScreenPower("k1", "on");
+
+    expect(api.put).toHaveBeenCalledWith("/kiosks/k1/screen-power", { power: "on" });
+    expect(answer.mode).toBe("external");
+    expect(store.kiosks[0].screenPower).toBe("external");
+    expect(store.kiosks[0].screenPowerView.power).toBe("on");
+    expect(store.kiosks[0].overrides).toEqual({ brightness: 20 });
+  });
+
+  it("url-encodes the id", async () => {
+    api.get.mockResolvedValue({ data: view({ id: "a/b" }) });
+    const store = useKiosksStore();
+    store.kiosks = [{ id: "a/b", overrides: {} }];
+    await store.fetchScreenPower("a/b");
+    expect(api.get).toHaveBeenCalledWith("/kiosks/a%2Fb/screen-power");
+  });
+
+  it("keeps the screen power view through a presence refresh", async () => {
+    api.get.mockResolvedValue({
+      data: { kiosks: [{ id: "k1", overrides: {}, powerHold: null }] },
+    });
+    const store = useKiosksStore();
+    const kept = view({ power: "off", keyName: "Homey" });
+    store.kiosks = [{ id: "k1", overrides: {}, screenPowerView: kept }];
+
+    await store.refreshKiosks();
+
+    expect(store.kiosks[0].screenPowerView).toEqual(kept);
+  });
+
+  it("keeps the screen power view through a list reload", async () => {
+    api.get.mockResolvedValue({
+      data: {
+        kiosks: [
+          { id: "k1", overrides: {} },
+          { id: "k2", overrides: {} },
+        ],
+      },
+    });
+    const store = useKiosksStore();
+    const kept = view({ power: "on" });
+    store.kiosks = [{ id: "k1", overrides: {}, screenPowerView: kept }];
+
+    await store.loadKiosks();
+
+    expect(store.kiosks[0].screenPowerView).toEqual(kept);
+    expect(store.kiosks[1].screenPowerView).toBeUndefined();
+  });
+
+  it("never caches the admin key name or the client-only view", async () => {
+    api.get.mockResolvedValue({ data: view() });
+    const store = useKiosksStore();
+    store.kiosks = [{ id: "k1", overrides: {} }];
+
+    await store.fetchScreenPower("k1");
+
+    const cached = JSON.parse(localStorage.getItem("calvin_cache_kiosks_list"));
+    expect(cached[0].screenPowerView).toBeUndefined();
+    expect(JSON.stringify(cached)).not.toContain("keyName");
+    expect(JSON.stringify(cached)).not.toContain("Homey");
+  });
+
+  it("clearScreenPower drops the view and its cached copy", async () => {
+    api.get.mockResolvedValue({ data: view() });
+    const store = useKiosksStore();
+    store.kiosks = [{ id: "k1", overrides: {} }];
+    await store.fetchScreenPower("k1");
+    expect(store.kiosks[0].screenPowerView).toBeTruthy();
+
+    store.clearScreenPower("k1");
+
+    expect(store.kiosks[0].screenPowerView).toBeUndefined();
+    const cached = JSON.parse(localStorage.getItem("calvin_cache_kiosks_list"));
+    expect(cached[0].screenPowerView).toBeUndefined();
   });
 });
 

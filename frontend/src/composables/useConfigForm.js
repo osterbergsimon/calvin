@@ -171,6 +171,13 @@ export function useConfigForm(initialConfig = {}) {
         // Display
         displayScheduleEnabled:
           response.displayScheduleEnabled ?? response.display_schedule_enabled ?? false,
+        // Screen power mode (calvin-25g9). The server derives it from the old
+        // switch when an install predates the key.
+        screenPower:
+          response.screenPower ??
+          ((response.displayScheduleEnabled ?? response.display_schedule_enabled ?? false)
+            ? "schedule"
+            : "always_on"),
         displaySchedule: response.displaySchedule
           ? typeof response.displaySchedule === "string"
             ? JSON.parse(response.displaySchedule)

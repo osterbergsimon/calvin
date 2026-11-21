@@ -106,4 +106,21 @@ describe("usePhotoFrameMode idle timer (calvin-agnx)", () => {
     await vi.advanceTimersByTimeAsync(10 * 60_000);
     expect(mode.enterFullscreen).toHaveBeenCalledTimes(1);
   });
+
+  it("re-arms the idle wait when activity other than a wake gesture dismisses the frame", async () => {
+    const frame = usePhotoFrameMode();
+    frame.setupEventListeners();
+    await frame.enterPhotoFrameMode();
+    expect(frame.isPhotoFrameActive.value).toBe(true);
+
+    // A mouse move is activity but not a wake gesture (WAKE_EVENTS), so the
+    // passive tracker exits the frame: the idle wait must be armed again.
+    window.dispatchEvent(new Event("mousemove"));
+    await vi.advanceTimersByTimeAsync(500);
+    expect(mode.exitFullscreen).toHaveBeenCalledTimes(1);
+    expect(frame.isPhotoFrameActive.value).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(mode.enterFullscreen).toHaveBeenCalledTimes(2);
+  });
 });

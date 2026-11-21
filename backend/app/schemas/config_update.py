@@ -187,6 +187,10 @@ class ConfigUpdate(BaseModel):
     # keeps no list of ids: an unknown id falls back to the default face.
     typeTheme: str | None = Field(None, max_length=64)
     displayScheduleEnabled: bool | None = None  # Enable display power schedule
+    # Screen power (calvin-25g9): schedule, always_on or external. When it is
+    # absent the mode is derived from displayScheduleEnabled, and every write of
+    # either keeps the pair in step (set), so both spellings agree.
+    screenPower: Literal["schedule", "always_on", "external"] | None = None
     # Display schedule as JSON string or array:
     # [{"day": 0-6, "enabled": bool, "onTime": "HH:MM", "offTime": "HH:MM"}, ...]
     displaySchedule: str | list[dict[str, Any]] | None = None
@@ -231,6 +235,19 @@ class ConfigUpdate(BaseModel):
             # not be a way around the clockBarDesign model above.
             if "clock_bar_design" in data:
                 raise ValueError("send clockBarDesign, not clock_bar_design")
+        return data
+
+    @model_validator(mode="before")
+    @classmethod
+    def _check_snake_case_screen_power(cls, data: Any) -> Any:
+        # The stored spelling is still read and written on the household config;
+        # extra="allow" would otherwise let any value through, since only the
+        # camelCase field is typed. An invalid value must be refused, not turned
+        # into the derived mode (calvin-25g9 review).
+        if isinstance(data, dict):
+            value = data.get("screen_power")
+            if value is not None and value not in ("schedule", "always_on", "external"):
+                raise ValueError("screen_power: use schedule, always_on or external")
         return data
 
     @model_validator(mode="after")

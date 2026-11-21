@@ -1,6 +1,7 @@
-"""The screen-power route and the held on/off in the kiosk config (calvin-2ifv)."""
+"""The screen-power route and its command in the kiosk config (calvin-2ifv, calvin-25g9)."""
 
-from datetime import UTC, datetime, timedelta
+import asyncio
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,6 +10,36 @@ from loguru import logger
 KIOSK = "kitchen"
 URL = f"/api/kiosks/{KIOSK}/screen-power"
 OVERRIDES_URL = f"/api/kiosks/{KIOSK}/overrides"
+
+# All days off: the schedule says "on" and has no boundary, so a test that does
+# not care about the schedule is not tied to the time of day.
+NO_SCHEDULE = [
+    {"day": day, "enabled": False, "onTime": "07:00", "offTime": "22:00"} for day in range(7)
+]
+# All days on 07:00-22:00: the expiry tests use its boundaries.
+SCHEDULE = [
+    {"day": day, "enabled": True, "onTime": "07:00", "offTime": "22:00"} for day in range(7)
+]
+
+# A fixed instant at 12:00 UTC on a Wednesday: inside SCHEDULE, so a test about
+# the schedule saying on does not depend on the wall clock. The route reads
+# "now" through screen_power.now_in, and a command's setAt through the registry.
+NOW = datetime(2026, 11, 18, 12, 0, tzinfo=UTC)
+
+
+@pytest.fixture(autouse=True)
+def _fixed_clock(test_client, monkeypatch):
+    """Pin the clocks the screen-power routes read, whatever the time of day.
+
+    ``test_client`` is requested first: it reloads the registry and route
+    modules, which would drop a patch set before they are bound to the test DB.
+    """
+    from app.api.routes import kiosks
+    from app.services import kiosk_registry, screen_power
+
+    monkeypatch.setattr(screen_power, "now_in", lambda _cfg: NOW)
+    monkeypatch.setattr(kiosk_registry, "utcnow", lambda: NOW)
+    monkeypatch.setattr(kiosks, "utcnow", lambda: NOW)
 
 
 @pytest.fixture(autouse=True)
@@ -20,7 +51,22 @@ def _fresh_limiter():
     change_limiter.reset()
 
 
-def _register(client: TestClient, kiosk_id: str = KIOSK, query: str = "kagent=v1") -> None:
+def _set_mode(client: TestClient, mode: str = "schedule") -> None:
+    body: dict = {"screenPower": mode}
+    if mode == "schedule":
+        body["displaySchedule"] = NO_SCHEDULE
+    assert client.post("/api/config", json=body).status_code == 200
+
+
+def _register(
+    client: TestClient,
+    kiosk_id: str = KIOSK,
+    query: str = "kagent=v1",
+    mode: str | None = "schedule",
+) -> None:
+    """Register a screen; unless ``mode`` is None, the household uses that mode."""
+    if mode is not None:
+        _set_mode(client, mode)
     assert client.get(f"/api/kiosks/{kiosk_id}/config?{query}").status_code == 200
 
 
@@ -37,21 +83,21 @@ def _listed(client: TestClient, kiosk_id: str = KIOSK) -> dict:
     return next(k for k in client.get("/api/kiosks").json()["kiosks"] if k["id"] == kiosk_id)
 
 
-def _client_choice(power: str, offset_s: float) -> dict:
-    """A "Screen now" as a phone would stamp it: browser clock, ISO-8601 with ms."""
-    return {"power": power, "setAt": (datetime.now(UTC) + timedelta(seconds=offset_s)).isoformat()}
+def _stored_command(kiosk_id: str = KIOSK) -> dict | None:
+    from app.models.db_models import KioskDB
+
+    row = asyncio.run(KioskDB.objects.get(id=kiosk_id))
+    return dict(row.power_hold) if row.power_hold is not None else None
 
 
-def _assert_restamped_now(stored: dict, sent: dict) -> None:
-    """The choice was kept, and its setAt now carries the server's clock, not the phone's."""
-    assert stored["setAt"] != sent["setAt"]
-    assert stored["setAt"].endswith("Z")
-    stamped = datetime.fromisoformat(stored["setAt"].replace("Z", "+00:00"))
-    assert abs((datetime.now(UTC) - stamped).total_seconds()) < 10
+def _set_command(power: str, mode: str, when: datetime, kiosk_id: str = KIOSK) -> None:
+    from app.services.kiosk_registry import set_power_command
+
+    asyncio.run(set_power_command(kiosk_id, power, "automation", mode, now=when))
 
 
 @pytest.mark.integration
-def test_put_off_holds_and_projects(test_client: TestClient):
+def test_put_off_stores_the_command_and_projects_screen_now(test_client: TestClient):
     _register(test_client)
     response = test_client.put(URL, json={"power": "off"})
     assert response.status_code == 200, response.text
@@ -65,33 +111,23 @@ def test_put_off_holds_and_projects(test_client: TestClient):
 
     config = test_client.get(f"/api/kiosks/{KIOSK}/config").json()
     expected = {"power": "off", "setAt": body["setAt"]}
-    assert config["screenHold"] == config["screen_hold"] == expected
     assert config["screenNow"] == config["screen_now"] == expected
-    assert "screenNow" not in test_client.get(f"/api/kiosks/{KIOSK}/overrides").json()["overrides"]
-    assert _listed(test_client)["powerHold"]["power"] == "off"
+    assert "screenHold" not in config and "screen_hold" not in config
+    assert "screenNow" not in test_client.get(OVERRIDES_URL).json()["overrides"]
+    assert _stored_command()["mode"] == "schedule"
+    assert _stored_command()["by"] == "settings"
 
 
 @pytest.mark.integration
-def test_schedule_ends_the_hold(test_client: TestClient):
+def test_schedule_clears_the_command(test_client: TestClient):
     _register(test_client)
     test_client.put(URL, json={"power": "off"})
     body = test_client.put(URL, json={"power": "schedule"}).json()
     assert body["power"] == "schedule" and body["held"] is False and body["setAt"] is None
     assert body["desiredOn"] is True  # no schedule: on
+    assert _stored_command() is None
     config = test_client.get(f"/api/kiosks/{KIOSK}/config").json()
     assert "screenHold" not in config and "screenNow" not in config
-
-
-@pytest.mark.integration
-def test_schedule_clears_a_manual_screen_now(test_client: TestClient):
-    _register(test_client)
-    test_client.patch(
-        f"/api/kiosks/{KIOSK}/overrides",
-        json={"overrides": {"screenNow": {"power": "off", "setAt": "2026-11-18T10:00:00Z"}}},
-    )
-    test_client.put(URL, json={"power": "schedule"})
-    layer = test_client.get(f"/api/kiosks/{KIOSK}/overrides").json()["overrides"]
-    assert "screenNow" not in layer
 
 
 @pytest.mark.integration
@@ -126,13 +162,13 @@ def test_no_change_writes_nothing_and_is_not_limited(test_client: TestClient, mo
     from app.services import kiosk_registry
 
     calls = []
-    original = kiosk_registry.set_power_hold
+    original = kiosk_registry.set_power_command
 
     async def counting(*args, **kwargs):
         calls.append(args)
         return await original(*args, **kwargs)
 
-    monkeypatch.setattr(kiosk_registry, "set_power_hold", counting)
+    monkeypatch.setattr(kiosk_registry, "set_power_command", counting)
     for _ in range(40):
         assert test_client.put(URL, json={"power": "off"}).status_code == 200
     assert calls == []
@@ -176,7 +212,8 @@ def test_limited_key_switches_and_is_logged_by_name(test_client: TestClient):
     joined = "\n".join(sink)
     assert "Homey" in joined and KIOSK in joined
     assert secret not in joined
-    # No public view carries the key's name.
+    # The command keeps the key's name; no public view carries it.
+    assert _stored_command()["keyName"] == "Homey"
     for path in (
         URL,
         "/api/kiosks",
@@ -195,7 +232,7 @@ def test_limited_key_cannot_replace_the_layer(test_client: TestClient):
     secret = _limited_key(test_client)
     test_client.cookies.clear()
     response = test_client.put(
-        f"/api/kiosks/{KIOSK}/overrides",
+        OVERRIDES_URL,
         json={"overrides": {}},
         headers={"Authorization": f"Bearer {secret}"},
     )
@@ -203,158 +240,75 @@ def test_limited_key_cannot_replace_the_layer(test_client: TestClient):
 
 
 @pytest.mark.integration
-def test_stale_settings_save_cannot_bring_back_screen_now(test_client: TestClient):
+@pytest.mark.parametrize("verb", ["put", "patch"])
+def test_a_layer_write_strips_screen_now(test_client: TestClient, verb):
+    """Settings no longer writes a Screen now into the layer; both writes drop one."""
     _register(test_client)
-    test_client.put(URL, json={"power": "off"})
     stale = {
         "displayName": "Kitchen",
         "screenNow": {"power": "on", "setAt": "2026-11-18T09:00:00Z"},
+        "screen_now": {"power": "off", "setAt": "2026-11-18T09:00:00Z"},
     }
-    assert (
-        test_client.put(f"/api/kiosks/{KIOSK}/overrides", json={"overrides": stale}).status_code
-        == 200
-    )
-    layer = test_client.get(f"/api/kiosks/{KIOSK}/overrides").json()["overrides"]
-    assert layer == {"displayName": "Kitchen"}
-    assert test_client.get(URL).json()["power"] == "off"
-
-
-@pytest.mark.integration
-def test_a_screen_now_older_than_the_last_power_change_is_dropped(test_client: TestClient):
-    """The stale-page probe from the PR #369 review (calvin-ldeu).
-
-    A page that missed a whole hold (set and cleared between two of its
-    kiosk-list refreshes) must not put its old manual choice back.
-    """
-    _register(test_client)
-    stale = {
-        "displayName": "Kitchen",
-        "screenNow": {"power": "off", "setAt": "2026-01-01T00:00:00Z"},
-    }
-    assert test_client.put(OVERRIDES_URL, json={"overrides": stale}).status_code == 200
-    # Home automation holds the screen on, then sends it back to its schedule,
-    # both between two kiosk-list refreshes, so the page never sees the hold.
-    assert test_client.put(URL, json={"power": "on"}).status_code == 200
-    assert test_client.put(URL, json={"power": "schedule"}).status_code == 200
-    assert test_client.get(URL).json()["held"] is False
-    # The person saves an unrelated field; the page resends its whole layer.
-    assert test_client.put(OVERRIDES_URL, json={"overrides": stale}).status_code == 200
+    response = getattr(test_client, verb)(OVERRIDES_URL, json={"overrides": stale})
+    assert response.status_code == 200, response.text
     layer = test_client.get(OVERRIDES_URL).json()["overrides"]
-    assert layer == {"displayName": "Kitchen"}
-    view = test_client.get(URL).json()
-    assert view["power"] == "schedule" and view["desiredOn"] is True
-
-
-@pytest.mark.integration
-def test_a_fresh_screen_now_after_the_change_is_kept(test_client: TestClient):
-    """A person's own "Turn off now" after a hold ended still works (PUT)."""
-    _register(test_client)
-    test_client.put(URL, json={"power": "on"})
-    test_client.put(URL, json={"power": "schedule"})
-    fresh = _client_choice("off", offset_s=0)
-    response = test_client.put(OVERRIDES_URL, json={"overrides": {"screenNow": fresh}})
-    assert response.status_code == 200, response.text
-    stored = test_client.get(OVERRIDES_URL).json()["overrides"]["screenNow"]
-    assert stored["power"] == "off"
-    _assert_restamped_now(stored, fresh)
-    assert test_client.get(URL).json()["desiredOn"] is False
-    assert test_client.get(f"/api/kiosks/{KIOSK}/config").json()["screenNow"] == stored
-
-
-@pytest.mark.integration
-@pytest.mark.parametrize("offset_s", [-5, 5])
-def test_put_keeps_a_fresh_choice_when_the_client_clock_is_off(
-    test_client: TestClient, offset_s: int
-):
-    """The page stamps setAt with the browser clock; the server judges with its own.
-
-    Ending a hold writes the tombstone on the server, and the page saves the new
-    choice milliseconds later. A phone a few seconds behind (or ahead) must not
-    have that press silently dropped because its clock disagrees (calvin-ldeu).
-    """
-    _register(test_client)
-    test_client.put(URL, json={"power": "on"})
-    test_client.put(URL, json={"power": "schedule"})
-    choice = _client_choice("off", offset_s=offset_s)
-    response = test_client.put(OVERRIDES_URL, json={"overrides": {"screenNow": choice}})
-    assert response.status_code == 200, response.text
-    stored = response.json()["overrides"]["screenNow"]
-    assert stored["power"] == "off"
-    _assert_restamped_now(stored, choice)
-    assert test_client.get(URL).json()["desiredOn"] is False
-
-
-@pytest.mark.integration
-@pytest.mark.parametrize("offset_s", [-5, 5])
-def test_patch_keeps_a_fresh_choice_when_the_client_clock_is_off(
-    test_client: TestClient, offset_s: int
-):
-    """The screen's own partial write (PATCH) gets the same clock tolerance."""
-    _register(test_client)
-    test_client.put(URL, json={"power": "on"})
-    test_client.put(URL, json={"power": "schedule"})
-    choice = _client_choice("off", offset_s=offset_s)
-    response = test_client.patch(OVERRIDES_URL, json={"overrides": {"screenNow": choice}})
-    assert response.status_code == 200, response.text
-    stored = response.json()["overrides"]["screenNow"]
-    assert stored["power"] == "off"
-    _assert_restamped_now(stored, choice)
-    assert test_client.get(URL).json()["desiredOn"] is False
-
-
-@pytest.mark.integration
-def test_a_choice_beyond_the_tolerance_in_the_future_is_not_restamped(test_client: TestClient):
-    """Far ahead is not "fresh now": no re-stamp, and the old rule still applies."""
-    _register(test_client)
-    test_client.put(URL, json={"power": "on"})
-    test_client.put(URL, json={"power": "schedule"})
-    ahead = _client_choice("off", offset_s=3600)
-    response = test_client.put(OVERRIDES_URL, json={"overrides": {"screenNow": ahead}})
-    assert response.status_code == 200, response.text
-    # Strictly newer than the change: kept exactly as sent.
-    assert response.json()["overrides"]["screenNow"] == ahead
-
-
-@pytest.mark.integration
-def test_patch_drops_a_superseded_screen_now(test_client: TestClient):
-    """A screen's own partial write (PATCH) is guarded the same way."""
-    _register(test_client)
-    test_client.put(URL, json={"power": "on"})
-    test_client.put(URL, json={"power": "schedule"})
-    stale = {"power": "off", "setAt": "2026-01-01T00:00:00Z"}
-    response = test_client.patch(OVERRIDES_URL, json={"overrides": {"screenNow": stale}})
-    assert response.status_code == 200, response.text
+    assert "screenNow" not in layer and "screen_now" not in layer
+    assert layer["displayName"] == "Kitchen"
     assert "screenNow" not in response.json()["overrides"]
-    assert "screenNow" not in test_client.get(OVERRIDES_URL).json()["overrides"]
 
 
 @pytest.mark.integration
-def test_patch_keeps_a_fresh_screen_now(test_client: TestClient):
+def test_an_expired_command_reads_as_schedule_without_a_write(test_client: TestClient):
+    """Decision 4: a passed boundary makes the command absent, and a read keeps it."""
     _register(test_client)
-    test_client.put(URL, json={"power": "on"})
-    test_client.put(URL, json={"power": "schedule"})
-    fresh = _client_choice("on", offset_s=0)
-    response = test_client.patch(OVERRIDES_URL, json={"overrides": {"screenNow": fresh}})
-    assert response.status_code == 200, response.text
-    _assert_restamped_now(response.json()["overrides"]["screenNow"], fresh)
+    test_client.post("/api/config", json={"screenPower": "schedule", "displaySchedule": SCHEDULE})
+    _set_command("off", "schedule", datetime(2026, 1, 1, 12, tzinfo=UTC))
+    stored_before = _stored_command()
+    assert stored_before["power"] == "off"
+
+    body = test_client.get(URL).json()
+    assert (body["power"], body["held"], body["setAt"], body["by"]) == (
+        "schedule",
+        False,
+        None,
+        None,
+    )
+    assert _stored_command() == stored_before  # nothing was cleared on the read
+
+    # The next command write replaces it.
+    assert test_client.put(URL, json={"power": "on"}).json()["power"] == "on"
+    assert _stored_command()["power"] == "on"
 
 
 @pytest.mark.integration
-def test_back_to_schedule_also_supersedes_a_lone_screen_now(test_client: TestClient):
-    """Ending a plain "Screen now" (no hold) is a power change too."""
+def test_a_command_from_another_mode_is_read_as_absent(test_client: TestClient):
+    """Decision 5's read rule: a mismatched command is absent, and a read keeps it."""
+    from app.services import kiosk_registry
+
     _register(test_client)
-    manual = {"power": "on", "setAt": "2026-01-01T00:00:00Z"}
-    test_client.put(OVERRIDES_URL, json={"overrides": {"screenNow": manual}})
-    test_client.put(URL, json={"power": "schedule"})
-    assert "screenNow" not in test_client.get(OVERRIDES_URL).json()["overrides"]
-    # A page that still carries the removed choice cannot put it back.
-    test_client.put(OVERRIDES_URL, json={"overrides": {"screenNow": manual}})
-    assert "screenNow" not in test_client.get(OVERRIDES_URL).json()["overrides"]
+    # A command from another mode, as an older backend or a hand-edited row
+    # could leave it; a household change now clears it on the write itself.
+    asyncio.run(kiosk_registry.set_power_command(KIOSK, "off", "automation", mode="external"))
+    stored_before = _stored_command()
+    assert stored_before["mode"] == "external"
+
+    body = test_client.get(URL).json()
+    assert (body["power"], body["held"], body["setAt"], body["by"]) == (
+        "schedule",
+        False,
+        None,
+        None,
+    )
+    assert body["desiredOn"] is True  # Schedule without a command follows the schedule
+    assert _stored_command() == stored_before  # a read never clears
+
+    # The next write replaces it with a command in the screen's own mode.
+    assert test_client.put(URL, json={"power": "on"}).status_code == 200
+    assert _stored_command()["mode"] == "schedule" and _stored_command()["power"] == "on"
 
 
 @pytest.mark.integration
-def test_a_cleared_hold_leaves_nothing_for_readers_or_agents(test_client: TestClient):
-    """The tombstone that keeps the guard is never a hold and never a config key."""
+def test_a_cleared_command_leaves_nothing_for_readers_or_agents(test_client: TestClient):
     _register(test_client, query="kagent=v1")  # an agent that cannot hold
     test_client.put(URL, json={"power": "off"})
     assert test_client.put(URL, json={"power": "schedule"}).status_code == 200
@@ -386,7 +340,7 @@ def test_agent_reports_it_can_hold(test_client: TestClient):
 @pytest.mark.integration
 @pytest.mark.no_admin_login
 def test_anonymous_cannot_switch_but_can_read(test_client: TestClient):
-    _register(test_client)
+    _register(test_client, mode=None)
     response = test_client.put(URL, json={"power": "off"})
     assert response.status_code == 401
     assert test_client.get(URL).status_code == 200
@@ -394,10 +348,10 @@ def test_anonymous_cannot_switch_but_can_read(test_client: TestClient):
 
 @pytest.mark.integration
 def test_a_hold_written_into_the_layer_is_ignored(test_client: TestClient):
-    """Only the hold column holds a screen: a layer (or a restored backup) cannot."""
+    """Only the command column switches a screen: a layer (or a restored backup) cannot."""
     _register(test_client)
     injected = {"screenHold": {"power": "off", "setAt": "2026-11-18T12:00:00Z"}}
-    test_client.put(f"/api/kiosks/{KIOSK}/overrides", json={"overrides": injected})
+    test_client.put(OVERRIDES_URL, json={"overrides": injected})
     config = test_client.get(f"/api/kiosks/{KIOSK}/config").json()
     assert "screenHold" not in config and "screen_hold" not in config
     body = test_client.get(URL).json()
@@ -408,28 +362,482 @@ def test_a_hold_written_into_the_layer_is_ignored(test_client: TestClient):
 def test_old_agent_desired_on_follows_the_projected_screen_now(test_client: TestClient):
     """For an agent that can't hold, desiredOn is what that agent will do."""
     _register(test_client)  # kagent without kfeat: cannot hold
-    test_client.post(
-        "/api/config",
-        json={
-            "displayScheduleEnabled": True,
-            "displaySchedule": [
-                {"day": d, "enabled": True, "onTime": "00:00", "offTime": "23:59"} for d in range(7)
-            ],
-        },
-    )
-    from app.services import kiosk_registry
+    test_client.post("/api/config", json={"screenPower": "schedule", "displaySchedule": SCHEDULE})
+    _set_command("off", "schedule", datetime(2026, 1, 1, tzinfo=UTC))
+    body = test_client.get(URL).json()
+    # Expired long ago: absent, the schedule says on.
+    assert body["held"] is False and body["desiredOn"] is True
 
-    async def _old_hold():
-        from datetime import UTC, datetime
-
-        await kiosk_registry.set_power_hold(
-            KIOSK, "off", "automation", now=datetime(2026, 1, 1, tzinfo=UTC)
-        )
-
-    import asyncio
-
-    asyncio.run(_old_hold())
+    _set_command("off", "schedule", NOW)  # inside the schedule, before its 22:00 boundary
     body = test_client.get(URL).json()
     assert body["held"] is True and body["agentHolds"] is False
-    # Set long ago: the old agent's projected screenNow has expired, the schedule says on.
+    assert body["desiredOn"] is False
+
+
+# -- what a command means per mode (design decision 3) ----------------------
+
+
+@pytest.mark.integration
+def test_always_on_refuses_a_command_with_the_exact_answer(test_client: TestClient):
+    _register(test_client, mode="always_on")
+    for power in ("on", "off"):
+        response = test_client.put(URL, json={"power": power})
+        assert response.status_code == 409
+        assert response.json()["detail"] == {
+            "code": "screen_power_always_on",
+            "message": "This screen is set to Always on. Choose Schedule or External to switch it.",
+        }
+    assert _stored_command() is None
+    body = test_client.get(URL).json()
+    assert body["power"] == "schedule" and body["held"] is False
     assert body["desiredOn"] is True
+
+
+@pytest.mark.integration
+def test_always_on_schedule_is_a_noop(test_client: TestClient, monkeypatch):
+    _register(test_client, mode="always_on")
+    from app.services import kiosk_registry
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("a no-op must not write")
+
+    monkeypatch.setattr(kiosk_registry, "clear_power_command", refuse)
+    monkeypatch.setattr(kiosk_registry, "set_power_command", refuse)
+    for _ in range(5):
+        assert test_client.put(URL, json={"power": "schedule"}).status_code == 200
+
+
+@pytest.mark.integration
+def test_external_takes_on_and_off(test_client: TestClient):
+    _register(test_client, mode="external")
+    body = test_client.get(URL).json()
+    # No command yet in External: the UI reads "schedule" as no command, and on.
+    assert body["power"] == "schedule" and body["held"] is False
+    assert body["desiredOn"] is True
+
+    assert test_client.put(URL, json={"power": "off"}).json()["power"] == "off"
+    assert _stored_command()["mode"] == "external"
+    assert test_client.get(URL).json()["power"] == "off"
+    assert test_client.put(URL, json={"power": "on"}).json()["power"] == "on"
+    assert _stored_command()["mode"] == "external"
+
+
+@pytest.mark.integration
+def test_external_refuses_schedule_with_the_exact_answer(test_client: TestClient):
+    _register(test_client, mode="external")
+    test_client.put(URL, json={"power": "off"})
+    response = test_client.put(URL, json={"power": "schedule"})
+    assert response.status_code == 409
+    assert response.json()["detail"] == {
+        "code": "screen_power_external",
+        "message": "This screen is set to External. Send on or off.",
+    }
+    assert _stored_command()["power"] == "off"  # nothing was cleared
+
+
+@pytest.mark.integration
+def test_a_refused_change_does_not_count_toward_the_limit(test_client: TestClient):
+    _register(test_client, mode="always_on")
+    for _ in range(40):
+        assert test_client.put(URL, json={"power": "off"}).status_code == 409
+    # The limiter was not touched by the refusals.
+    _set_mode(test_client, "external")
+    assert test_client.put(URL, json={"power": "off"}).status_code == 200
+
+
+# -- the answer (design decision 7) and the kiosk list (decision 8) ----------
+
+
+@pytest.mark.integration
+def test_the_answer_reports_the_mode(test_client: TestClient):
+    _register(test_client, mode="schedule")
+    assert test_client.get(URL).json()["mode"] == "schedule"
+    _set_mode(test_client, "always_on")
+    assert test_client.get(URL).json()["mode"] == "always_on"
+    _set_mode(test_client, "external")
+    assert test_client.get(URL).json()["mode"] == "external"
+
+
+@pytest.mark.integration
+def test_until_is_the_end_of_a_schedule_command(test_client: TestClient):
+    _register(test_client, mode="schedule")
+    assert test_client.get(URL).json()["until"] is None  # no command in force
+
+    test_client.post("/api/config", json={"screenPower": "schedule", "displaySchedule": SCHEDULE})
+    body = test_client.put(URL, json={"power": "off"}).json()
+    assert body["until"] is not None
+    now = NOW
+    until = datetime.fromisoformat(body["until"].replace("Z", "+00:00")).astimezone(UTC)
+    assert until > now
+    assert (until - now).days <= 8
+    # It is the boundary at which the command ends: the next 22:00 or 07:00.
+    assert until.strftime("%H:%M") in ("07:00", "22:00")
+
+    _set_mode(test_client, "external")
+    assert test_client.get(URL).json()["until"] is None
+
+
+@pytest.mark.integration
+def test_until_is_null_without_a_boundary_in_the_next_8_days(test_client: TestClient):
+    _register(test_client, mode="schedule")  # NO_SCHEDULE: all days disabled
+    body = test_client.put(URL, json={"power": "off"}).json()
+    assert body["held"] is True and body["until"] is None
+
+
+@pytest.mark.integration
+def test_the_key_name_is_only_for_an_admin_session(test_client: TestClient):
+    from app.security.admin_auth import COOKIE_NAME
+
+    _register(test_client, mode="schedule")
+    secret = _limited_key(test_client)
+    admin = test_client.cookies.get(COOKIE_NAME)
+    assert admin
+    test_client.cookies.clear()
+    assert (
+        test_client.put(
+            URL, json={"power": "off"}, headers={"Authorization": f"Bearer {secret}"}
+        ).status_code
+        == 200
+    )
+
+    admin_view = test_client.get(URL, headers={"cookie": f"{COOKIE_NAME}={admin}"}).json()
+    assert admin_view["by"] == "automation"
+    assert admin_view["keyName"] == "Homey"
+    # The screens.power key itself gets no name.
+    assert (
+        test_client.get(URL, headers={"Authorization": f"Bearer {secret}"}).json()["keyName"]
+        is None
+    )
+    # Neither does an anonymous caller on a screen it may read.
+    assert test_client.get(URL).json()["keyName"] is None
+
+
+@pytest.mark.integration
+def test_the_screen_itself_gets_no_key_name(test_client: TestClient):
+    from app.security.kiosk_auth import KIOSK_COOKIE, issue_kiosk_cookie
+    from app.services.kiosk_pairing import hash_secret, new_secret
+
+    _register(test_client, mode="schedule", query="kagent=v1")
+    secret = _limited_key(test_client)
+    test_client.cookies.clear()
+    assert (
+        test_client.put(
+            URL, json={"power": "off"}, headers={"Authorization": f"Bearer {secret}"}
+        ).status_code
+        == 200
+    )
+    kiosk_secret = new_secret()
+    asyncio.run(kiosk_registry_set_credential(KIOSK, hash_secret(kiosk_secret)))
+    cookie = issue_kiosk_cookie(KIOSK, hash_secret(kiosk_secret))
+    view = test_client.get(URL, headers={"cookie": f"{KIOSK_COOKIE}={cookie}"}).json()
+    assert view["by"] == "automation" and view["keyName"] is None
+
+
+def kiosk_registry_set_credential(kiosk_id: str, secret_hash: str):
+    from app.services import kiosk_registry
+
+    return kiosk_registry.set_credential(kiosk_id, secret_hash)
+
+
+@pytest.mark.integration
+def test_the_list_row_reports_the_effective_mode_and_only_a_live_command(
+    test_client: TestClient,
+):
+    _register(test_client, mode="schedule")
+    assert _listed(test_client)["screenPower"] == "schedule"
+    _set_mode(test_client, "always_on")
+    assert _listed(test_client)["screenPower"] == "always_on"
+    _set_mode(test_client, "external")
+    row = _listed(test_client)
+    assert row["screenPower"] == "external"
+    assert row["powerHold"] is None  # no command yet
+
+    test_client.put(URL, json={"power": "off"})
+    assert _listed(test_client)["powerHold"]["power"] == "off"
+
+    # A command from another mode is not in force, so the list shows none.
+    _set_mode(test_client, "schedule")
+    row = _listed(test_client)
+    assert row["screenPower"] == "schedule"
+    assert row["powerHold"] is None
+
+
+@pytest.mark.integration
+def test_an_expired_command_is_not_in_the_list(test_client: TestClient):
+    _register(test_client, mode="schedule")
+    test_client.post("/api/config", json={"screenPower": "schedule", "displaySchedule": SCHEDULE})
+    _set_command("off", "schedule", datetime(2026, 1, 1, 12, tzinfo=UTC))
+    assert _listed(test_client)["powerHold"] is None
+
+
+@pytest.mark.integration
+def test_a_gated_list_row_hides_the_mode_like_the_other_presence_fields(
+    test_client: TestClient,
+):
+    from app.services.config_service import config_service
+
+    _register(test_client, mode="external")
+    asyncio.run(config_service.set_value("kioskPairing", "required"))
+    test_client.cookies.clear()
+    row = _listed(test_client)
+    assert row["presenceHidden"] is True
+    assert "screenPower" not in row
+    assert "powerHold" not in row
+
+
+# -- a mode change ends the command (design decision 5) ---------------------
+
+
+@pytest.mark.integration
+def test_leaving_and_reentering_external_starts_with_no_command(test_client: TestClient):
+    _register(test_client, mode="external")
+    assert test_client.put(URL, json={"power": "off"}).json()["power"] == "off"
+    assert _stored_command()["mode"] == "external"
+
+    _set_mode(test_client, "always_on")
+    _set_mode(test_client, "external")
+    view = test_client.get(URL).json()
+    assert view["mode"] == "external"
+    assert (view["power"], view["held"], view["setAt"], view["by"]) == (
+        "schedule",
+        False,
+        None,
+        None,
+    )
+    assert view["desiredOn"] is True
+    assert _stored_command() is None
+
+
+@pytest.mark.integration
+def test_leaving_and_reentering_schedule_ends_the_command(test_client: TestClient):
+    _register(test_client, mode="schedule")
+    assert test_client.put(URL, json={"power": "off"}).json()["power"] == "off"
+    assert _stored_command()["mode"] == "schedule"
+
+    _set_mode(test_client, "external")
+    _set_mode(test_client, "schedule")
+    view = test_client.get(URL).json()
+    assert view["mode"] == "schedule"
+    assert (view["power"], view["held"], view["setAt"], view["until"]) == (
+        "schedule",
+        False,
+        None,
+        None,
+    )
+    assert view["desiredOn"] is True
+    assert _stored_command() is None
+
+
+@pytest.mark.integration
+def test_a_household_mode_change_ends_a_following_screens_command_only(
+    test_client: TestClient,
+):
+    _register(test_client, mode="external")
+    assert test_client.get("/api/kiosks/hall/config?khost=pi-hall").status_code == 200
+    test_client.put(URL, json={"power": "off"})  # kitchen follows the household
+    # Hall has its own mode (Schedule) and a command of its own.
+    test_client.patch("/api/kiosks/hall/overrides", json={"overrides": {"screenPower": "schedule"}})
+    assert (
+        test_client.put("/api/kiosks/hall/screen-power", json={"power": "off"}).status_code == 200
+    )
+    assert _stored_command()["mode"] == "external"
+    assert _stored_command("hall")["mode"] == "schedule"
+
+    _set_mode(test_client, "always_on")
+    assert _stored_command() is None  # kitchen followed the household mode
+    assert _stored_command("hall")["mode"] == "schedule"  # hall kept its own mode
+    hall = test_client.get("/api/kiosks/hall/screen-power").json()
+    assert hall["mode"] == "schedule" and hall["power"] == "off"
+
+
+@pytest.mark.integration
+def test_an_override_mode_change_ends_the_command(test_client: TestClient):
+    _register(test_client, mode="external")
+    test_client.put(URL, json={"power": "off"})
+
+    test_client.patch(OVERRIDES_URL, json={"overrides": {"screenPower": "schedule"}})
+    assert _stored_command() is None
+    view = test_client.get(URL).json()
+    assert view["mode"] == "schedule" and view["power"] == "schedule"
+    assert view["desiredOn"] is True
+
+    # Coming back to External still starts with no command, which is on.
+    test_client.patch(OVERRIDES_URL, json={"overrides": {"screenPower": "external"}})
+    assert _stored_command() is None
+    view = test_client.get(URL).json()
+    assert view["mode"] == "external" and view["power"] == "schedule"
+    assert view["desiredOn"] is True
+
+
+@pytest.mark.integration
+def test_replacing_a_layer_with_another_mode_ends_the_command(test_client: TestClient):
+    _register(test_client, mode="schedule")
+    test_client.put(URL, json={"power": "off"})
+    assert _stored_command()["mode"] == "schedule"
+
+    response = test_client.put(OVERRIDES_URL, json={"overrides": {"screenPower": "external"}})
+    assert response.status_code == 200
+    assert _stored_command() is None
+    view = test_client.get(URL).json()
+    assert view["mode"] == "external" and view["power"] == "schedule"
+    assert view["desiredOn"] is True
+
+
+# -- a legacy layer agrees on its mode everywhere (calvin-25g9 review) ------
+
+
+@pytest.mark.integration
+def test_a_legacy_layer_under_an_external_household_agrees_everywhere(
+    test_client: TestClient,
+):
+    """A layer from before the mode existed carries only displayScheduleEnabled."""
+    from app.services import kiosk_registry
+
+    _register(test_client, mode="external")
+    asyncio.run(
+        kiosk_registry.set_overrides(
+            KIOSK, {"displayScheduleEnabled": True, "displaySchedule": NO_SCHEDULE}
+        )
+    )
+    # The screen's own switch decides: it is Schedule, not the household External.
+    assert test_client.get(URL).json()["mode"] == "schedule"
+
+    put = test_client.put(URL, json={"power": "off"}).json()
+    assert put["mode"] == "schedule"
+    assert put["power"] == "off" and put["held"] is True
+    assert put["desiredOn"] is False
+
+    config = test_client.get(f"/api/kiosks/{KIOSK}/config").json()
+    assert config["screenNow"]["power"] == "off"
+    assert "screenHold" not in config and "screen_hold" not in config
+
+    row = _listed(test_client)
+    assert row["screenPower"] == "schedule"
+    assert row["powerHold"]["power"] == "off"
+
+
+@pytest.mark.integration
+def test_a_layer_without_mode_keys_follows_external_everywhere(test_client: TestClient):
+    from app.services import kiosk_registry
+
+    _register(test_client, mode="external")
+    asyncio.run(kiosk_registry.set_overrides(KIOSK, {"displayName": "Kitchen"}))
+    assert test_client.get(URL).json()["mode"] == "external"
+
+    put = test_client.put(URL, json={"power": "off"}).json()
+    assert put["mode"] == "external" and put["power"] == "off" and put["held"] is True
+
+    config = test_client.get(f"/api/kiosks/{KIOSK}/config").json()
+    assert config["screenNow"]["power"] == "off"
+    assert config["screenHold"]["power"] == "off"
+    assert config["displayScheduleEnabled"] is False
+    assert config["display_schedule_enabled"] is False
+
+    row = _listed(test_client)
+    assert row["screenPower"] == "external"
+    assert row["powerHold"]["power"] == "off"
+
+
+# -- a value outside the modes is refused (calvin-25g9 review) --------------
+
+
+@pytest.mark.integration
+def test_an_invalid_snake_household_mode_is_422(test_client: TestClient):
+    assert test_client.post("/api/config", json={"screen_power": "bogus"}).status_code == 422
+    assert test_client.post("/api/config", json={"screen_power": "always-on"}).status_code == 422
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("verb", ["put", "patch"])
+def test_an_invalid_snake_screen_mode_is_400(test_client: TestClient, verb):
+    _register(test_client)
+    response = getattr(test_client, verb)(
+        OVERRIDES_URL, json={"overrides": {"screen_power": "bogus"}}
+    )
+    assert response.status_code == 400
+
+
+@pytest.mark.integration
+def test_a_valid_snake_household_mode_is_accepted(test_client: TestClient):
+    response = test_client.post("/api/config", json={"screen_power": "external"})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["screenPower"] == "external"
+    assert body["displayScheduleEnabled"] is False
+    assert body["screen_power"] == "external"
+
+
+# -- projection to the agent (design decision 6) ----------------------------
+
+
+@pytest.mark.integration
+def test_external_projects_the_command_as_hold_and_screen_now(test_client: TestClient):
+    _register(test_client, mode="external")
+    body = test_client.put(URL, json={"power": "off"}).json()
+    config = test_client.get(f"/api/kiosks/{KIOSK}/config").json()
+    expected = {"power": "off", "setAt": body["setAt"]}
+    for key in ("screenHold", "screen_hold", "screenNow", "screen_now"):
+        assert config[key] == expected, key
+    assert config["displayScheduleEnabled"] is False
+    assert config["display_schedule_enabled"] is False
+    # The stored layer never changes.
+    assert "screenHold" not in test_client.get(OVERRIDES_URL).json()["overrides"]
+
+
+@pytest.mark.integration
+def test_external_without_a_command_projects_nothing_and_is_on(test_client: TestClient):
+    _register(test_client, mode="external")
+    config = test_client.get(f"/api/kiosks/{KIOSK}/config").json()
+    for key in ("screenHold", "screen_hold", "screenNow", "screen_now"):
+        assert key not in config, key
+    assert config["displayScheduleEnabled"] is False
+    assert test_client.get(URL).json()["desiredOn"] is True
+
+
+@pytest.mark.integration
+def test_always_on_turns_the_schedule_off_for_the_agent(test_client: TestClient):
+    _register(test_client, mode="always_on")
+    config = test_client.get(f"/api/kiosks/{KIOSK}/config").json()
+    assert config["displayScheduleEnabled"] is False
+    assert config["display_schedule_enabled"] is False
+    for key in ("screenHold", "screen_hold", "screenNow", "screen_now"):
+        assert key not in config, key
+    assert test_client.get(URL).json()["desiredOn"] is True
+
+
+@pytest.mark.integration
+def test_an_old_agent_obeys_external(test_client: TestClient):
+    """agentHolds False: it ignores screenHold and follows the screenNow it knows."""
+    _register(test_client, mode="external")  # kagent without kfeat: cannot hold
+    test_client.put(URL, json={"power": "off"})
+    assert _listed(test_client)["agentHolds"] is False
+    body = test_client.get(URL).json()
+    assert body["power"] == "off" and body["agentHolds"] is False
+    # The old agent has no boundary to stop at in External, so it stays off.
+    assert body["desiredOn"] is False
+    # A new agent gets screenHold too and obeys the same command.
+    _register(test_client, query="kagent=v2&kfeat=hold", mode="external")
+    assert test_client.get(URL).json()["desiredOn"] is False
+
+
+@pytest.mark.integration
+def test_a_gated_unpaired_screen_receives_no_command_in_external(test_client: TestClient):
+    """The gated, unpaired rule stays: no command reaches it, so External is on."""
+    from app.security.admin_auth import COOKIE_NAME
+    from app.services.config_service import config_service
+
+    _register(test_client, mode="external")  # the row exists while pairing is optional
+    test_client.put(URL, json={"power": "off"})
+    asyncio.run(config_service.set_value("kioskPairing", "required"))
+    admin = test_client.cookies.get(COOKIE_NAME)
+    assert admin
+
+    test_client.cookies.clear()  # the unpaired screen's own poll carries no secret
+    config = test_client.get(f"/api/kiosks/{KIOSK}/config").json()
+    for key in ("screenHold", "screen_hold", "screenNow", "screen_now"):
+        assert key not in config, key
+    assert config["displayScheduleEnabled"] is False
+    assert config["presenceHidden"] is True
+
+    view = test_client.get(URL, headers={"cookie": f"{COOKIE_NAME}={admin}"}).json()
+    assert view["desiredOn"] is True
