@@ -75,6 +75,23 @@ def effective_mode(cfg: dict) -> ScreenMode:
     return _mode_value(_get(cfg, *_MODE_KEYS)) or derived_mode(cfg)
 
 
+def effective_mode_for(base: dict, layer: dict | None) -> ScreenMode:
+    """The screen's mode from its own layer, else from the household config.
+
+    A layer written before the mode existed carries only
+    ``displayScheduleEnabled``; it must decide that screen's mode even though
+    the merged household config has a ``screenPower`` of its own. The screen's
+    explicit mode wins over its switch, and its switch over the household.
+    """
+    layer = layer or {}
+    explicit = _mode_value(_get(layer, *_MODE_KEYS))
+    if explicit is not None:
+        return explicit
+    if any(key in layer for key in _SWITCH_KEYS):
+        return derived_mode(layer)
+    return effective_mode(base)
+
+
 def sync_mode_keys(layer: dict, *, snake: bool = False) -> dict:
     """Return ``layer`` with ``screenPower`` and the schedule switch in step.
 

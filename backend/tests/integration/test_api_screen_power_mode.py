@@ -30,6 +30,10 @@ def _layer(client: TestClient) -> dict:
     return client.get(OVERRIDES_URL).json()["overrides"]
 
 
+def _listed(client: TestClient) -> dict:
+    return next(k for k in client.get("/api/kiosks").json()["kiosks"] if k["id"] == KIOSK)
+
+
 def _mode_pair(layer: dict) -> dict:
     return {key: layer[key] for key in ("screenPower", "displayScheduleEnabled") if key in layer}
 
@@ -177,3 +181,28 @@ def test_the_household_mode_reaches_a_screen_without_its_own(test_client: TestCl
     # The screen's own choice wins.
     test_client.patch(OVERRIDES_URL, json={"overrides": {"screenPower": "always_on"}})
     assert _kiosk_config(test_client)["screenPower"] == "always_on"
+
+
+@pytest.mark.integration
+def test_an_old_layers_switch_alone_decides_the_screen_mode(test_client: TestClient):
+    """A layer from before the mode existed carries only displayScheduleEnabled."""
+    import asyncio
+
+    from app.services import kiosk_registry
+
+    _register(test_client)
+    test_client.post(CONFIG_URL, json={"screenPower": "schedule"})
+    # Written straight to the row, as the previous backend stored it.
+    asyncio.run(kiosk_registry.set_overrides(KIOSK, {"displayScheduleEnabled": False}))
+
+    config = _kiosk_config(test_client)
+    assert config["screenPower"] == "always_on"
+    assert config["displayScheduleEnabled"] is False
+    view = test_client.get(f"/api/kiosks/{KIOSK}/screen-power").json()
+    assert view["mode"] == "always_on"
+    assert _listed(test_client)["screenPower"] == "always_on"
+    # The mode is in force: Always on refuses a command.
+    assert (
+        test_client.put(f"/api/kiosks/{KIOSK}/screen-power", json={"power": "off"}).status_code
+        == 409
+    )

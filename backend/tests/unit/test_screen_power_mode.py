@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.schemas.config_update import ConfigUpdate, sanitize_overrides
-from app.services.screen_power import effective_mode, sync_mode_keys
+from app.services.screen_power import effective_mode, effective_mode_for, sync_mode_keys
 
 pytestmark = pytest.mark.unit
 
@@ -32,6 +32,22 @@ def test_an_invalid_stored_value_falls_back_to_the_schedule_switch():
     assert effective_mode({"screenPower": "dim", "displayScheduleEnabled": True}) == "schedule"
     assert effective_mode({"screenPower": 3}) == "always_on"
     assert effective_mode({"screen_power": None, "displayScheduleEnabled": True}) == "schedule"
+
+
+def test_a_screens_own_layer_decides_its_mode_over_the_household():
+    """A layer from before the mode existed carries only the schedule switch."""
+    household = {"screenPower": "schedule", "displayScheduleEnabled": True}
+    assert effective_mode_for(household, {}) == "schedule"
+    assert effective_mode_for(household, None) == "schedule"
+    # The old per-screen toggle off still means Always on.
+    assert effective_mode_for(household, {"displayScheduleEnabled": False}) == "always_on"
+    assert effective_mode_for(household, {"display_schedule_enabled": False}) == "always_on"
+    # A screen's own explicit mode wins over its switch.
+    assert (
+        effective_mode_for(household, {"screenPower": "external", "displayScheduleEnabled": True})
+        == "external"
+    )
+    assert effective_mode_for(household, {"screen_power": "always_on"}) == "always_on"
 
 
 def test_a_mode_write_keeps_the_schedule_switch_in_step():

@@ -71,8 +71,11 @@ async def get_kiosks(request: Request, response: Response):
     for row in rows:
         # The effective mode and the command in force (calvin-25g9): an expired
         # command, or one from another mode, is not in force and reads as none.
-        merged = merge_overrides(base, row.get("overrides") or {})
-        row["screenPower"] = screen_power.effective_mode(merged)
+        overrides = row.get("overrides") or {}
+        merged = merge_overrides(base, overrides)
+        power_mode = screen_power.effective_mode_for(base, overrides)
+        merged["screenPower"] = power_mode
+        row["screenPower"] = power_mode
         row["powerHold"] = screen_power.active_command(
             row.get("powerHold"), merged, screen_power.now_in(merged)
         )
@@ -273,10 +276,13 @@ async def _screen_state(
     status: dict,
 ) -> tuple[dict, screen_power.ScreenMode, dict | None, datetime]:
     """The screen's merged config, mode, command in force and the screen's now."""
-    merged = merge_overrides(await build_global_config(), status["overrides"])
+    base = await build_global_config()
+    merged = merge_overrides(base, status["overrides"])
+    mode = screen_power.effective_mode_for(base, status["overrides"])
+    merged["screenPower"] = mode  # the command is judged against the effective mode
     now = screen_power.now_in(merged)
     command = screen_power.active_command(status["command"], merged, now)
-    return merged, screen_power.effective_mode(merged), command, now
+    return merged, mode, command, now
 
 
 async def _power_status_or_404(kiosk_id: str) -> dict:
@@ -295,7 +301,7 @@ async def _screen_power_view(
     screen_power.strip_holds(merged)
     merged = screen_power.without_screen_now(merged)
     screen_power.project_mode(merged, mode, command)
-    # A gated screen receives a hold only when it is paired and its agent's
+    # A gated screen receives a command only when it is paired and its agent's
     # latest poll proved it is the screen (calvin-0xns). An old agent that polls
     # without the secret, like an unpaired screen, follows the schedule; its
     # ``desiredOn`` must say so (design §7).
@@ -350,7 +356,7 @@ async def _may_read_screen_power(request: Request, kiosk_id: str) -> None:
 
 @router.get("/kiosks/{kiosk_id}/screen-power", response_model=ScreenPowerView)
 async def get_screen_power(kiosk_id: str, request: Request):
-    """A screen's power: held on or off, or following its schedule."""
+    """A screen's power mode, and the command in force within it."""
     status = await _power_status_or_404(kiosk_id)
     if kiosk_view.is_gated(status["paired"], await kiosk_view.pairing_mode()):
         await _may_read_screen_power(request, kiosk_id)
@@ -359,11 +365,13 @@ async def get_screen_power(kiosk_id: str, request: Request):
 
 @router.put("/kiosks/{kiosk_id}/screen-power", response_model=ScreenPowerView)
 async def put_screen_power(kiosk_id: str, body: ScreenPowerBody, request: Request):
-    """Hold a screen on or off until changed, or send it back to its schedule.
+    """Store the screen's command in its mode, or send it back to its schedule.
 
-    Open to an admin session, an admin key, and a limited key with the
-    ``screens.power`` permission (``PERMISSION_ROUTES``). A request that changes
-    nothing writes nothing and does not count toward the change limit.
+    Schedule takes on/off or schedule; External takes on/off and refuses
+    schedule; Always on refuses on/off and has nothing to clear. Open to an
+    admin session, an admin key, and a limited key with the ``screens.power``
+    permission (``PERMISSION_ROUTES``). A request that changes nothing writes
+    nothing and does not count toward the change limit.
     """
     status = await _power_status_or_404(kiosk_id)
     _merged, mode, command, _now = await _screen_state(status)
@@ -822,9 +830,9 @@ async def get_kiosk_config(
 
     # Whether the agent polls as the screen (calvin-0xns §7): ``desiredOn`` for a
     # paired screen says what its agent will actually receive, so an old agent
-    # that polls without the screen's secret must not be told a hold reaches it.
-    # Only a poll from an address the screen itself proved is trusted to say so;
-    # a forged one cannot make home automation believe the hold is ignored.
+    # that polls without the screen's secret must not be told a command reaches
+    # it. Only a poll from an address the screen itself proved is trusted to say
+    # so; a forged one cannot make home automation believe the command is ignored.
     if kagent and await kiosk_registry.kiosk_has_peer(kiosk_id, direct_peer_ip(request)):
         kiosk_registry.note_agent_poll(kiosk_id, principal == kiosk_id)
 
@@ -839,13 +847,15 @@ async def get_kiosk_config(
     overrides = await get_overrides(kiosk_id)
     merged = merge_overrides(base, overrides)
     merged.pop("_agentUpdateRequested", None)  # never expose the host-internal flag verbatim
+    power_mode = screen_power.effective_mode_for(base, overrides)
+    merged["screenPower"] = power_mode
     merged = screen_power.without_screen_now(merged)  # the command is the only source
     screen_power.strip_holds(merged)  # only the command column switches a screen
     now = screen_power.now_in(merged)
     command = screen_power.active_command(
         await kiosk_registry.get_power_command(kiosk_id), merged, now
     )
-    screen_power.project_mode(merged, screen_power.effective_mode(merged), command)
+    screen_power.project_mode(merged, power_mode, command)
     version = device_config_version(merged)
     update_requested = agent_update_requested(overrides)
 
