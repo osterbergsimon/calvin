@@ -252,6 +252,24 @@ describe("ScreensSettings — the Screen power control", () => {
     });
   });
 
+  it("keeps focus on the segment that was chosen", async () => {
+    const { wrapper } = mountScreens();
+    document.body.appendChild(wrapper.element);
+    try {
+      await open(wrapper);
+      const external = wrapper.findAll('[role="radio"]')[2];
+      external.element.focus();
+      await external.trigger("click");
+      await flushPromises();
+
+      const after = wrapper.findAll('[role="radio"]')[2];
+      expect(document.activeElement).toBe(after.element);
+      expect(after.attributes("aria-checked")).toBe("true");
+    } finally {
+      wrapper.element.remove();
+    }
+  });
+
   it("does not link to the guide on the kiosk itself", async () => {
     window.sessionStorage.setItem("calvin_kiosk_id", "hall");
     try {
