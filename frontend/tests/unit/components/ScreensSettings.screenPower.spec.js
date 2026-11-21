@@ -252,6 +252,51 @@ describe("ScreensSettings — the Screen power control", () => {
     });
   });
 
+  it("reads Same as Default or Changed here on a screen page", async () => {
+    const inherited = mountScreens();
+    await open(inherited.wrapper);
+    expect(inherited.wrapper.find("#setting-screenPower .scope-line__label").text()).toBe(
+      "Same as Default"
+    );
+
+    const changed = mountScreens({ overrides: { screenPower: "external" } });
+    await open(changed.wrapper);
+    expect(changed.wrapper.find("#setting-screenPower .scope-line__label").text()).toBe(
+      "Changed here"
+    );
+    expect(changed.wrapper.find("[data-test='reset-screen-power']").exists()).toBe(true);
+  });
+
+  it("summarises the mode on the screen row and the Default card", async () => {
+    const external = mountScreens({
+      cfg: config({ screenPower: "external", displayScheduleEnabled: false }),
+      kiosks: [kiosk({ overrides: { screenPower: "external" } })],
+    });
+    await flushPromises();
+    expect(external.wrapper.find("[data-test='screen-summary']").text()).toContain(
+      "External on/off"
+    );
+    expect(external.wrapper.find("[data-test='default-summary']").text()).toContain(
+      "External on/off"
+    );
+
+    const schedule = mountScreens({
+      kiosks: [kiosk({ overrides: { screenPower: "schedule", displayScheduleEnabled: true } })],
+    });
+    await flushPromises();
+    expect(schedule.wrapper.find("[data-test='screen-summary']").text()).toContain(
+      "off 22:00–06:30"
+    );
+
+    const always = mountScreens({
+      cfg: config({ screenPower: "always_on", displayScheduleEnabled: false }),
+      kiosks: [kiosk({ overrides: { screenPower: "always_on", displayScheduleEnabled: false } })],
+    });
+    await flushPromises();
+    expect(always.wrapper.find("[data-test='screen-summary']").text()).not.toContain("off ");
+    expect(always.wrapper.find("[data-test='default-summary']").text()).not.toContain("External");
+  });
+
   it("keeps focus on the segment that was chosen", async () => {
     const { wrapper } = mountScreens();
     document.body.appendChild(wrapper.element);
