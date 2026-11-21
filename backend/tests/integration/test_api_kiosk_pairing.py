@@ -475,3 +475,37 @@ def test_pairing_routes_keep_secrets_out_of_logs(test_client: TestClient):
     joined = "\n".join(lines)
     assert "clv_kiosk_" not in joined
     assert "clv_pair_" not in joined
+
+
+@pytest.mark.integration
+def test_install_code_never_takes_over_a_paired_screen(test_client: TestClient):
+    """A sniffed install code can give an attacker a screen, never someone else's."""
+    old_secret, started = _start(test_client)
+    assert _approve(test_client, _code_of(started.json())).status_code == 200
+    minted = test_client.post("/api/kiosks/install-codes").json()["code"]
+
+    attacker_secret = _new_secret()
+    refused = test_client.post(
+        "/api/kiosks/kitchen/pair",
+        json={"installCode": minted},
+        headers=_auth(attacker_secret),
+    )
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["code"] == "install_code_invalid"
+    assert (
+        test_client.get("/api/kiosks/kitchen/pair", headers=_auth(old_secret)).json()["state"]
+        == "paired"
+    )
+    assert (
+        test_client.get("/api/kiosks/kitchen/pair", headers=_auth(attacker_secret)).json()["state"]
+        == "none"
+    )
+
+    # The refused code was not used up: it still pairs a fresh screen.
+    fresh = test_client.post(
+        "/api/kiosks/hall/pair",
+        json={"installCode": minted},
+        headers=_auth(attacker_secret),
+    )
+    assert fresh.status_code == 200
+    assert fresh.json()["state"] == "paired"

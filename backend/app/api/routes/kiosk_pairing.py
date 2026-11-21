@@ -72,6 +72,16 @@ def _setup_required() -> HTTPException:
     )
 
 
+def _install_code_invalid() -> HTTPException:
+    return HTTPException(
+        status_code=409,
+        detail={
+            "code": "install_code_invalid",
+            "message": "This install code is not valid any more. Pair by code instead.",
+        },
+    )
+
+
 def _rate_limited(wait: int) -> HTTPException:
     return HTTPException(
         status_code=429,
@@ -248,18 +258,14 @@ async def post_pair(
         secret = candidate
 
     if body.installCode is not None:
-        if (
-            secret is None
-            or not is_install_code(body.installCode)
-            or not (pairing_store.use_install_code(body.installCode))
-        ):
-            raise HTTPException(
-                status_code=409,
-                detail={
-                    "code": "install_code_invalid",
-                    "message": "This install code is not valid any more. Pair by code instead.",
-                },
-            )
+        if secret is None or not is_install_code(body.installCode):
+            raise _install_code_invalid()
+        # A sniffed install code may give an attacker a screen of their own, never
+        # someone else's: it never replaces an existing pairing (design, Security).
+        if await get_credential_hash(kiosk_id) is not None:
+            raise _install_code_invalid()
+        if not pairing_store.use_install_code(body.installCode):
+            raise _install_code_invalid()
         now = utcnow()
         await kiosk_registry.set_credential(
             kiosk_id,
