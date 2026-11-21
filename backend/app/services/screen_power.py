@@ -275,16 +275,50 @@ def agent_view(
     return view
 
 
-def project_hold(merged: dict, hold: dict | None) -> None:
-    """Put a hold into a config response (both spellings, as the agent reads both).
+def _drop_command_keys(payload: dict) -> None:
+    for key in (*_NOW_KEYS, *_HOLD_KEYS):
+        payload.pop(key, None)
 
-    The stored override layer never changes; ``by`` stays out of the response.
+
+def _set_command_keys(payload: dict, command: dict, *, hold: bool) -> None:
+    value = {"power": command["power"], "setAt": command["setAt"]}
+    for key in _NOW_KEYS:
+        payload[key] = dict(value)
+    if hold:
+        for key in _HOLD_KEYS:
+            payload[key] = dict(value)
+
+
+def project_mode(merged: dict, mode: str, command: dict | None) -> None:
+    """Put the mode into a config response as the screen's agent obeys it.
+
+    Schedule: the schedule switch as stored, and the command as ``screenNow``
+    (an older agent follows it to the next boundary). Always on: the switch off
+    and no command. External: the switch off, and the command as both
+    ``screenNow`` (an older agent, which has no boundary to stop at) and
+    ``screenHold`` (a new one). A screen set to External with no command yet is
+    on, because the projected switch is off and nothing else switches it.
+
+    Both spellings are written, as the agent reads both. The stored layer and
+    the household config never change; ``by`` and the key's name stay out of the
+    response.
     """
-    if hold is None:
+    if mode == "always_on":
+        for key in _SWITCH_KEYS:
+            merged[key] = False
+        _drop_command_keys(merged)
         return
-    value = {"power": hold["power"], "setAt": hold["setAt"]}
-    for key in (*_HOLD_KEYS, *_NOW_KEYS):
-        merged[key] = dict(value)
+    if mode == "external":
+        for key in _SWITCH_KEYS:
+            merged[key] = False
+        _drop_command_keys(merged)
+        if command is not None:
+            _set_command_keys(merged, command, hold=True)
+        return
+    # Schedule: the switch is exactly what the screen stores.
+    _drop_command_keys(merged)
+    if command is not None:
+        _set_command_keys(merged, command, hold=False)
 
 
 class ChangeLimiter:

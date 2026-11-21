@@ -92,6 +92,7 @@ def test_put_off_stores_the_command_and_projects_screen_now(test_client: TestCli
     config = test_client.get(f"/api/kiosks/{KIOSK}/config").json()
     expected = {"power": "off", "setAt": body["setAt"]}
     assert config["screenNow"] == config["screen_now"] == expected
+    assert "screenHold" not in config and "screen_hold" not in config
     assert "screenNow" not in test_client.get(OVERRIDES_URL).json()["overrides"]
     assert _stored_command()["mode"] == "schedule"
     assert _stored_command()["by"] == "settings"
@@ -417,3 +418,79 @@ def test_a_refused_change_does_not_count_toward_the_limit(test_client: TestClien
     # The limiter was not touched by the refusals.
     _set_mode(test_client, "external")
     assert test_client.put(URL, json={"power": "off"}).status_code == 200
+
+
+# -- projection to the agent (design decision 6) ----------------------------
+
+
+@pytest.mark.integration
+def test_external_projects_the_command_as_hold_and_screen_now(test_client: TestClient):
+    _register(test_client, mode="external")
+    body = test_client.put(URL, json={"power": "off"}).json()
+    config = test_client.get(f"/api/kiosks/{KIOSK}/config").json()
+    expected = {"power": "off", "setAt": body["setAt"]}
+    for key in ("screenHold", "screen_hold", "screenNow", "screen_now"):
+        assert config[key] == expected, key
+    assert config["displayScheduleEnabled"] is False
+    assert config["display_schedule_enabled"] is False
+    # The stored layer never changes.
+    assert "screenHold" not in test_client.get(OVERRIDES_URL).json()["overrides"]
+
+
+@pytest.mark.integration
+def test_external_without_a_command_projects_nothing_and_is_on(test_client: TestClient):
+    _register(test_client, mode="external")
+    config = test_client.get(f"/api/kiosks/{KIOSK}/config").json()
+    for key in ("screenHold", "screen_hold", "screenNow", "screen_now"):
+        assert key not in config, key
+    assert config["displayScheduleEnabled"] is False
+    assert test_client.get(URL).json()["desiredOn"] is True
+
+
+@pytest.mark.integration
+def test_always_on_turns_the_schedule_off_for_the_agent(test_client: TestClient):
+    _register(test_client, mode="always_on")
+    config = test_client.get(f"/api/kiosks/{KIOSK}/config").json()
+    assert config["displayScheduleEnabled"] is False
+    assert config["display_schedule_enabled"] is False
+    for key in ("screenHold", "screen_hold", "screenNow", "screen_now"):
+        assert key not in config, key
+    assert test_client.get(URL).json()["desiredOn"] is True
+
+
+@pytest.mark.integration
+def test_an_old_agent_obeys_external(test_client: TestClient):
+    """agentHolds False: it ignores screenHold and follows the screenNow it knows."""
+    _register(test_client, mode="external")  # kagent without kfeat: cannot hold
+    test_client.put(URL, json={"power": "off"})
+    assert _listed(test_client)["agentHolds"] is False
+    body = test_client.get(URL).json()
+    assert body["power"] == "off" and body["agentHolds"] is False
+    # The old agent has no boundary to stop at in External, so it stays off.
+    assert body["desiredOn"] is False
+    # A new agent gets screenHold too and obeys the same command.
+    _register(test_client, query="kagent=v2&kfeat=hold", mode="external")
+    assert test_client.get(URL).json()["desiredOn"] is False
+
+
+@pytest.mark.integration
+def test_a_gated_unpaired_screen_receives_no_command_in_external(test_client: TestClient):
+    """The gated, unpaired rule stays: no command reaches it, so External is on."""
+    from app.security.admin_auth import COOKIE_NAME
+    from app.services.config_service import config_service
+
+    _register(test_client, mode="external")  # the row exists while pairing is optional
+    test_client.put(URL, json={"power": "off"})
+    asyncio.run(config_service.set_value("kioskPairing", "required"))
+    admin = test_client.cookies.get(COOKIE_NAME)
+    assert admin
+
+    test_client.cookies.clear()  # the unpaired screen's own poll carries no secret
+    config = test_client.get(f"/api/kiosks/{KIOSK}/config").json()
+    for key in ("screenHold", "screen_hold", "screenNow", "screen_now"):
+        assert key not in config, key
+    assert config["displayScheduleEnabled"] is False
+    assert config["presenceHidden"] is True
+
+    view = test_client.get(URL, headers={"cookie": f"{COOKIE_NAME}={admin}"}).json()
+    assert view["desiredOn"] is True

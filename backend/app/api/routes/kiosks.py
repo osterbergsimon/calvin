@@ -271,10 +271,10 @@ async def _power_status_or_404(kiosk_id: str) -> dict:
 
 
 async def _screen_power_view(kiosk_id: str, status: dict) -> ScreenPowerView:
-    merged, _mode, command, now = await _screen_state(status)
+    merged, mode, command, now = await _screen_state(status)
     screen_power.strip_holds(merged)
     merged = screen_power.without_screen_now(merged)
-    screen_power.project_hold(merged, command)
+    screen_power.project_mode(merged, mode, command)
     # A gated screen receives a hold only when it is paired and its agent's
     # latest poll proved it is the screen (calvin-0xns). An old agent that polls
     # without the secret, like an unpaired screen, follows the schedule; its
@@ -290,7 +290,7 @@ async def _screen_power_view(kiosk_id: str, status: dict) -> ScreenPowerView:
         held=command is not None,
         setAt=command["setAt"] if command else None,
         by=command["by"] if command else None,
-        desiredOn=screen_power.desired_on(agent_cfg, screen_power.now_in(agent_cfg)),
+        desiredOn=screen_power.desired_on(agent_cfg, now),
         online=last_seen is not None and (utcnow() - last_seen).total_seconds() < _ONLINE_S,
         agentHolds=status["agentHolds"],
         paired=status["paired"],
@@ -740,9 +740,10 @@ async def get_kiosk_config(
     its real aspect ratio (CLV-36). ``kfeat`` is what the display agent
     understands, comma-separated (``hold``: it obeys ``screenHold``).
 
-    A held screen power (calvin-2ifv) is projected as ``screenHold`` and as
-    ``screenNow``, so an agent too old to hold still obeys it until the next
-    scheduled change. The stored layer is not changed.
+    A screen's power mode (calvin-25g9) is projected as the agent obeys it:
+    Schedule sends the command as ``screenNow`` (until its boundary), External
+    sends it as both ``screenHold`` and ``screenNow`` with the schedule switch
+    off, and Always on sends neither. The stored layer is not changed.
 
     Only a real poll is recorded (registers a new kiosk and bumps last-seen): one
     that carries ``khost`` (the kiosk browser) or ``kagent`` (the display agent).
@@ -817,7 +818,7 @@ async def get_kiosk_config(
     command = screen_power.active_command(
         await kiosk_registry.get_power_command(kiosk_id), merged, now
     )
-    screen_power.project_hold(merged, command)
+    screen_power.project_mode(merged, screen_power.effective_mode(merged), command)
     version = device_config_version(merged)
     update_requested = agent_update_requested(overrides)
 
