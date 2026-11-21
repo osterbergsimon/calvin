@@ -229,6 +229,11 @@
      built-in themes (light, dark, ocean, forest, sunset × dark mode). */
   --tag-ink: 45%;
 
+  /* Pairing strip — the code is read across a living room from the 7-inch
+     panel (docs/design/2026-11-21-kiosk-pairing.md §2.2). Component token:
+     nothing outside the strip uses it. */
+  --pairing-code-size: calc(var(--text-display) * 1.75);
+
   /* Editor page tabs (one-line underline tabs) */
   --tab-height: var(--touch-target); /* 44px */
   --tab-indicator: 2px;

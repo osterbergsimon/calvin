@@ -301,7 +301,7 @@ onUnmounted(() => {
 .connection-status--floating {
   position: fixed;
   left: var(--gap-4);
-  bottom: var(--gap-4);
+  bottom: calc(var(--gap-4) + var(--pairing-strip-h, 0px));
   z-index: var(--z-dialog);
 }
 

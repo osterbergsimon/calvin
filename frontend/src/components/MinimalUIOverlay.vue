@@ -101,7 +101,7 @@ const cornerStyle = computed(() => ({
 /* Per-corner anchoring: inner corner rounded, gradient + icon hug the edge.
    Inset + radius scale with the target size. */
 .hot-corner--bottom-left {
-  bottom: 0;
+  bottom: var(--pairing-strip-h, 0px);
   left: 0;
   align-items: flex-end;
   justify-content: flex-start;
@@ -116,7 +116,7 @@ const cornerStyle = computed(() => ({
   );
 }
 .hot-corner--bottom-right {
-  bottom: 0;
+  bottom: var(--pairing-strip-h, 0px);
   right: 0;
   align-items: flex-end;
   justify-content: flex-end;

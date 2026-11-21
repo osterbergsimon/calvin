@@ -48,10 +48,53 @@ function captured(param, key) {
   return readStored(key);
 }
 
+// The kiosk units append the screen's own secret to the start URL as a
+// fragment. It is 43 token_urlsafe characters after the prefix (design §6).
+const PAIR_FRAGMENT = /^#pair=(clv_kiosk_[A-Za-z0-9_-]{43})$/;
+
+/**
+ * Read and remove the `#pair=` fragment, synchronously, before any request.
+ *
+ * The fragment is the one place the secret travels: a fragment is never sent
+ * to the server, never seen by the service worker and never reaches the
+ * Referer. A malformed `#pair=` is still removed, so it cannot linger in the
+ * address bar; an ordinary hash is left alone.
+ *
+ * @returns {string | null} the secret, or null when there is none to hand off
+ */
+export function takePairFragment() {
+  let hash = "";
+  try {
+    hash = window.location.hash || "";
+  } catch {
+    return null;
+  }
+  if (!hash.startsWith("#pair=")) return null;
+  const secret = PAIR_FRAGMENT.exec(hash)?.[1] ?? null;
+  try {
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+  } catch {
+    // A blocked History API still leaves the fragment, but boot must not throw.
+  }
+  return secret;
+}
+
+// Only the top-level page reads the fragment, starts browser-only pairing or
+// shows the code (design §14). Previews and iframes never do.
+export function isTopLevelPage() {
+  try {
+    return window.top === window;
+  } catch {
+    return false;
+  }
+}
+
 // Call once at boot (main.js) so the identity is stored before any route change.
 // A kiosk also gets the KIOSK_ROOT_CLASS on <html>: the breakpoints read it so
 // the short 800x480 wall panel is never classed as a landscape phone.
+// Returns the pairing secret read from `#pair=` for the store to hand off.
 export function captureKioskIdentity() {
+  const secret = isTopLevelPage() ? takePairFragment() : null;
   const id = captured("kiosk", KIOSK_ID_KEY);
   captured("khost", KIOSK_HOST_KEY);
   // ?display=kiosk only survives until the first in-app navigation: store it now.
@@ -61,6 +104,7 @@ export function captureKioskIdentity() {
   } catch {
     // No DOM (SSR/tests without jsdom): nothing to mark.
   }
+  return id && secret ? secret : null;
 }
 
 // Link handling only (calvin-eugy): which displays have no tabs, address bar or

@@ -1,3 +1,4 @@
+import { bootPairSecret } from "./utils/kioskBoot";
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import { VueQueryPlugin } from "@tanstack/vue-query";
@@ -11,7 +12,7 @@ import { initLogger, logError, logInfo } from "./utils/logger";
 import { useConfigStore } from "./stores/config";
 import { useTypeTheme } from "./composables/useTypeTheme";
 import { useUiScale } from "./composables/useUiScale";
-import { captureKioskIdentity } from "./utils/kioskId";
+import { usePairingStore } from "./stores/kioskPairing";
 import { reloadWithLight } from "./utils/reloadWithLight";
 import { useProgressStore } from "./stores/progress";
 import {
@@ -20,8 +21,10 @@ import {
   startUpdateChecks,
 } from "./utils/serviceWorkerUpdate";
 
-// Store ?kiosk=/&khost= before the router can drop them on the first navigation (F1).
-captureKioskIdentity();
+// kioskBoot has already stored ?kiosk=/&khost= and removed the kiosk units'
+// #pair= secret before the router captured the URL. It is handed to the server
+// once below, and kept nowhere.
+const pairSecret = bootPairSecret;
 
 // Apply the persisted typeface before mount so the dashboard boots with the
 // saved font instead of the default (previously only applied on opening Settings).
@@ -35,6 +38,9 @@ const app = createApp(App);
 const pinia = createPinia();
 
 app.use(pinia);
+// Swap the one-time fragment secret for the HttpOnly cookie, then learn this
+// screen's pairing state. No kiosk id, an iframe or an old server: a quiet no-op.
+usePairingStore(pinia).start(pairSecret);
 app.use(router);
 app.use(VueQueryPlugin, {
   defaultOptions: {
