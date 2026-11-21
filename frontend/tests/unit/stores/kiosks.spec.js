@@ -238,6 +238,78 @@ describe("kiosks store — triggerUpdate", () => {
   });
 });
 
+describe("kiosks store — screen power", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+  });
+
+  const view = over => ({
+    id: "k1",
+    mode: "schedule",
+    power: "off",
+    held: true,
+    setAt: "2026-11-21T21:04:00Z",
+    by: "automation",
+    until: "2026-11-21T22:00:00Z",
+    keyName: "Homey",
+    desiredOn: false,
+    online: true,
+    agentHolds: true,
+    paired: true,
+    ...over,
+  });
+
+  it("reads the mode, who and when, until and the key's name", async () => {
+    api.get.mockResolvedValue({ data: view() });
+    const store = useKiosksStore();
+    store.kiosks = [{ id: "k1", overrides: { screenNow: { power: "on" } } }];
+
+    const answer = await store.fetchScreenPower("k1");
+
+    expect(api.get).toHaveBeenCalledWith("/kiosks/k1/screen-power");
+    expect(answer).toMatchObject({
+      mode: "schedule",
+      power: "off",
+      until: "2026-11-21T22:00:00Z",
+      keyName: "Homey",
+    });
+    const kiosk = store.kiosks[0];
+    expect(kiosk.screenPower).toBe("schedule");
+    expect(kiosk.screenPowerView).toMatchObject({
+      power: "off",
+      by: "automation",
+      setAt: "2026-11-21T21:04:00Z",
+      until: "2026-11-21T22:00:00Z",
+      keyName: "Homey",
+    });
+    // The server owns the command now: a stored Screen now is gone.
+    expect(kiosk.overrides.screenNow).toBeUndefined();
+  });
+
+  it("sends one PUT for a button press and stores its answer", async () => {
+    api.put.mockResolvedValue({ data: view({ mode: "external", power: "on", until: null }) });
+    const store = useKiosksStore();
+    store.kiosks = [{ id: "k1", overrides: { brightness: 20 } }];
+
+    const answer = await store.setScreenPower("k1", "on");
+
+    expect(api.put).toHaveBeenCalledWith("/kiosks/k1/screen-power", { power: "on" });
+    expect(answer.mode).toBe("external");
+    expect(store.kiosks[0].screenPower).toBe("external");
+    expect(store.kiosks[0].screenPowerView.power).toBe("on");
+    expect(store.kiosks[0].overrides).toEqual({ brightness: 20 });
+  });
+
+  it("url-encodes the id", async () => {
+    api.get.mockResolvedValue({ data: view({ id: "a/b" }) });
+    const store = useKiosksStore();
+    store.kiosks = [{ id: "a/b", overrides: {} }];
+    await store.fetchScreenPower("a/b");
+    expect(api.get).toHaveBeenCalledWith("/kiosks/a%2Fb/screen-power");
+  });
+});
+
 describe("kiosks store — removeKiosk", () => {
   beforeEach(() => {
     setActivePinia(createPinia());

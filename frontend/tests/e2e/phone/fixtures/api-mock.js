@@ -90,6 +90,9 @@ export const sampleConfig = {
   darkModeStart: 18,
   darkModeEnd: 6,
   typeTheme: null,
+  // Screen power mode (calvin-25g9). With the legacy switch off, Always on is
+  // what today's installs read; a spec that needs the schedule sets "schedule".
+  screenPower: "always_on",
   displayScheduleEnabled: false,
   displayTimeoutEnabled: false,
   displayTimeout: 0,
@@ -784,23 +787,68 @@ export async function installApiMock(page, options = {}) {
     const screenPower = path.match(/^\/api\/kiosks\/([^/]+)\/screen-power$/);
     if (screenPower) {
       const id = decodeURIComponent(screenPower[1]);
+      const layer = state.overridesByKiosk[id] || {};
+      const mode =
+        layer.screenPower ??
+        (layer.displayScheduleEnabled !== undefined
+          ? layer.displayScheduleEnabled
+            ? "schedule"
+            : "always_on"
+          : (state.config.screenPower ??
+            (state.config.displayScheduleEnabled ? "schedule" : "always_on")));
       if (method === "PUT") {
         const { power } = request.postDataJSON() || {};
         state.screenPowerRequests.push(power);
+        if (mode === "always_on" && power !== "schedule") {
+          return json(
+            route,
+            {
+              detail: {
+                code: "screen_power_always_on",
+                message:
+                  "This screen is set to Always on. Choose Schedule or External to switch it.",
+              },
+            },
+            409
+          );
+        }
+        if (mode === "external" && power === "schedule") {
+          return json(
+            route,
+            {
+              detail: {
+                code: "screen_power_external",
+                message: "This screen is set to External. Send on or off.",
+              },
+            },
+            409
+          );
+        }
         if (power === "schedule") delete state.screenPowerByKiosk[id];
         else
-          state.screenPowerByKiosk[id] = { power, setAt: new Date().toISOString(), by: "settings" };
+          state.screenPowerByKiosk[id] = {
+            power,
+            setAt: new Date().toISOString(),
+            by: "settings",
+            // A Schedule command ends at the next change; the mock names one so
+            // the until line is testable at any clock time.
+            until: mode === "schedule" ? new Date(Date.now() + 3600 * 1000).toISOString() : null,
+          };
       }
       const hold = state.screenPowerByKiosk[id] || null;
       return json(route, {
         id,
+        mode,
         power: hold ? hold.power : "schedule",
         held: Boolean(hold),
         setAt: hold?.setAt ?? null,
         by: hold?.by ?? null,
-        desiredOn: hold ? hold.power === "on" : true,
+        until: hold?.until ?? null,
+        keyName: hold?.keyName ?? null,
+        desiredOn: hold ? hold.power === "on" : mode !== "schedule",
         online: true,
         agentHolds: true,
+        paired: state.kiosks.find(kiosk => kiosk.id === id)?.paired ?? true,
       });
     }
     if (/^\/api\/kiosks\/[^/]+\/config$/.test(path)) {

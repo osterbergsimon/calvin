@@ -1,5 +1,6 @@
-// A screen held on or off by home automation (calvin-2ifv): the power row says
-// so, "Back to schedule" ends the hold, and a person's own choice replaces it.
+// A screen switched by home automation (calvin-2ifv, calvin-25g9): the power
+// row says who set it and when, "Back to schedule" ends a Schedule command with
+// one call, and a person's press is one call too (no hold followed by a save).
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises as flushPromisesNow } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
@@ -12,23 +13,43 @@ async function flushPromises() {
   await flushPromisesNow();
 }
 
-beforeEach(() => vi.useFakeTimers());
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-11-21T12:00:00Z"));
+});
 afterEach(() => vi.useRealTimers());
 
-const config = () => ({
+const week = [0, 1, 2, 3, 4, 5, 6].map(day => ({
+  day,
+  enabled: true,
+  onTime: "06:30",
+  offTime: "22:00",
+}));
+
+const config = (over = {}) => ({
   orientation: "landscape",
   dashboardScreens: {
     version: 2,
     activeScreenId: "home",
     screens: [{ id: "home", name: "Home", layout: { version: 1, regions: [] } }],
   },
-  displayScheduleEnabled: false,
-  displaySchedule: [],
+  timeFormat: "24h",
+  timezone: "UTC",
+  screenPower: "schedule",
+  displayScheduleEnabled: true,
+  displaySchedule: week,
   displayTimeoutEnabled: false,
   displayTimeout: 0,
+  ...over,
 });
 
-const HOLD = { power: "off", setAt: "2026-11-18T12:00:00Z", by: "automation" };
+const COMMAND = {
+  power: "off",
+  setAt: "2026-11-21T21:04:00Z",
+  by: "automation",
+  keyName: "Homey",
+  until: "2026-11-21T22:00:00Z",
+};
 
 const kiosk = (over = {}) => ({
   id: "kitchen",
@@ -36,16 +57,15 @@ const kiosk = (over = {}) => ({
   lastSeen: new Date().toISOString(),
   agentUpdateStatus: "ok",
   agentUpdateRequested: false,
+  paired: true,
   overrides: {},
-  powerHold: null,
-  agentHolds: true,
   ...over,
 });
 
-function mountScreens({ kiosks = [kiosk()], overrides = {}, attachTo = undefined } = {}) {
+function mountScreens({ kiosks = [kiosk()], overrides = {}, cfg = config(), view = null } = {}) {
   setActivePinia(createPinia());
-  delete window.matchMedia;
   const store = useKiosksStore();
+  store.kiosks = kiosks;
   store.loadKiosks = vi.fn(async () => {
     store.kiosks = kiosks;
   });
@@ -57,15 +77,30 @@ function mountScreens({ kiosks = [kiosk()], overrides = {}, attachTo = undefined
   store.fetchAvailableAgentVersion = vi.fn(async () => null);
   store.fetchScreenPower = vi.fn(async id => {
     const target = store.kiosks.find(k => k.id === id);
-    const hold = target?.powerHold ?? null;
-    return { id, held: Boolean(hold), ...(hold ?? { power: "schedule" }) };
+    const answer = view ? { id, mode: cfg.screenPower, held: true, ...view } : null;
+    if (target && answer) target.screenPowerView = answer;
+    return answer;
   });
   store.setScreenPower = vi.fn(async (id, power) => {
     const target = store.kiosks.find(k => k.id === id);
-    if (target) target.powerHold = null;
-    return { id, power, held: false, setAt: null, by: null, desiredOn: true };
+    const answer = {
+      id,
+      mode: cfg.screenPower,
+      power,
+      held: power !== "schedule",
+      setAt: power === "schedule" ? null : new Date().toISOString(),
+      by: power === "schedule" ? null : "settings",
+      until: null,
+      keyName: null,
+      desiredOn: power !== "off",
+      online: true,
+      agentHolds: true,
+      paired: true,
+    };
+    if (target) target.screenPowerView = answer;
+    return answer;
   });
-  const wrapper = mount(ScreensSettings, { props: { config: config() }, attachTo });
+  const wrapper = mount(ScreensSettings, { props: { config: cfg } });
   return { wrapper, store };
 }
 
@@ -77,62 +112,38 @@ async function open(wrapper) {
 
 const text = (wrapper, test) => wrapper.find(`[data-test='${test}']`).text();
 
-describe("ScreensSettings — a held screen", () => {
-  it("says the screen is held by home automation", async () => {
-    const { wrapper } = mountScreens({ kiosks: [kiosk({ powerHold: HOLD })] });
+describe("ScreensSettings — a command from home automation", () => {
+  it("says who set it, when, and when a Schedule command ends", async () => {
+    const { wrapper } = mountScreens({ view: COMMAND });
     await open(wrapper);
-    expect(text(wrapper, "screen-now-state")).toBe(
-      "Off, set by home automation. The schedule is paused."
-    );
-    expect(wrapper.find("[data-test='screen-now-until']").exists()).toBe(false);
+    expect(text(wrapper, "screen-now-state")).toBe("Off · set by Homey at 21:04");
+    expect(text(wrapper, "screen-now-until")).toBe("Until the next scheduled change at 22:00");
     expect(text(wrapper, "screen-now-follow")).toBe("Back to schedule");
     expect(wrapper.find("[data-test='screen-now-off']").attributes("aria-disabled")).toBe("true");
     expect(wrapper.find("[data-test='screen-now-on']").attributes("aria-disabled")).toBeUndefined();
     expect(wrapper.find("[data-test='screen-now-old-agent']").exists()).toBe(false);
   });
 
-  it("says who else can hold it", async () => {
-    const on = mountScreens({
-      kiosks: [kiosk({ powerHold: { ...HOLD, power: "on", by: "settings" } })],
-    });
-    await open(on.wrapper);
-    expect(text(on.wrapper, "screen-now-state")).toBe(
-      "On until someone changes it. The schedule is paused."
-    );
-
-    const off = mountScreens({
-      kiosks: [kiosk({ powerHold: { ...HOLD, power: "off", by: "settings" } })],
-    });
-    await open(off.wrapper);
-    expect(text(off.wrapper, "screen-now-state")).toBe(
-      "Off until someone changes it. The schedule is paused."
-    );
-  });
-
-  it("ignores a stale manual choice while held", async () => {
-    const { wrapper } = mountScreens({
-      kiosks: [kiosk({ powerHold: { ...HOLD, power: "on" } })],
-      overrides: { screenNow: { power: "off", setAt: new Date().toISOString() } },
-    });
+  it("says set by home automation when the server sends no key name", async () => {
+    const { wrapper } = mountScreens({ view: { ...COMMAND, keyName: null } });
     await open(wrapper);
-    expect(text(wrapper, "screen-now-state")).toBe(
-      "On, set by home automation. The schedule is paused."
-    );
+    expect(text(wrapper, "screen-now-state")).toBe("Off · set by home automation at 21:04");
   });
 
-  it("Back to schedule ends the hold through the screen-power call", async () => {
-    const { wrapper, store } = mountScreens({ kiosks: [kiosk({ powerHold: HOLD })] });
+  it("Back to schedule ends the command with one call and keeps the layer", async () => {
+    const { wrapper, store } = mountScreens({ view: COMMAND });
     await open(wrapper);
     await wrapper.find("[data-test='screen-now-follow']").trigger("click");
     await flushPromises();
     expect(store.setScreenPower).toHaveBeenCalledWith("kitchen", "schedule");
+    expect(store.setScreenPower).toHaveBeenCalledTimes(1);
     expect(store.saveOverrides).not.toHaveBeenCalled();
-    expect(text(wrapper, "screen-now-state")).toBe("On now");
+    expect(text(wrapper, "screen-now-state")).toBe("On · by the schedule");
     expect(wrapper.find("[data-test='screen-now-follow']").exists()).toBe(false);
   });
 
-  it("a failed Back to schedule says so and keeps the hold", async () => {
-    const { wrapper, store } = mountScreens({ kiosks: [kiosk({ powerHold: HOLD })] });
+  it("a failed Back to schedule says so and keeps the command", async () => {
+    const { wrapper, store } = mountScreens({ view: COMMAND });
     store.setScreenPower = vi.fn(async () => {
       throw new Error("offline");
     });
@@ -145,164 +156,16 @@ describe("ScreensSettings — a held screen", () => {
     expect(wrapper.find("[data-test='screen-now-message']").classes()).toContain(
       "inline-note--err"
     );
-    expect(text(wrapper, "screen-now-state")).toBe(
-      "Off, set by home automation. The schedule is paused."
-    );
+    expect(text(wrapper, "screen-now-state")).toBe("Off · set by Homey at 21:04");
   });
 
-  it("Turn on now ends the hold, then saves the choice as today", async () => {
-    const { wrapper, store } = mountScreens({ kiosks: [kiosk({ powerHold: HOLD })] });
+  it("Turn on now is one call, not a hold to end and a choice to save", async () => {
+    const { wrapper, store } = mountScreens({ view: COMMAND });
     await open(wrapper);
     await wrapper.find("[data-test='screen-now-on']").trigger("click");
-    await flushPromises();
-    expect(store.setScreenPower).toHaveBeenCalledWith("kitchen", "schedule");
-    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
-      screenNow: { power: "on", setAt: expect.any(String) },
-    });
-    const order = [
-      store.setScreenPower.mock.invocationCallOrder[0],
-      store.saveOverrides.mock.invocationCallOrder[0],
-    ];
-    expect(order[0]).toBeLessThan(order[1]);
-  });
-
-  it("Turn off now on a page that hasn't seen a new hold still ends it", async () => {
-    const { wrapper, store } = mountScreens();
-    await open(wrapper);
-    // Home automation held it after the page loaded; the page still says not held.
-    store.fetchScreenPower = vi.fn(async id => ({ id, held: true, ...HOLD, power: "on" }));
-    await wrapper.find("[data-test='screen-now-off']").trigger("click");
-    await flushPromises();
-    expect(store.fetchScreenPower).toHaveBeenCalledWith("kitchen");
-    expect(store.setScreenPower).toHaveBeenCalledWith("kitchen", "schedule");
-    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
-      screenNow: { power: "off", setAt: expect.any(String) },
-    });
-  });
-
-  it("a failed hold check still saves the person's choice", async () => {
-    const { wrapper, store } = mountScreens();
-    await open(wrapper);
-    store.fetchScreenPower = vi.fn(async () => {
-      throw new Error("offline");
-    });
-    await wrapper.find("[data-test='screen-now-off']").trigger("click");
-    await flushPromises();
-    expect(store.setScreenPower).not.toHaveBeenCalled();
-    expect(store.saveOverrides).toHaveBeenCalled();
-  });
-
-  it("says the hold ended when turning the screen on failed to save", async () => {
-    const { wrapper, store } = mountScreens({ kiosks: [kiosk({ powerHold: HOLD })] });
-    store.saveOverrides = vi.fn(async () => {
-      throw new Error("offline");
-    });
-    await open(wrapper);
-    await wrapper.find("[data-test='screen-now-on']").trigger("click");
-    await flushPromises();
-    expect(store.setScreenPower).toHaveBeenCalledWith("kitchen", "schedule");
-    expect(text(wrapper, "screen-now-message")).toBe(
-      "The screen is back on its schedule, but turning it on didn't save. Try again."
-    );
-    expect(wrapper.find("[data-test='screen-now-message']").classes()).toContain(
-      "inline-note--err"
-    );
-  });
-
-  it("says the hold ended when turning the screen off failed to save", async () => {
-    const { wrapper, store } = mountScreens({
-      kiosks: [kiosk({ powerHold: { ...HOLD, power: "on" } })],
-    });
-    store.saveOverrides = vi.fn(async () => {
-      throw new Error("offline");
-    });
-    await open(wrapper);
-    await wrapper.find("[data-test='screen-now-off']").trigger("click");
-    await flushPromises();
-    expect(store.setScreenPower).toHaveBeenCalledWith("kitchen", "schedule");
-    expect(text(wrapper, "screen-now-message")).toBe(
-      "The screen is back on its schedule, but turning it off didn't save. Try again."
-    );
-  });
-
-  it("marks both buttons unavailable while the hold ends and the choice saves", async () => {
-    const { wrapper, store } = mountScreens({ kiosks: [kiosk({ powerHold: HOLD })] });
-    let release;
-    store.setScreenPower = vi.fn(
-      () =>
-        new Promise(resolve => {
-          release = resolve;
-        })
-    );
-    await open(wrapper);
-    await wrapper.find("[data-test='screen-now-on']").trigger("click");
-    await flushPromisesNow();
-    expect(wrapper.find("[data-test='screen-now-on']").attributes("aria-disabled")).toBe("true");
-    expect(wrapper.find("[data-test='screen-now-off']").attributes("aria-disabled")).toBe("true");
-    // A second tap while the calls run sends nothing.
-    await wrapper.find("[data-test='screen-now-on']").trigger("click");
-    await flushPromisesNow();
-    expect(store.setScreenPower).toHaveBeenCalledTimes(1);
-    release({
-      id: "kitchen",
-      power: "schedule",
-      held: false,
-      setAt: null,
-      by: null,
-      desiredOn: true,
-    });
     await flushPromises();
     expect(store.setScreenPower).toHaveBeenCalledTimes(1);
-    expect(store.saveOverrides).toHaveBeenCalledTimes(1);
-  });
-
-  it("keeps focus on the power button that was pressed", async () => {
-    const { wrapper, store } = mountScreens({ attachTo: document.body });
-    try {
-      await open(wrapper);
-      const offButton = wrapper.find("[data-test='screen-now-off']");
-      offButton.element.focus();
-      expect(document.activeElement).toBe(offButton.element);
-
-      await offButton.trigger("click");
-      await flushPromises();
-
-      expect(store.saveOverrides).toHaveBeenCalledTimes(1);
-      // aria-disabled, not disabled: the button stays in the focus order, so
-      // the person keeps their place when the row redraws.
-      const sameButton = wrapper.find("[data-test='screen-now-off']");
-      expect(document.activeElement).toBe(sameButton.element);
-      expect(sameButton.attributes("aria-disabled")).toBe("true");
-      expect(
-        wrapper.find("[data-test='screen-now-on']").attributes("aria-disabled")
-      ).toBeUndefined();
-
-      // A tap on the unavailable choice sends nothing.
-      await sameButton.trigger("click");
-      await flushPromises();
-      expect(store.saveOverrides).toHaveBeenCalledTimes(1);
-    } finally {
-      wrapper.unmount();
-    }
-  });
-
-  it("explains a screen whose software is too old to hold", async () => {
-    const { wrapper } = mountScreens({
-      kiosks: [kiosk({ powerHold: HOLD, agentHolds: false })],
-    });
-    await open(wrapper);
-    expect(text(wrapper, "screen-now-old-agent")).toBe(
-      "This screen needs an update to stay this way. Until then, its next scheduled change switches it."
-    );
-  });
-
-  it("without a hold, the row is as before and nothing is ended", async () => {
-    const { wrapper, store } = mountScreens();
-    await open(wrapper);
-    expect(text(wrapper, "screen-now-state")).toBe("On now");
-    await wrapper.find("[data-test='screen-now-off']").trigger("click");
-    await flushPromises();
-    expect(store.setScreenPower).not.toHaveBeenCalled();
-    expect(store.saveOverrides).toHaveBeenCalled();
+    expect(store.setScreenPower).toHaveBeenCalledWith("kitchen", "on");
+    expect(store.saveOverrides).not.toHaveBeenCalled();
   });
 });

@@ -365,7 +365,6 @@ describe("DefaultScreenSettings copy (§3.3)", () => {
       "Rotate the screen output",
       "On: Calvin turns the Pi's picture itself. Off: leave it to the OS or the screen.",
     ],
-    ["Screen on/off schedule", "Turns the screen off and on at set times."],
     [
       "Touchscreen",
       "Shows touch buttons: arrows, page dots and close. Auto works for most screens; choose On if a touch panel acts like a mouse.",

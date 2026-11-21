@@ -131,10 +131,12 @@ export const useKiosksStore = defineStore("kiosks", () => {
     setCachedData(CACHE_KEY, kiosks.value);
   }
 
-  // Screen power held from home automation or Settings (calvin-2ifv). The hold
-  // lives outside the override layer, and setting or ending it removes
-  // screenNow from the layer on the server. Keep the list's copy in step, or
-  // a later save of this page would send an old manual choice back.
+  // The screen's power mode and the command in force (calvin-25g9). The command
+  // lives outside the override layer, and setting or ending it removes screenNow
+  // from the layer on the server. Keep the list's copy in step, or a later save
+  // of this page would send an old manual choice back. The whole answer is kept
+  // as `screenPowerView`: the page reads `mode`, `power`, `by`, `setAt`, `until`
+  // and the admin-only `keyName` from it.
   function applyScreenPower(id, view, { wrote = false } = {}) {
     const kiosk = kiosks.value.find(k => k.id === id);
     if (!kiosk || !view) return;
@@ -143,8 +145,11 @@ export const useKiosksStore = defineStore("kiosks", () => {
     if (wrote || hold || JSON.stringify(hold) !== JSON.stringify(kiosk.powerHold ?? null)) {
       kiosk.overrides = withoutScreenNow(kiosk.overrides);
     }
+    kiosk.screenPowerView = view;
+    if (view.mode) kiosk.screenPower = view.mode;
     kiosk.powerHold = hold;
     kiosk.agentHolds = view.agentHolds ?? kiosk.agentHolds ?? null;
+    if (typeof view.paired === "boolean") kiosk.paired = view.paired;
     setCachedData(CACHE_KEY, kiosks.value);
   }
 

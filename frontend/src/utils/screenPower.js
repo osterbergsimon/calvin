@@ -9,6 +9,28 @@
 // the boundary for the informational "Off until HH:MM" text, and mirror the
 // agent's schedule decision so the row can say what the screen is doing now.
 
+import { formatDataFrom } from "./connectionTime";
+
+/** Where the home automation guide lives (UI spec §5). */
+export const HOME_AUTOMATION_GUIDE_URL =
+  "https://osterbergsimon.github.io/calvin/integrations/HOME_AUTOMATION/";
+
+export const SCREEN_POWER_MODES = ["schedule", "always_on", "external"];
+
+/** The three choices, in the order the control shows them (UI spec §2.1). */
+export const SCREEN_POWER_OPTIONS = [
+  { value: "schedule", label: "Schedule" },
+  { value: "always_on", label: "Always on" },
+  { value: "external", label: "External" },
+];
+
+/** The hint under the label, per choice (UI spec §2.1). */
+export const SCREEN_POWER_HINTS = {
+  schedule: "Turns on and off at the times below.",
+  always_on: "Never turns off on a schedule. Turn off when idle still applies.",
+  external: "Homey, Home Assistant or a script with an API key turns it on and off.",
+};
+
 const formatterCache = new Map();
 
 /** The screen's configured zone, or null when it uses the system zone. */
@@ -203,12 +225,87 @@ export function activePowerOverride(
   return { power, setAt: override.setAt, expiry, hasSchedule };
 }
 
-/** "22:00" for a boundary, in the screen's timezone. */
-export function formatUntil(until, timeZone = null) {
+/** "22:00" (or "10:00 PM") for a boundary, in the screen's timezone. */
+export function formatUntil(until, timeZone = null, timeFormat = "24h") {
   const date = until instanceof Date ? until : new Date(until);
   if (Number.isNaN(date.getTime())) return "";
+  if (timeFormat === "12h") {
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: timeZone || undefined,
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }).format(date);
+  }
   const parts = zonedParts(date, timeZone);
   return `${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
+}
+
+/**
+ * The screen's power mode (calvin-25g9): its own `screenPower`, else the legacy
+ * layer switch, else the household's mode, else the household's legacy switch.
+ * Mirrors the server's `effective_mode_for`.
+ */
+export function effectiveScreenMode(overrides, config) {
+  const layer = overrides || {};
+  if (SCREEN_POWER_MODES.includes(layer.screenPower)) return layer.screenPower;
+  if ("displayScheduleEnabled" in layer) {
+    return layer.displayScheduleEnabled ? "schedule" : "always_on";
+  }
+  if (SCREEN_POWER_MODES.includes(config?.screenPower)) return config.screenPower;
+  return config?.displayScheduleEnabled ? "schedule" : "always_on";
+}
+
+const dayKeyFormatterCache = new Map();
+function dayKeyFormatter(timeZone) {
+  let formatter = dayKeyFormatterCache.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timeZone || undefined,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    dayKeyFormatterCache.set(timeZone, formatter);
+  }
+  return formatter;
+}
+
+function dayDifference(from, to, timeZone) {
+  const fromKey = dayKeyFormatter(timeZone).format(from);
+  const toKey = dayKeyFormatter(timeZone).format(to);
+  const [fy, fm, fd] = fromKey.split("-").map(Number);
+  const [ty, tm, td] = toKey.split("-").map(Number);
+  return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86400000);
+}
+
+/**
+ * When a command was set, in the UI spec's words: "at 21:04" today,
+ * "on Tue at 21:04" in the last 6 days, "on 12 Oct" older (UI spec §3.3).
+ * The clock text itself comes from formatDataFrom, so there is one date format.
+ */
+export function formatWhen(setAt, { timeFormat = "24h", timezone = null, now = new Date() } = {}) {
+  if (!setAt) return "";
+  const date = setAt instanceof Date ? setAt : new Date(setAt);
+  if (Number.isNaN(date.getTime())) return "";
+  const text = formatDataFrom(date, { timeFormat, timezone, now });
+  if (!text) return "";
+  const days = dayDifference(date, now, timezone);
+  if (days <= 0) return `at ${text}`;
+  if (days <= 6) {
+    const split = text.indexOf(" ");
+    if (split > 0) return `on ${text.slice(0, split)} at ${text.slice(split + 1)}`;
+  }
+  return `on ${text}`;
+}
+
+const KEY_NAME_LIMIT = 40;
+
+/** The API key's name, cut to 40 characters with an ellipsis (UI spec §3.3). */
+export function keyNameLabel(keyName) {
+  const name = String(keyName ?? "").trim();
+  if (!name) return "home automation";
+  return name.length > KEY_NAME_LIMIT ? `${name.slice(0, KEY_NAME_LIMIT - 1)}…` : name;
 }
 
 /** The object to save for a manual choice: the choice plus the UTC instant. */

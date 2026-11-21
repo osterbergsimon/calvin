@@ -203,7 +203,7 @@ for (const [name, viewport] of [
 
       const height = await page.evaluate(() => {
         const toggleRow = [...document.querySelectorAll("#section-device-power .setting-row")].find(
-          row => row.textContent.includes("Screen on/off schedule")
+          row => row.textContent.includes("Screen power")
         );
         const schedule = document.querySelector("[data-test='display-schedule']");
         if (!toggleRow || !schedule) return null;

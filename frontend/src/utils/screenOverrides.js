@@ -514,16 +514,34 @@ export const SCREEN_SETTING_DESCRIPTORS = [
     keywords: ["faster page switching", "page switching", "pages ready", "slow screen", "speed"],
   },
   {
-    key: "displayScheduleEnabled",
-    label: "Screen on/off schedule",
+    // The screen power choice (calvin-25g9): Schedule, Always on or External.
+    // Its row is hand-written in the Power section so the hint can change with
+    // the choice; the descriptor drives the Changed here label and the notes
+    // that name the screens keeping their own mode.
+    key: "screenPower",
+    label: "screen power",
     section: "power",
-    description: "Turns the screen off and on at set times.",
-    control: { kind: "toggle" },
-    defaultValue: false,
+    control: {
+      kind: "segmented",
+      options: [
+        { value: "schedule", label: "Schedule" },
+        { value: "always_on", label: "Always on" },
+        { value: "external", label: "External" },
+      ],
+    },
+    defaultValue: "schedule",
     browserLayer: false,
     copyable: true,
-    resetTest: "reset-schedule-enabled",
-    keywords: ["power", "schedule", "screen off", "screen on", "night", "display"],
+    resetTest: "reset-screen-power",
+    keywords: [
+      "screen power",
+      "schedule",
+      "always on",
+      "external",
+      "home automation",
+      "homey",
+      "home assistant",
+    ],
   },
   {
     key: "displaySchedule",
@@ -894,7 +912,7 @@ const SCREEN_PAGE_ROW_ORDER = [
   "hotCornerOpacity",
   "hotCornerSize",
   "hotCornerLongPressMs",
-  "displayScheduleEnabled",
+  "screenPower",
   "displaySchedule",
   "displayTimeout",
   "brightnessRampEnabled",
@@ -980,9 +998,10 @@ export const visibleDescriptors = (descriptors, values) =>
   (descriptors || []).filter(descriptor => isSettingVisible(descriptor, values));
 
 // Keys that are not durable settings, so they never make a screen "differ from
-// Default": its own name, and the transient "Screen now" manual power choice
-// (it expires at the schedule's next boundary and is not copied anywhere).
-const NON_SETTING_KEYS = new Set(["displayName", "screenNow"]);
+// Default": its own name, the transient "Screen now" manual power choice (it
+// expires at the schedule's next boundary and is not copied anywhere), and the
+// legacy schedule switch the server keeps in step with `screenPower`.
+const NON_SETTING_KEYS = new Set(["displayName", "screenNow", "displayScheduleEnabled"]);
 
 // Keys that make a screen's *settings* differ from Default. The name does not
 // count: every screen can be called something without deviating from Default.
@@ -1039,6 +1058,9 @@ export const useAsDefaultPatch = overrides => {
 export const withoutPromotedSettings = overrides => {
   const next = { ...(overrides || {}) };
   for (const key of DEFAULT_COPYABLE_KEYS) delete next[key];
+  // The server's legacy mode switch travels with `screenPower`; leaving it
+  // behind would derive an old mode for a screen that now follows Default.
+  delete next.displayScheduleEnabled;
   return next;
 };
 

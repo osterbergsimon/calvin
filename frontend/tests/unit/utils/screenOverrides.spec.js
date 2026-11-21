@@ -108,7 +108,7 @@ describe("screen setting descriptors", () => {
       "orientation",
       "orientationFlipped",
       "applyDisplayRotation",
-      "displayScheduleEnabled",
+      "screenPower",
       "displaySchedule",
       "displayTimeoutEnabled",
       "displayTimeout",

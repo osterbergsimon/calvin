@@ -27,15 +27,16 @@ describe("brightness per-screen descriptors (calvin-29ws)", () => {
     expect(SCREEN_SETTING_LABELS[key]).toBeTruthy();
   });
 
-  it("lists brightness overrides in Changed here, in page order, after the schedule", () => {
+  it("lists brightness overrides in Changed here, in page order, after the mode", () => {
     const rows = changedSettingRows({
       touchControls: "on",
       brightnessRampEnabled: true,
-      displayScheduleEnabled: true,
+      screenPower: "external",
+      displayScheduleEnabled: false,
       sleepMode: "dim",
     });
     expect(rows.map(r => r.key)).toEqual([
-      "displayScheduleEnabled",
+      "screenPower",
       "brightnessRampEnabled",
       "sleepMode",
       "touchControls",

@@ -174,23 +174,52 @@
     </SettingsSection>
 
     <SettingsSection id="device-power" title="Power">
-      <SettingRow
-        label="Screen on/off schedule"
-        description="Turns the screen off and on at set times."
-      >
-        <ToggleSwitch
-          :model-value="config.displayScheduleEnabled"
-          aria-label="Screen on/off schedule"
-          @update:model-value="v => emitChange({ displayScheduleEnabled: v })"
+      <SettingRow stacked label="Screen power">
+        <template #description>
+          <span data-test="default-screen-power-hint">{{ screenPowerHint }}</span>
+          <template v-if="effScreenPower === 'external'">
+            <InlineNote data-test="default-screen-power-keys-note">
+              It needs an API key that can turn screens on and off.
+              <template #action>
+                <Button
+                  variant="link"
+                  size="sm"
+                  data-test="default-screen-power-keys"
+                  @click="openApiKeys"
+                >
+                  Open API keys
+                </Button>
+              </template>
+            </InlineNote>
+            <InlineNote v-if="!onKiosk" data-test="default-screen-power-guide-note">
+              The home automation guide shows the steps for Homey and Home Assistant.
+              <template #action>
+                <Button
+                  variant="link"
+                  size="sm"
+                  data-test="default-screen-power-guide"
+                  @click="openGuide"
+                >
+                  Open the guide
+                </Button>
+              </template>
+            </InlineNote>
+          </template>
+        </template>
+        <SegmentedControl
+          :model-value="effScreenPower"
+          aria-label="Screen power"
+          :options="SCREEN_POWER_OPTIONS"
+          @update:model-value="setScreenPowerMode"
         />
       </SettingRow>
       <DefaultEditNote
         :note="editNote"
-        setting="displayScheduleEnabled"
+        setting="screenPower"
         @change-them-too="changeThemToo"
         @dismiss="dismissNote"
       />
-      <template v-if="config.displayScheduleEnabled">
+      <template v-if="effScreenPower === 'schedule'">
         <DisplayScheduleGrid
           :model-value="config.displaySchedule || []"
           :week-start="config.weekStartDay ?? 1"
@@ -395,6 +424,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from "vue";
+import { useRouter } from "vue-router";
 import { mdiCheck } from "@mdi/js";
 import { useKiosksStore } from "@/stores/kiosks";
 import Button from "@/components/ui/Button.vue";
@@ -428,6 +458,13 @@ import {
   visibleDescriptors,
 } from "@/utils/screenOverrides";
 import { screenLabel } from "@/utils/screenLabel";
+import { getKioskId } from "@/utils/kioskId";
+import {
+  HOME_AUTOMATION_GUIDE_URL,
+  SCREEN_POWER_HINTS,
+  SCREEN_POWER_OPTIONS,
+  effectiveScreenMode,
+} from "@/utils/screenPower";
 import {
   OSK_LAYOUT_CHANGE_EVENT,
   clearStoredOskLayout,
@@ -465,6 +502,31 @@ const defaultEffectsAutoCopy = `Auto (${effectsLevelLabel(
 const store = useKiosksStore();
 const editorOpen = ref(false);
 const pagesMsg = ref("");
+
+// --- Screen power (calvin-25g9) -------------------------------------------
+// Default is the household choice; a screen's own page writes that screen's
+// override. The Default is not a screen, so it has no Screen now row.
+const router = useRouter();
+const kioskId = getKioskId();
+const effScreenPower = computed(() => effectiveScreenMode({}, props.config));
+const screenPowerHint = computed(() => SCREEN_POWER_HINTS[effScreenPower.value] || "");
+const onKiosk = computed(
+  () =>
+    Boolean(kioskId) ||
+    (typeof document !== "undefined" && document.documentElement.classList.contains("calvin-kiosk"))
+);
+function setScreenPowerMode(mode) {
+  if (mode === effScreenPower.value) return;
+  // The schedule itself is never touched. The server keeps the legacy switch
+  // in step with the mode.
+  emitChange({ screenPower: mode });
+}
+function openApiKeys() {
+  router?.push({ path: "/settings", query: { setting: "security-api-keys" } });
+}
+function openGuide() {
+  window.open(HOME_AUTOMATION_GUIDE_URL, "_blank", "noopener");
+}
 
 // --- Default editing vs screens that override the same key ------------------
 // Changing a Default row only reaches screens that follow it. When a screen has

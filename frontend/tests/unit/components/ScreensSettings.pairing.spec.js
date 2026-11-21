@@ -22,7 +22,8 @@ const baseConfig = {
   orientation: "landscape",
   orientationFlipped: false,
   applyDisplayRotation: true,
-  displayScheduleEnabled: false,
+  screenPower: "schedule",
+  displayScheduleEnabled: true,
   displaySchedule: [],
   displayTimeoutEnabled: false,
   displayTimeout: 0,
@@ -726,14 +727,14 @@ describe("One screen's Pairing section", () => {
     expect(power.find("[data-test='screen-now-state']").exists()).toBe(false);
     expect(power.find("[data-test='screen-now-until']").exists()).toBe(false);
     expect(power.get("[data-test='screen-now-hidden']").text()).toBe(
-      "Sign in as admin to see whether home automation is holding this screen."
+      "Sign in as admin to see whether this screen is on or off, and who set it."
     );
   });
 
-  it("never infers 'no hold' from a hidden presence row", async () => {
-    // With presence hidden, powerHold is absent whether or not a hold exists.
-    // The controls must stay neutral: neither button disabled by the schedule,
-    // a way back to the schedule, and no assumed wake state (design §3.4).
+  it("never infers 'no command' from a hidden presence row", async () => {
+    // With presence hidden, the command fields are absent whether or not one
+    // exists. The controls must stay neutral: neither button disabled by the
+    // schedule, a way back to the schedule, and no assumed wake state (§3.4).
     const { wrapper } = mountScreens({ kiosks: [kiosk({ presenceHidden: true })] });
     await flushPromises();
     await openScreen(wrapper);
