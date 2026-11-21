@@ -4,10 +4,12 @@ import asyncio
 import io
 import json
 import os
+import re
 import shutil
 import tempfile
 import zipfile
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -15,6 +17,7 @@ from loguru import logger
 
 from app.config import settings
 from app.models.db_models import ConfigDB, KioskDB, PluginDB, PluginTypeDB
+from app.services.config_service import config_service
 from app.utils.db_retry import retry_on_db_locked
 
 from .exporter import (
@@ -246,6 +249,8 @@ class _Outcome:
     removed: list[str] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
     needs_credentials: list[str] = field(default_factory=list)
+    paired_screens: list[str] = field(default_factory=list)
+    removed_screens: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
@@ -364,16 +369,60 @@ async def _restore_plugin_types(doc: BackupDocument, out: _Outcome) -> None:
 
 
 @retry_on_db_locked(max_retries=5)
-async def _restore_kiosks(doc: BackupDocument) -> None:
-    # Always merged: kiosks re-register on their next poll anyway.
+async def _restore_kiosks(doc: BackupDocument, removed: frozenset[str], out: _Outcome) -> None:
+    """Restore the kiosk rows, keeping each existing row's current pairing.
+
+    A row the server does not have takes the backup's pairing, unless its id is
+    in ``removed``: a removed or stolen screen then comes back unpaired, so its
+    old secret is dead (owner decision 3). An existing row keeps its current
+    pairing, paired or not, so a restore never re-pairs a screen the owner
+    unpaired after the backup, nor breaks one paired since.
+    """
     for row in doc.data.kiosks:
         existing = await KioskDB.objects.get_or_none(id=row.id)
-        if existing is None:
-            await KioskDB.objects.create(id=row.id, hostname=row.hostname, overrides=row.overrides)
-        else:
+        if existing is not None:
             existing.hostname = row.hostname or existing.hostname
             existing.overrides = row.overrides
-            await existing.update()
+            # Column-scoped: a whole-row update could race a pairing made during
+            # the restore and put back a stale credential_hash.
+            await existing.update(_columns=["hostname", "overrides"])
+            continue
+
+        values: dict[str, Any] = {
+            "id": row.id,
+            "hostname": row.hostname,
+            "overrides": row.overrides,
+            "last_seen": None,
+        }
+        if row.id in removed:
+            out.removed_screens.append(row.id)
+        else:
+            pairing = row.pairing or {}
+            credential_hash = pairing.get("credentialHash")
+            if credential_hash is not None:
+                if _valid_credential_hash(credential_hash):
+                    values["credential_hash"] = credential_hash
+                    values["paired_at"] = _paired_at(pairing.get("pairedAt"))
+                    out.paired_screens.append(row.id)
+                else:
+                    logger.warning(
+                        "Ignoring a malformed pairing hash for restored screen {!r}", row.id
+                    )
+        await KioskDB.objects.create(**values)
+
+
+def _valid_credential_hash(value: object) -> bool:
+    """A SHA-256 hex, and nothing else, is ever written from a backup."""
+    return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None
+
+
+def _paired_at(value: object) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
 
 async def _migrate_room_name(out: _Outcome) -> None:
@@ -607,6 +656,14 @@ async def apply_restore(
         doc = loaded.document
         out = _Outcome()
 
+        # The removed list and the household mode are snapshot before the config
+        # is restored, so a replace cannot lose a removal made after the backup,
+        # and a backup without the mode never quietly loosens it (design §12/§14).
+        from app.services.kiosk_registry import REMOVED_KIOSK_CAP, removed_kiosk_ids
+
+        pre_removed = await removed_kiosk_ids()
+        pre_pairing_mode = await config_service.get_value("kioskPairing")
+
         safety_name = None
         if safety_backup:
             from .store import write_backup_unlocked
@@ -615,12 +672,28 @@ async def apply_restore(
 
         await _install_packages(loaded, plan, out)
         await _restore_config(doc, mode)
+        # Straight after the config restore, before anything slow (an instance
+        # start, the network): a later failure must not leave the household mode
+        # loosened or the removed list lost (calvin-0xns, PR #385 review).
+        if "kioskPairing" not in {row.key for row in doc.data.config} and (
+            pre_pairing_mode is not None
+        ):
+            await config_service.set_value("kioskPairing", pre_pairing_mode)
+        restored_removed = await removed_kiosk_ids()
+        # The current list is authoritative: keep it last so the cap drops
+        # backup-only ids first, never one this server still lists (design §12).
+        backup_only = [k for k in restored_removed if k not in pre_removed]
+        effective_removed = (backup_only + pre_removed)[-REMOVED_KIOSK_CAP:]
+        if effective_removed != restored_removed:
+            await config_service.set_value("kioskRemoved", effective_removed, value_type="json")
+
         await _restore_keyboard(doc, mode)
         await _restore_instances(doc, plan, mode, out)
         # After instances: updating a running instance through the instance
         # manager also writes its type's enabled flag.
         await _restore_plugin_types(doc, out)
-        await _restore_kiosks(doc)
+
+        await _restore_kiosks(doc, frozenset(effective_removed), out)
         await _migrate_room_name(out)
         await _migrate_screen_controls(out)
         await _migrate_photo_frame(out, doc)
@@ -646,6 +719,10 @@ async def apply_restore(
                 "skipped": out.skipped,
             },
             "needs_credentials": out.needs_credentials,
+            "counts": {
+                "pairedScreens": len(out.paired_screens),
+                "removedScreens": len(out.removed_screens),
+            },
             "signing_key_restored": bool(loaded.signing_key and restore_signing_key),
             "warnings": plan["warnings"] + out.warnings,
             "errors": out.errors,

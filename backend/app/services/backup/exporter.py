@@ -14,6 +14,7 @@ from loguru import logger
 from app import __version__
 from app.config import settings
 from app.models.db_models import ConfigDB, KeyboardMappingDB, KioskDB, PluginDB, PluginTypeDB
+from app.utils.utc import as_utc
 
 from .format import FORMAT_NAME, FORMAT_VERSION
 from .secrets import strip_secrets
@@ -59,6 +60,27 @@ def _class_schema(type_id: str, attr: str) -> dict[str, Any]:
     cls = plugin_loader.get_plugin_class(type_id)
     metadata = getattr(cls, "metadata", None) if cls else None
     return (getattr(metadata, attr, None) or {}) if metadata else {}
+
+
+def _kiosk_document(row: KioskDB) -> dict[str, Any]:
+    """A kiosk row for the backup: overrides plus a paired screen's fingerprint.
+
+    Only the SHA-256 hash and when it was approved, never the secret; pending
+    pairings and install codes live in memory and are never exported.
+    """
+    document: dict[str, Any] = {
+        "id": row.id,
+        "hostname": row.hostname,
+        "overrides": row.overrides or {},
+    }
+    if row.credential_hash:
+        paired_at = (
+            as_utc(row.paired_at).isoformat(timespec="seconds").replace("+00:00", "Z")
+            if row.paired_at is not None
+            else None
+        )
+        document["pairing"] = {"credentialHash": row.credential_hash, "pairedAt": paired_at}
+    return document
 
 
 async def collect_document(options: ExportOptions) -> dict[str, Any]:
@@ -134,10 +156,7 @@ async def collect_document(options: ExportOptions) -> dict[str, Any]:
                 for r in await PluginTypeDB.objects.order_by("type_id").all()
             ],
             "plugin_instances": instances,
-            "kiosks": [
-                {"id": r.id, "hostname": r.hostname, "overrides": r.overrides or {}}
-                for r in await KioskDB.objects.order_by("id").all()
-            ],
+            "kiosks": [_kiosk_document(r) for r in await KioskDB.objects.order_by("id").all()],
         },
     }
 

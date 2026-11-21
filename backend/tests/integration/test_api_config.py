@@ -385,3 +385,50 @@ def test_get_config_defaults_git_branch_to_develop(test_client: TestClient):
     response = test_client.get("/api/config")
     assert response.status_code == 200
     assert response.json()["gitBranch"] == "develop"
+
+
+# -- household pairing mode (calvin-0xns, Task 7) ---------------------------
+
+
+def _run(coro):
+    import asyncio
+
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+
+
+@pytest.mark.integration
+def test_household_pairing_mode_needs_admin(test_client: TestClient):
+    from app.services.kiosk_view import pairing_mode
+
+    test_client.cookies.clear()
+    refused = test_client.post("/api/config", json={"kioskPairing": "required"})
+    assert refused.status_code == 401
+    assert refused.json()["detail"]["code"] == "admin_required"
+    assert _run(pairing_mode()) == "optional"
+
+    assert (
+        test_client.post("/api/auth/login", json={"password": "test-admin-password"}).status_code
+        == 200
+    )
+    accepted = test_client.post("/api/config", json={"kioskPairing": "required"})
+    assert accepted.status_code == 200, accepted.text
+    assert _run(pairing_mode()) == "required"
+
+    assert test_client.post("/api/config", json={"kioskPairing": "optional"}).status_code == 200
+    assert _run(pairing_mode()) == "optional"
+
+
+@pytest.mark.integration
+def test_a_bad_household_pairing_mode_is_422(test_client: TestClient):
+    response = test_client.post("/api/config", json={"kioskPairing": "sometimes"})
+    assert response.status_code == 422
+
+
+def test_household_pairing_mode_is_never_a_display_key():
+    from app.security.route_policy import CONFIG_DISPLAY_KEYS
+
+    assert "kioskPairing" not in CONFIG_DISPLAY_KEYS

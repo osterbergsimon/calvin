@@ -9,15 +9,18 @@ from loguru import logger
 from pydantic import BaseModel, ValidationError
 
 from app.api.routes.config import ConfigUpdate, build_global_config
-from app.security.admin_auth import lock_kiosk_sessions
+from app.security import kiosk_auth
+from app.security.admin_auth import get_admin_store, lock_kiosk_sessions
 from app.security.route_policy import (
     KIOSK_SELF_WRITE_KEYS,
+    admin_error,
     direct_peer_ip,
     is_admin,
     is_loopback_peer,
+    permission_routes,
     request_api_key,
 )
-from app.services import display_check, kiosk_bundle, kiosk_registry, screen_power
+from app.services import display_check, kiosk_bundle, kiosk_registry, kiosk_view, screen_power
 from app.services.kiosk_pairing import pairing_store
 from app.services.kiosk_registry import (
     _KIOSK_ID_RE,
@@ -48,19 +51,57 @@ class OverridesBody(BaseModel):
 
 
 @router.get("/kiosks")
-async def get_kiosks():
-    """List known kiosks (id, hostname, last-seen, lastAppliedVersion)."""
-    return {"kiosks": await kiosk_registry.list_kiosks()}
+async def get_kiosks(request: Request, response: Response):
+    """List known kiosks (id, hostname, last-seen, lastAppliedVersion).
+
+    A gated row's presence fields (``powerHold``, ``displayCheckActive`` and the
+    layer's ``screenNow``) go only to an admin or to that screen itself; the
+    list has no kiosk id in its path, so only the screen's cookie unlocks its
+    own row and a bearer unlocks none (calvin-0xns).
+    """
+    mode = await kiosk_view.pairing_mode()
+    admin = is_admin(request)
+    cookie_id = await kiosk_auth.kiosk_cookie_id(request)
+    rows = await kiosk_registry.list_kiosks()
+    for row in rows:
+        visible = kiosk_view.can_see_presence(
+            admin=admin,
+            principal=cookie_id,
+            kiosk_id=row["id"],
+            paired=row["paired"],
+            mode=mode,
+        )
+        if not visible:
+            kiosk_view.strip_list_row(row)
+            row["presenceHidden"] = True
+    response.headers["Cache-Control"] = "private, no-cache"
+    response.headers["Vary"] = "Cookie, Authorization"
+    return {"kiosks": rows}
 
 
 @router.get("/kiosks/{kiosk_id}/overrides")
-async def get_kiosk_overrides(kiosk_id: str):
+async def get_kiosk_overrides(kiosk_id: str, request: Request):
     """Return a kiosk's raw override layer (not merged). 404 if kiosk unknown."""
     _valid_id_or_400(kiosk_id)
     overrides = await get_overrides(kiosk_id)
     if overrides is None:
         raise HTTPException(status_code=404, detail="Unknown kiosk")
+    visible = await _can_see_this_screen_presence(request, kiosk_id)
+    if not visible:
+        kiosk_view.strip_layer_presence(overrides)
+        return {"id": kiosk_id, "overrides": overrides, "presenceHidden": True}
     return {"id": kiosk_id, "overrides": overrides}
+
+
+async def _can_see_this_screen_presence(request: Request, kiosk_id: str) -> bool:
+    """Presence rules for a route whose kiosk id is in the path."""
+    return kiosk_view.can_see_presence(
+        admin=is_admin(request),
+        principal=await kiosk_auth.kiosk_principal(request),
+        kiosk_id=kiosk_id,
+        paired=await kiosk_registry.get_credential_hash(kiosk_id) is not None,
+        mode=await kiosk_view.pairing_mode(),
+    )
 
 
 @router.put("/kiosks/{kiosk_id}/overrides")
@@ -117,8 +158,10 @@ async def delete_kiosk(kiosk_id: str):
         )
     if not removed:
         raise HTTPException(status_code=404, detail="Unknown kiosk")
-    # A removed screen's pending pairings die with its row (calvin-0xns).
+    # A removed screen's pending pairings die with its row, and its id is
+    # remembered so an older backup restores it unpaired (calvin-0xns).
     pairing_store.drop_kiosk(kiosk_id)
+    await kiosk_registry.note_kiosk_removed(kiosk_id)
     return {"id": kiosk_id, "removed": True}
 
 
@@ -189,7 +232,14 @@ async def patch_kiosk_overrides(kiosk_id: str, body: OverridesBody, request: Req
     merged = await merge_into_overrides(kiosk_id, partial)
     if merged is None:
         raise HTTPException(status_code=404, detail="Unknown kiosk")
-    return {"id": kiosk_id, "overrides": merged}
+    # This answer is open to unpaired callers for ``showUI``, so it goes through
+    # the same presence projection as the GET and never the host-internal keys
+    # (calvin-0xns, PR #385 review).
+    answer: dict = {"id": kiosk_id, "overrides": public_overrides(merged)}
+    if not await _can_see_this_screen_presence(request, kiosk_id):
+        kiosk_view.strip_layer_presence(answer["overrides"])
+        answer["presenceHidden"] = True
+    return answer
 
 
 # -- screen power held from home automation (calvin-2ifv) -------------------
@@ -211,6 +261,7 @@ class ScreenPowerView(BaseModel):
     desiredOn: bool  # noqa: N815 - what the agent will do, not what the panel reports
     online: bool
     agentHolds: bool | None  # noqa: N815 - False: this screen's agent is too old to hold
+    paired: bool
 
 
 async def _power_status_or_404(kiosk_id: str) -> dict:
@@ -227,7 +278,14 @@ async def _screen_power_view(kiosk_id: str, status: dict) -> ScreenPowerView:
     merged = merge_overrides(await build_global_config(), status["overrides"])
     screen_power.strip_holds(merged)
     screen_power.project_hold(merged, hold)
-    agent_cfg = screen_power.agent_view(merged, status["agentHolds"])
+    # A gated screen receives a hold only when it is paired and its agent's
+    # latest poll proved it is the screen (calvin-0xns). An old agent that polls
+    # without the secret, like an unpaired screen, follows the schedule; its
+    # ``desiredOn`` must say so (design §7).
+    receives_hold = None
+    if kiosk_view.is_gated(status["paired"], await kiosk_view.pairing_mode()):
+        receives_hold = status["paired"] and kiosk_registry.agent_polls_authenticated(kiosk_id)
+    agent_cfg = screen_power.agent_view(merged, status["agentHolds"], receives_hold)
     last_seen = status["lastSeen"]
     return ScreenPowerView(
         id=kiosk_id,
@@ -238,13 +296,43 @@ async def _screen_power_view(kiosk_id: str, status: dict) -> ScreenPowerView:
         desiredOn=screen_power.desired_on(agent_cfg, screen_power.now_in(agent_cfg)),
         online=last_seen is not None and (utcnow() - last_seen).total_seconds() < _ONLINE_S,
         agentHolds=status["agentHolds"],
+        paired=status["paired"],
     )
 
 
+async def _may_read_screen_power(request: Request, kiosk_id: str) -> None:
+    """Who may read a gated screen's power: admin, ``screens.power``, itself.
+
+    The route is public by default, so this is the handler-level gate. A plain
+    read key gets ``insufficient_scope`` (it is for dashboard scripts, not
+    presence) and an anonymous caller gets the usual ``admin_required``
+    (calvin-0xns, design §7).
+    """
+    if is_admin(request):
+        return
+    key = request_api_key(request)
+    if key is not None:
+        route_id = ("GET", "/api/kiosks/{kiosk_id}/screen-power")
+        if route_id in permission_routes(key):
+            return
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "insufficient_scope",
+                "message": "This API key can't do that. It needs the screens.power scope.",
+            },
+        )
+    if await kiosk_auth.kiosk_principal(request) == kiosk_id:
+        return
+    raise admin_error(get_admin_store().is_configured())
+
+
 @router.get("/kiosks/{kiosk_id}/screen-power", response_model=ScreenPowerView)
-async def get_screen_power(kiosk_id: str):
+async def get_screen_power(kiosk_id: str, request: Request):
     """A screen's power: held on or off, or following its schedule."""
     status = await _power_status_or_404(kiosk_id)
+    if kiosk_view.is_gated(status["paired"], await kiosk_view.pairing_mode()):
+        await _may_read_screen_power(request, kiosk_id)
     return await _screen_power_view(kiosk_id, status)
 
 
@@ -505,9 +593,14 @@ async def post_display_check_verdict(kiosk_id: str, body: display_check.VerdictR
 
 
 @router.post("/kiosks/{kiosk_id}/display-check")
-async def post_display_check_report(kiosk_id: str, body: display_check.AgentReport):
+async def post_display_check_report(
+    kiosk_id: str, body: display_check.AgentReport, request: Request
+):
     """The display agent's report on a run. Dropped unless it names the stored run."""
     _valid_id_or_400(kiosk_id)
+    # On a gated screen the run id is public, so the screen's own secret is
+    # what protects the report (calvin-0xns, design §8).
+    await kiosk_auth.require_screen_itself(request, kiosk_id)
     try:
         await display_check.record_report(kiosk_id, body)
     except (
@@ -586,7 +679,14 @@ async def kiosk_screen_sleep(kiosk_id: str, request: Request):
     _valid_id_or_400(kiosk_id)
     if not await kiosk_registry.kiosk_exists(kiosk_id):
         raise HTTPException(status_code=404, detail="Unknown kiosk")
-    if not await kiosk_registry.kiosk_has_peer(kiosk_id, direct_peer_ip(request)):
+    gated = kiosk_view.is_gated(
+        await kiosk_registry.get_credential_hash(kiosk_id) is not None,
+        await kiosk_view.pairing_mode(),
+    )
+    # Every KIOSK_ROUTES handler asks the shared gate; it passes on an ungated
+    # screen, which then keeps today's peer check (calvin-0xns).
+    await kiosk_auth.require_screen_itself(request, kiosk_id)
+    if not gated and not await kiosk_registry.kiosk_has_peer(kiosk_id, direct_peer_ip(request)):
         raise HTTPException(status_code=403, detail="Only the kiosk itself can report this")
     lock_kiosk_sessions(kiosk_id)
     logger.info(f"Kiosk {kiosk_id!r} screen asleep: its admin sessions ended")
@@ -640,6 +740,18 @@ async def get_kiosk_config(
     screen look online (calvin-7aqu).
     """
     _valid_id_or_400(kiosk_id)
+    principal = await kiosk_auth.kiosk_principal(request)
+    admin = is_admin(request)
+    paired = await kiosk_registry.get_credential_hash(kiosk_id) is not None
+    mode = await kiosk_view.pairing_mode()
+    gated = kiosk_view.is_gated(paired, mode)
+    sees_presence = kiosk_view.can_see_presence(
+        admin=admin,
+        principal=principal,
+        kiosk_id=kiosk_id,
+        paired=paired,
+        mode=mode,
+    )
     # Compute available version BEFORE record_kiosk so we can pass it in,
     # enabling auto-clear of the update flag when agent_version == available_version.
     # Falls back to None when bundle files are unavailable (e.g. dev without Pi deploy tree).
@@ -649,7 +761,9 @@ async def get_kiosk_config(
     except Exception:
         available = None
     try:
-        if khost or kagent:
+        # A gated screen only writes its row when the caller is that screen
+        # itself (calvin-0xns); a forged poll writes nothing, not even peer_ips.
+        if (khost or kagent) and (not gated or principal == kiosk_id):
             await kiosk_registry.record_kiosk(
                 kiosk_id,
                 hostname=khost,
@@ -662,9 +776,25 @@ async def get_kiosk_config(
                 wifi_power_save=kwifi,
                 peer_ip=direct_peer_ip(request),
                 agent_features=kfeat,
+                authenticated=principal == kiosk_id,
             )
     except Exception as exc:
         logger.warning(f"Failed to record kiosk {kiosk_id!r}: {exc}")
+
+    # Whether the agent polls as the screen (calvin-0xns §7): ``desiredOn`` for a
+    # paired screen says what its agent will actually receive, so an old agent
+    # that polls without the screen's secret must not be told a hold reaches it.
+    # Only a poll from an address the screen itself proved is trusted to say so;
+    # a forged one cannot make home automation believe the hold is ignored.
+    if kagent and await kiosk_registry.kiosk_has_peer(kiosk_id, direct_peer_ip(request)):
+        kiosk_registry.note_agent_poll(kiosk_id, principal == kiosk_id)
+
+    # Whether the screen's own browser still has its cookie (calvin-0xns): only
+    # a browser poll from one of the screen's recorded addresses counts, so a
+    # forged poll cannot make the agent restart the browser.
+    if khost and not kagent:
+        if await kiosk_registry.kiosk_has_peer(kiosk_id, direct_peer_ip(request)):
+            kiosk_registry.note_browser_seen(kiosk_id, principal == kiosk_id)
 
     base = await build_global_config()
     overrides = await get_overrides(kiosk_id)
@@ -683,6 +813,24 @@ async def get_kiosk_config(
         # Both spellings, like every other key the agent reads (snake_case first).
         merged["displayCheck"] = job
         merged["display_check"] = job
+
+    # Presence is projected first and then stripped (calvin-0xns): the
+    # projection stays as it is, only who receives it changed.
+    if not sees_presence:
+        kiosk_view.strip_presence(merged)
+        merged["presenceHidden"] = True
+
+    auth: dict = {
+        "state": "paired" if principal == kiosk_id else "unpaired",
+        "mode": mode,
+        "hasAgent": await kiosk_registry.agent_seen(kiosk_id)
+        or pairing_store.has_agent_pending(kiosk_id),
+    }
+    if principal == kiosk_id:
+        # Only the screen itself may know whether its browser still has the cookie.
+        auth["browser"] = kiosk_registry.browser_state(kiosk_id)
+    merged["kioskAuth"] = auth
+
     content = json.dumps(merged)
 
     # The ETag must cover the whole body, not just deviceConfigVersion: a
@@ -691,6 +839,17 @@ async def get_kiosk_config(
     # cached old config (calvin-fufd). The display agent reads
     # deviceConfigVersion from the body and does not use the ETag.
     etag = hashlib.sha256(content.encode("utf-8")).hexdigest()[:32]
+    headers = {
+        "ETag": etag,
+        # The answer differs by credential, so it must never be cached by a
+        # shared cache, while the ETag still works per caller (calvin-0xns).
+        "Cache-Control": "private, no-cache",
+        "Vary": "Cookie, Authorization",
+    }
     if request.headers.get("If-None-Match") == etag:
-        return Response(status_code=304, headers={"ETag": etag})
-    return Response(content=content, media_type="application/json", headers={"ETag": etag})
+        response = Response(status_code=304, headers=headers)
+    else:
+        response = Response(content=content, media_type="application/json", headers=headers)
+    # A cookie older than 30 days is re-signed on the config read (Part A review).
+    kiosk_auth.renew_kiosk_cookie(request, response)
+    return response

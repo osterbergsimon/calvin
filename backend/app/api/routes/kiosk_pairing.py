@@ -285,6 +285,8 @@ async def post_pair(
         ):
             raise _install_code_invalid()
         pairing_store.drop_kiosk(kiosk_id)
+        # A screen added back is no longer called removed (design §9).
+        await kiosk_registry.forget_kiosk_removed(kiosk_id)
         logger.info(f"Screen {kiosk_id!r} paired with a one-time install code")
         return PairState(state="paired")
 
@@ -395,6 +397,8 @@ async def approve_pairing(
     await kiosk_registry.set_credential(
         pending.kiosk_id, pending.secret_hash, hostname=pending.hostname, now=now
     )
+    # A screen the owner pairs again is no longer called removed (design §9).
+    await kiosk_registry.forget_kiosk_removed(pending.kiosk_id)
     overrides = await get_overrides(pending.kiosk_id) or {}
     name = overrides.get("displayName")
     display_name = (

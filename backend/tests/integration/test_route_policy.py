@@ -290,3 +290,22 @@ def test_kiosk_routes_stay_public_writes():
     from app.security.route_policy import KIOSK_ROUTES
 
     assert KIOSK_ROUTES <= PUBLIC_WRITES
+
+
+def test_every_kiosk_route_calls_require_screen_itself(test_client, monkeypatch):
+    """Every KIOSK_ROUTES handler asks the shared gate, not a copy of the rule."""
+    from app.security import kiosk_auth
+    from app.security.route_policy import KIOSK_ROUTES
+
+    calls: list[str] = []
+
+    async def recorder(request, kiosk_id):
+        calls.append(kiosk_id)
+
+    monkeypatch.setattr(kiosk_auth, "require_screen_itself", recorder)
+    assert test_client.get("/api/kiosks/x/config?khost=pi").status_code == 200
+
+    for method, path in sorted(KIOSK_ROUTES):
+        test_client.request(method, _fill(path), json={"id": "run", "status": "running"})
+
+    assert calls == ["x", "x"]

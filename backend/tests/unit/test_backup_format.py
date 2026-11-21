@@ -93,3 +93,19 @@ def test_strip_secrets_inside_lists():
     stripped, fields = strip_secrets(config)
     assert stripped == {"accounts": [{"user": "a", "password": ""}], "tags": ["x"]}
     assert fields == ["accounts.0.password"]
+
+
+@pytest.mark.unit
+def test_kiosk_row_carries_pairing_and_ignores_unknown_keys():
+    pairing = {"credentialHash": "a" * 64, "pairedAt": "2026-11-19T10:00:00Z"}
+    doc = fmt.load_document(
+        _doc(kiosks=[{"id": "kitchen", "pairing": pairing, "fromTheFuture": True}])
+    )
+    assert doc.data.kiosks[0].pairing == pairing
+    assert not hasattr(doc.data.kiosks[0], "fromTheFuture")
+
+
+@pytest.mark.unit
+def test_kiosk_row_without_pairing_reads_as_unpaired():
+    doc = fmt.load_document(_doc(kiosks=[{"id": "hall"}]))
+    assert doc.data.kiosks[0].pairing is None

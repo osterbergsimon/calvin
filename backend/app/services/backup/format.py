@@ -53,6 +53,9 @@ class KioskRow(_Lenient):
     id: str
     hostname: str | None = None
     overrides: dict[str, Any] | None = None
+    # {"credentialHash", "pairedAt"} for a paired screen; absent for an unpaired
+    # one. It is a one-way fingerprint, never the screen's secret (calvin-0xns).
+    pairing: dict[str, Any] | None = None
 
 
 class StrippedSecret(_Lenient):

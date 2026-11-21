@@ -1507,6 +1507,21 @@
             ],
             "title": "Keyboardfeedbackmode"
           },
+          "kioskPairing": {
+            "anyOf": [
+              {
+                "enum": [
+                  "optional",
+                  "required"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kioskpairing"
+          },
           "lastSideViewMode": {
             "anyOf": [
               {
@@ -2824,6 +2839,10 @@
             "title": "Online",
             "type": "boolean"
           },
+          "paired": {
+            "title": "Paired",
+            "type": "boolean"
+          },
           "power": {
             "enum": [
               "on",
@@ -2853,7 +2872,8 @@
           "by",
           "desiredOn",
           "online",
-          "agentHolds"
+          "agentHolds",
+          "paired"
         ],
         "title": "ScreenPowerView",
         "type": "object"
@@ -5244,7 +5264,7 @@
     },
     "/api/kiosks": {
       "get": {
-        "description": "List known kiosks (id, hostname, last-seen, lastAppliedVersion).",
+        "description": "List known kiosks (id, hostname, last-seen, lastAppliedVersion).\n\nA gated row's presence fields (``powerHold``, ``displayCheckActive`` and the\nlayer's ``screenNow``) go only to an admin or to that screen itself; the\nlist has no kiosk id in its path, so only the screen's cookie unlocks its\nown row and a bearer unlocks none (calvin-0xns).",
         "operationId": "get_kiosks_api_kiosks_get",
         "responses": {
           "200": {

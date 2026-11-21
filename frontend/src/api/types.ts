@@ -1033,6 +1033,11 @@ export interface paths {
     /**
      * Get Kiosks
      * @description List known kiosks (id, hostname, last-seen, lastAppliedVersion).
+     *
+     *     A gated row's presence fields (``powerHold``, ``displayCheckActive`` and the
+     *     layer's ``screenNow``) go only to an admin or to that screen itself; the
+     *     list has no kiosk id in its path, so only the screen's cookie unlocks its
+     *     own row and a bearer unlocks none (calvin-0xns).
      */
     get: operations["get_kiosks_api_kiosks_get"];
     put?: never;
@@ -3153,6 +3158,8 @@ export interface components {
       keyboardFeedbackEnabled?: boolean | null;
       /** Keyboardfeedbackmode */
       keyboardFeedbackMode?: ("normal" | "small") | null;
+      /** Kioskpairing */
+      kioskPairing?: ("optional" | "required") | null;
       /** Lastsideviewmode */
       lastSideViewMode?: string | null;
       /** Layoutmode */
@@ -3595,6 +3602,8 @@ export interface components {
       id: string;
       /** Online */
       online: boolean;
+      /** Paired */
+      paired: boolean;
       /**
        * Power
        * @enum {string}
