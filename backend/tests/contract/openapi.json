@@ -1507,6 +1507,21 @@
             ],
             "title": "Keyboardfeedbackmode"
           },
+          "kioskPairing": {
+            "anyOf": [
+              {
+                "enum": [
+                  "optional",
+                  "required"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kioskpairing"
+          },
           "lastSideViewMode": {
             "anyOf": [
               {

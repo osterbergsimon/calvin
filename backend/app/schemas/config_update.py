@@ -269,6 +269,11 @@ class ConfigUpdate(BaseModel):
     # needs admin, like the other clock bar keys.
     clockBarDesign: ClockBarDesign | None = None
 
+    # The household choice between optional pairing and "Only paired screens"
+    # (calvin-0xns). Read from the household table by kiosk_view.pairing_mode;
+    # never in CONFIG_DISPLAY_KEYS, so only an admin can set it.
+    kioskPairing: Literal["optional", "required"] | None = None
+
     # --- Per-screen settings (settings-scope §7 item 8) -------------------
     # Keys a Screens page can write into a screen's override layer. The
     # descriptors in frontend/src/utils/screenOverrides.js are the source of

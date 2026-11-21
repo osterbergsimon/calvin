@@ -3158,6 +3158,8 @@ export interface components {
       keyboardFeedbackEnabled?: boolean | null;
       /** Keyboardfeedbackmode */
       keyboardFeedbackMode?: ("normal" | "small") | null;
+      /** Kioskpairing */
+      kioskPairing?: ("optional" | "required") | null;
       /** Lastsideviewmode */
       lastSideViewMode?: string | null;
       /** Layoutmode */
