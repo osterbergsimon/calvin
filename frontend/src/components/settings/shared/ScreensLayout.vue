@@ -55,4 +55,26 @@ defineProps({
 .screens-layout__detail :deep(.screens-saved) {
   margin: var(--panel-pad-y) var(--panel-pad-x);
 }
+
+/* Pair a screen: the field and its button share one line, the field taking
+   the room and the button sitting on the field's bottom edge. On a phone the
+   field takes all the room that is left; a wider list caps it at 14rem so the
+   pair says what it does without turning into a search bar. */
+.screens-layout :deep(.screens-pair-form) {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--gap-inline);
+}
+
+.screens-layout :deep(.screens-pair-form .text-field) {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 14rem;
+}
+
+@media (--bp-phone) {
+  .screens-layout :deep(.screens-pair-form .text-field) {
+    max-width: none;
+  }
+}
 </style>

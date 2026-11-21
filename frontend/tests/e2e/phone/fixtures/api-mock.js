@@ -102,6 +102,7 @@ export const sampleConfig = {
   rebootComboKey2: "KEY_7",
   rebootComboDuration: 10000,
   timezone: null,
+  kioskPairing: "optional",
   clockShowDate: false,
   clockShowSeconds: false,
   clockBarMode: "horizontal",
@@ -270,6 +271,10 @@ const sampleKiosks = [
     lastSeen: new Date().toISOString(),
     lastAppliedVersion: "1.6.0",
     agentVersion: "1.6.0",
+    agentPairs: true,
+    paired: true,
+    pairedAt: new Date().toISOString(),
+    presenceHidden: false,
     overrides: {},
     hostname: "hallway-pi",
   },
@@ -279,6 +284,10 @@ const sampleKiosks = [
     lastSeen: new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString(),
     lastAppliedVersion: "1.5.2",
     agentVersion: "1.5.2",
+    agentPairs: true,
+    paired: false,
+    pairedAt: null,
+    presenceHidden: false,
     overrides: {},
     hostname: "workshop-pi",
   },
@@ -331,11 +340,12 @@ const sampleKeys = [
   },
 ];
 
-function json(route, body, status = 200) {
+function json(route, body, status = 200, headers = {}) {
   return route.fulfill({
     status,
     contentType: "application/json",
     body: JSON.stringify(body),
+    headers,
   });
 }
 
@@ -386,6 +396,15 @@ export async function installApiMock(page, options = {}) {
     // The kiosk list, with any extra fields a spec needs (displayStack and the
     // saved display-check findings, calvin-29ws). Mutable: a test changes it.
     kiosks: sampleKiosks.map(kiosk => ({ ...kiosk, ...(options.kioskExtras?.[kiosk.id] || {}) })),
+    // Kiosk pairing (calvin-0xns): the waiting list, the pair answers a spec
+    // plays, and the requests it made, so nothing is ever guessed.
+    pendingPairings: options.pendingPairings ? [...options.pendingPairings] : [],
+    pairRequests: [],
+    unpairRequests: [],
+    installCodeRequests: [],
+    pairingAnswer: options.pairingAnswer ?? null,
+    pairingFailure: options.pairingFailure ?? null,
+    unpairChanged: options.unpairChanged ?? true,
     // Display check (calvin-29ws): the latest run per kiosk. A test plays the
     // agent with `agentReport`; the backend side is answered here.
     displayCheckRuns: {},
@@ -586,6 +605,56 @@ export async function installApiMock(page, options = {}) {
       const plugin = samplePlugins.find(p => p.id === pluginId);
       if (plugin) return json(route, plugin);
       return json(route, { detail: "not found" }, 404);
+    }
+
+    // Kiosk pairing (calvin-0xns). The real pending list has no code and no
+    // hash; a spec supplies its own answers.
+    if (path === "/api/kiosks/pairings" && method === "GET") {
+      return json(route, { pending: state.pendingPairings });
+    }
+    if (path === "/api/kiosks/pairings" && method === "POST") {
+      const body = request.postDataJSON() || {};
+      state.pairRequests.push(body);
+      if (state.pairingFailure) {
+        return json(
+          route,
+          state.pairingFailure.body,
+          state.pairingFailure.status,
+          state.pairingFailure.headers || {}
+        );
+      }
+      if (state.pairingAnswer) {
+        const answer = state.pairingAnswer;
+        const kiosk = state.kiosks.find(item => item.id === answer.id);
+        if (kiosk) {
+          kiosk.paired = true;
+          kiosk.pairedAt = answer.pairedAt ?? new Date().toISOString();
+        }
+        state.pendingPairings = state.pendingPairings.filter(entry => entry.kioskId !== answer.id);
+        return json(route, answer);
+      }
+      return json(route, { detail: { code: "pairing_code_invalid" } }, 404);
+    }
+    if (path === "/api/kiosks/install-codes" && method === "POST") {
+      state.installCodeRequests.push(true);
+      const now = new Date();
+      return json(route, {
+        code: "clv_pair_mocksamplecode",
+        expiresAt: new Date(now.getTime() + 30 * 60000).toISOString(),
+        command:
+          "curl -fsSL 'http://calvin.local:8000/api/kiosks/install.sh?pair=clv_pair_mocksamplecode' | sudo bash",
+      });
+    }
+    const kioskPairing = path.match(/^\/api\/kiosks\/([^/]+)\/pairing$/);
+    if (kioskPairing && method === "DELETE") {
+      const id = decodeURIComponent(kioskPairing[1]);
+      state.unpairRequests.push(id);
+      const kiosk = state.kiosks.find(item => item.id === id);
+      if (kiosk && state.unpairChanged) {
+        kiosk.paired = false;
+        kiosk.pairedAt = null;
+      }
+      return json(route, { id, changed: state.unpairChanged });
     }
 
     if (path === "/api/kiosks") {

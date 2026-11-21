@@ -149,11 +149,19 @@ describe("ScreensSettings — screen list", () => {
     expect(wrapper.find("[data-test='add-kiosk-panel']").exists()).toBe(true);
   });
 
-  it("leaves no empty intro strip above the first row", async () => {
+  it("shows the count line above the first row and no empty strip on a fresh install", async () => {
     const { wrapper } = mountScreens();
     await flushPromises();
-    expect(wrapper.find("#section-screens-list .settings-section__intro").exists()).toBe(false);
+    expect(wrapper.find("#section-screens-list .settings-section__intro").exists()).toBe(true);
+    expect(wrapper.find("[data-test='screens-count-line']").exists()).toBe(true);
     expect(wrapper.find("[data-test='screens-empty']").exists()).toBe(false);
+
+    const fresh = mountScreens({ kiosks: [] });
+    await fresh.wrapper.vm.$nextTick();
+    await flushPromises();
+    expect(fresh.wrapper.find("#section-screens-list .settings-section__intro").exists()).toBe(
+      false
+    );
   });
 
   it("puts + Add a screen in the Screens header as a secondary button", async () => {
@@ -501,6 +509,7 @@ describe("ScreensSettings — one screen's page", () => {
       "section-screen-touch",
       "section-screen-remote",
       "section-screen-behaviour",
+      "section-screen-pairing",
       "section-screen-software",
       "section-screen-remove",
     ]);
@@ -1488,7 +1497,7 @@ describe("ScreensSettings — Default is a screen (§2, §3)", () => {
     const ids = wrapper
       .findAll("section.settings-section")
       .map(s => s.attributes("id"))
-      .filter(id => id !== "section-screens-list");
+      .filter(id => !["section-screens-list", "section-screens-pairing"].includes(id));
     expect(ids).toEqual([
       "section-default-pages",
       "section-screen-look",

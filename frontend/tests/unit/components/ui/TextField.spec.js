@@ -81,6 +81,20 @@ describe("TextField", () => {
     expect(w.find("input").attributes("aria-describedby")).toBe(notes[0].attributes("id"));
   });
 
+  it("draws the error border for invalid when the message lives elsewhere", () => {
+    const w = mount(TextField, { props: { label: "Code", invalid: true } });
+    expect(w.find("input").classes()).toContain("text-field__input--invalid");
+    expect(w.find("input").attributes("aria-invalid")).toBe("true");
+    // No second copy of the message: the answer line already announces it.
+    expect(w.findComponent(InlineNote).exists()).toBe(false);
+  });
+
+  it("draws no error border by default", () => {
+    const w = mount(TextField, { props: { label: "Name" } });
+    expect(w.find("input").classes()).not.toContain("text-field__input--invalid");
+    expect(w.find("input").attributes("aria-invalid")).toBe("false");
+  });
+
   it("accepts a hint slot", () => {
     const w = mount(TextField, {
       props: { label: "Name" },

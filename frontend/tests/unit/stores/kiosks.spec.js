@@ -335,3 +335,53 @@ describe("kiosks store — screen power hold", () => {
     expect(byId.same.overrides).toEqual({ screenNow: OLD_NOW }); // nothing changed: kept
   });
 });
+
+describe("kiosks store: pairing", () => {
+  it("pairScreen approves a code and returns the named screen", async () => {
+    api.post.mockResolvedValueOnce({
+      data: { id: "hall", displayName: "Hall", pairedAt: "2026-11-21T10:00:00Z", replaced: false },
+    });
+    const store = useKiosksStore();
+    const answer = await store.pairScreen("K7Q4MD");
+    expect(api.post).toHaveBeenCalledWith("/kiosks/pairings", { code: "K7Q4MD" });
+    expect(answer.displayName).toBe("Hall");
+  });
+
+  it("unpairScreen deletes that screen's pairing", async () => {
+    api.delete.mockResolvedValueOnce({ data: { id: "hall", changed: true } });
+    const store = useKiosksStore();
+    const answer = await store.unpairScreen("hall");
+    expect(api.delete).toHaveBeenCalledWith("/kiosks/hall/pairing");
+    expect(answer.changed).toBe(true);
+  });
+
+  it("newInstallCode mints the command for a new screen", async () => {
+    api.post.mockResolvedValueOnce({
+      data: { code: "clv_pair_abc", expiresAt: "2026-11-21T10:30:00Z", command: "curl x" },
+    });
+    const store = useKiosksStore();
+    const answer = await store.newInstallCode();
+    expect(api.post).toHaveBeenCalledWith("/kiosks/install-codes");
+    expect(answer.command).toBe("curl x");
+  });
+
+  it("loadPairings lists the screens waiting for approval", async () => {
+    api.get.mockResolvedValueOnce({
+      data: {
+        pending: [{ kioskId: "landing", hostname: "landing", createdAt: "x", byAgent: true }],
+      },
+    });
+    const store = useKiosksStore();
+    await store.loadPairings();
+    expect(api.get).toHaveBeenCalledWith("/kiosks/pairings");
+    expect(store.pairings.map(item => item.kioskId)).toEqual(["landing"]);
+  });
+
+  it("loadPairings fails quietly, because waiting rows are only a hint", async () => {
+    const store = useKiosksStore();
+    store.pairings = [{ kioskId: "landing" }];
+    api.get.mockRejectedValueOnce(new Error("offline"));
+    await store.loadPairings();
+    expect(store.pairings).toEqual([]);
+  });
+});

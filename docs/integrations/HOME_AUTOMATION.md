@@ -81,6 +81,31 @@ variant of the card with method `GET` and the same URL and `Authorization` line:
 **Status Code** and **Response** tokens feed the next cards, and a "text contains"
 condition on `"held":true` is enough to branch.
 
+## Paired screens
+
+A hold reaches a screen unless the screen is gated and cannot prove it is itself. A screen
+is gated when it is paired, or when **Only paired screens** is on.
+
+- With **Only paired screens** off, an unpaired screen follows a hold exactly as before.
+- With **Only paired screens** on, every screen is gated. An unpaired screen follows its own
+  schedule instead of the hold. The call still answers `200` and stores the hold with
+  `paired: false`, and `desiredOn` tells the truth.
+- A paired screen is gated too. Its hold reaches it only while its display agent checks in
+  with the screen's own secret. A screen whose software is too old to send that secret, or
+  that has not checked in as itself yet, stays on its schedule; `desiredOn` says so. Choose
+  **Update** for that screen in Settings › Screens.
+
+So a hold is withheld only from a gated screen that is not authenticated: unpaired while
+**Only paired screens** is on, or paired but on software too old to send its secret. Pair an
+unpaired screen, or update one whose software is too old, to let it follow holds again.
+
+`PUT /api/kiosks/{id}/screen-power` is open to an admin and to a key with **Turn screens on
+and off**; a plain read key gets `403 insufficient_scope`, and an anonymous caller gets `401`.
+`GET` on a gated screen (a paired screen, or any screen while **Only paired screens** is on)
+is open to an admin, a key with **Turn screens on and off** and the screen itself; a plain
+read key gets `403 insufficient_scope`, and an anonymous caller gets `401`. `GET` on a screen
+that is not gated stays a public read.
+
 ## Settings and people
 
 - On the screen's power row, Settings shows "Off, set by home automation. The schedule is
@@ -101,9 +126,10 @@ condition on `"held":true` is enough to branch.
 - **Plain HTTP on the LAN.** Calvin is usually reached over plain HTTP, so a device that can
   watch your network traffic could copy the key and replay a request. Put Calvin behind
   HTTPS (a reverse proxy) if that matters in your home.
-- **Presence.** Screens read their settings without a password, so any device on your
-  network that knows a screen's id can see that it is held off, which can hint that nobody
-  is home. Calvin never shows which key made the change.
+- **Presence.** A paired screen's hold is hidden from other devices on your network,
+  and so is an unpaired screen's while **Only paired screens** is on. A screen still
+  reads its own settings without a password. Calvin never shows which key made the
+  change.
 - **Backups.** Calvin's own API keys are not in a [backup](../configuration/BACKUP_RESTORE.md),
   and neither is a hold. After moving Calvin to a new server, create a new key and paste it
   into your flows.

@@ -14,9 +14,12 @@
             </Button>
           </template>
           <!-- The section's own intro strip: padded like a row inside the panel. -->
-          <template v-if="removedScreenNote" #description>
-            <InlineNote tone="warn" data-test="screen-removed-note">
+          <template v-if="removedScreenNote || countLine" #description>
+            <InlineNote v-if="removedScreenNote" tone="warn" data-test="screen-removed-note">
               That screen was removed.
+            </InlineNote>
+            <InlineNote v-if="countLine" :tone="countLine.tone" data-test="screens-count-line">
+              {{ countLine.text }}
             </InlineNote>
           </template>
           <EmptyState
@@ -28,7 +31,11 @@
             title="No screens have connected yet"
             help="A screen shows up here once it is set up as a kiosk: a Raspberry Pi installed with the command under “Add a screen”, or any browser that opens the dashboard with ?kiosk=<name> in its address."
           />
-          <AddKioskPanel v-if="addOpen" />
+          <AddKioskPanel
+            v-if="addOpen"
+            :time-format="config.timeFormat || '24h'"
+            :timezone="config.timezone || null"
+          />
           <SettingRow
             v-if="agentKiosks.length > 0"
             class="kiosk-software"
@@ -144,6 +151,13 @@
                 >
                   {{ softwareLine(k) }}
                 </InlineNote>
+                <InlineNote
+                  v-if="pairingLine(k)"
+                  :tone="pairingLine(k).tone"
+                  data-test="screen-pairing-line"
+                >
+                  {{ pairingLine(k).text }}
+                </InlineNote>
               </template>
               <template #actions>
                 <Tag data-test="screen-status" :tone="isOnline(k) ? 'ok' : 'neutral'">
@@ -158,6 +172,25 @@
                   title="Offline. It will apply the new display settings when it's back."
                   :icon="mdiAlert"
                 />
+              </template>
+            </ListRow>
+
+            <!-- Waiting to be paired (§3.3): a live pending pairing for an id
+                 that has no row yet. Not a button: there is no page to open. -->
+            <ListRow
+              v-for="entry in waitingPairings"
+              :key="`waiting-${entry.kioskId}`"
+              class="screen-card screen-card--waiting"
+              :name="entry.hostname || entry.kioskId"
+              data-test="screen-waiting-row"
+            >
+              <template #lead>
+                <PageThumbnail placeholder data-test="waiting-thumbnail" />
+              </template>
+              <template #meta>
+                <InlineNote>
+                  Waiting to be paired. Type the code it shows in Pair a screen.
+                </InlineNote>
               </template>
             </ListRow>
 
@@ -180,6 +213,78 @@
               </template>
             </ListRow>
           </div>
+        </SettingsSection>
+
+        <!-- §4. One place to type a code, and the household choice. Shown
+             whenever the list is, even before the first screen exists. -->
+        <SettingsSection id="screens-pairing" title="Pairing">
+          <SettingRow
+            stacked
+            label="Pair a screen"
+            description="Type the code shown at the bottom of the screen."
+          >
+            <form class="screens-pair-form" data-test="pair-form" @submit.prevent="submitPair">
+              <TextField
+                ref="pairField"
+                v-model="pairCode"
+                label="Code"
+                input-test="pair-code-input"
+                autocapitalize="characters"
+                autocomplete="off"
+                enterkeyhint="go"
+                maxlength="12"
+                :readonly="pairingBusy"
+                :invalid="pairCodeInvalid"
+                @update:model-value="onPairCodeInput"
+              />
+              <Button
+                variant="primary"
+                type="submit"
+                data-test="pair-screen-btn"
+                :loading="pairingBusy"
+                loading-label="Pairing…"
+                :aria-disabled="pairCooldown ? 'true' : undefined"
+              >
+                Pair
+              </Button>
+            </form>
+            <InlineNote
+              v-if="pairResult.text"
+              :tone="pairResult.tone"
+              class="screens-pair-result"
+              data-test="pair-result"
+              role="status"
+              aria-live="polite"
+            >
+              {{ pairResult.text }}
+              <template v-if="pairResult.target" #action>
+                <Button variant="link" size="sm" data-test="open-paired-screen" @click="openPaired">
+                  Open {{ pairResult.target.displayName }}
+                </Button>
+              </template>
+            </InlineNote>
+          </SettingRow>
+          <SettingRow
+            label="Only paired screens"
+            description="Unpaired screens still show the dashboard, but can't report in or follow home automation."
+          >
+            <ToggleSwitch
+              :model-value="pairingRequired"
+              :disabled="pairingModeSaving"
+              aria-label="Only paired screens"
+              data-test="only-paired-toggle"
+              @update:model-value="onPairingModeToggle"
+            />
+          </SettingRow>
+          <InlineNote
+            v-if="pairingModeError"
+            class="screens-saved"
+            tone="err"
+            data-test="pairing-mode-error"
+            role="status"
+          >
+            {{ pairingModeError }}
+          </InlineNote>
         </SettingsSection>
       </div>
     </template>
@@ -500,12 +605,17 @@
         </SettingRow>
         <SettingRow label="Screen now">
           <template #description>
-            <InlineNote data-test="screen-now-state">
-              {{ powerStateCopy }}
+            <InlineNote v-if="selectedKiosk?.presenceHidden" data-test="screen-now-hidden">
+              Sign in as admin to see whether home automation is holding this screen.
             </InlineNote>
-            <InlineNote v-if="!powerHold && activeOverride" data-test="screen-now-until">
-              {{ untilCopy }}
-            </InlineNote>
+            <template v-else>
+              <InlineNote data-test="screen-now-state">
+                {{ powerStateCopy }}
+              </InlineNote>
+              <InlineNote v-if="!powerHold && activeOverride" data-test="screen-now-until">
+                {{ untilCopy }}
+              </InlineNote>
+            </template>
             <InlineNote
               v-if="powerHold && selectedKiosk?.agentHolds === false"
               tone="warn"
@@ -520,20 +630,20 @@
           </template>
           <Button
             data-test="screen-now-on"
-            :aria-disabled="powerBusy || desiredOnNow ? 'true' : undefined"
+            :aria-disabled="powerBusy || (!presenceHidden && desiredOnNow) ? 'true' : undefined"
             @click="setScreenNow('on')"
           >
             Turn on now
           </Button>
           <Button
             data-test="screen-now-off"
-            :aria-disabled="powerBusy || !desiredOnNow ? 'true' : undefined"
+            :aria-disabled="powerBusy || (!presenceHidden && !desiredOnNow) ? 'true' : undefined"
             @click="setScreenNow('off')"
           >
             Turn off now
           </Button>
           <Button
-            v-if="powerHold || activeOverride"
+            v-if="presenceHidden || powerHold || activeOverride"
             variant="link"
             data-test="screen-now-follow"
             @click="followSchedule"
@@ -545,7 +655,7 @@
           :kiosk="selectedKiosk"
           :overrides="overrides"
           :screen-name="selectedName"
-          :asleep="!desiredOnNow"
+          :asleep="!presenceHidden && !desiredOnNow"
           :online="selectedKiosk ? isOnline(selectedKiosk) : true"
           @patch="patchBrightness"
           @open-check="openCheck"
@@ -554,7 +664,7 @@
           v-model="checkOpen"
           :kiosk-id="selectedId || ''"
           :screen-name="selectedName"
-          :asleep="!desiredOnNow"
+          :asleep="!presenceHidden && !desiredOnNow"
           :on-panel="Boolean(kioskId) && kioskId === selectedId"
           :overrides="overrides"
           :save-patch="patchBrightness"
@@ -672,6 +782,63 @@
         </InlineNote>
       </SettingsSection>
 
+      <SettingsSection id="screen-pairing" title="Pairing">
+        <SettingRow :label="screenPairing.label">
+          <template #description>
+            <InlineNote data-test="screen-pairing-state">
+              {{ screenPairing.description }}
+            </InlineNote>
+            <InlineNote
+              v-if="!pairingState.paired && pairingRequired"
+              tone="warn"
+              data-test="screen-pairing-required"
+            >
+              Only paired screens is on, so until it is paired this screen can't report in or follow
+              home automation.
+            </InlineNote>
+          </template>
+          <Button
+            v-if="pairingState.paired"
+            ref="unpairButton"
+            data-test="unpair-screen-btn"
+            :loading="unpairBusy"
+            loading-label="Unpairing…"
+            @click="askUnpair"
+          >
+            Unpair
+          </Button>
+          <Button
+            v-else-if="pairingState.kind === 'can-pair'"
+            ref="pairScreenButton"
+            data-test="pair-screen-link"
+            @click="goToPairField"
+          >
+            Pair a screen
+          </Button>
+          <Button
+            v-else
+            data-test="pairing-update-btn"
+            :loading="selectedKiosk?.agentUpdateRequested"
+            loading-label="Updating…"
+            @click="onUpdate(selectedId)"
+          >
+            <template v-if="selectedKiosk?.agentUpdateRequested">Updating…</template>
+            <template v-else-if="hasUpdateError(selectedKiosk)">Try again</template>
+            <template v-else>Update</template>
+          </Button>
+        </SettingRow>
+        <InlineNote
+          v-if="unpairResult.text"
+          class="screens-saved"
+          :tone="unpairResult.tone"
+          data-test="unpair-result"
+          role="status"
+          aria-live="polite"
+        >
+          {{ unpairResult.text }}
+        </InlineNote>
+      </SettingsSection>
+
       <SettingsSection id="screen-software" title="Software">
         <SettingRow
           v-if="selectedKiosk.agentVersion != null"
@@ -761,21 +928,31 @@
         @close="editorOpen = false"
       />
     </template>
-
-    <ConfirmModal
-      :show="confirm.show"
-      :title="confirm.title"
-      :message="confirm.message"
-      :confirm-text="confirm.confirmText"
-      :danger="confirm.mode !== 'use-default'"
-      @confirm="onConfirm"
-      @cancel="confirm.show = false"
-    />
   </ScreensLayout>
+
+  <ConfirmModal
+    :show="confirm.show"
+    :title="confirm.title"
+    :message="confirm.message"
+    :confirm-text="confirm.confirmText"
+    :danger="confirm.danger !== false"
+    @confirm="onConfirm"
+    @cancel="confirm.show = false"
+  />
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, provide, reactive, ref, watch } from "vue";
+import {
+  computed,
+  inject,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  provide,
+  reactive,
+  ref,
+  watch,
+} from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { SECTION_FOCUS_INDEX, useSettingsPhoneNav } from "@/composables/useSettingsPhoneNav";
 import { mdiAlert, mdiCheck } from "@mdi/js";
@@ -848,6 +1025,7 @@ import ChangedHereLine from "@/components/settings/shared/ChangedHereLine.vue";
 import { effectsLevelLabel, resolveEffectsLevel } from "@/utils/effectsLevel";
 import { flushKioskOverridesQueues, kioskOverridesQueue } from "@/utils/kioskOverridesQueue";
 import { friendlyError } from "@/utils/friendlyError";
+import { formatKeyDate } from "@/utils/apiKeyFormat";
 
 const props = defineProps({
   config: { type: Object, required: true },
@@ -912,6 +1090,7 @@ const sectionIndex = [
   { id: "screen-touch", label: "Touch & keyboard" },
   { id: "screen-remote", label: "Remote & keys" },
   { id: "screen-behaviour", label: "Behaviour" },
+  { id: "screen-pairing", label: "Pairing" },
   { id: "screen-software", label: "Software" },
 ];
 const initialOwnScreenId =
@@ -1217,6 +1396,337 @@ const footerCopy = computed(() => {
   return `${count} ${count === 1 ? "setting differs" : "settings differ"} from the default.`;
 });
 
+// --- pairing (calvin-0xns) ------------------------------------------------
+// The household choice saves through Settings' own config form, so the toggle
+// shows the same saving state and rollback as every other config row.
+const saveConfig = inject("saveConfig", null);
+const pairingRequired = computed(() => props.config.kioskPairing === "required");
+const recentKiosks = computed(() =>
+  kiosks.value.filter(
+    k => k.lastSeen && nowTick.value - Date.parse(k.lastSeen) <= 7 * 24 * 3600 * 1000
+  )
+);
+const waitingPairings = computed(() => {
+  const ids = new Set(kiosks.value.map(k => k.id));
+  return store.pairings.filter(entry => !ids.has(entry.kioskId));
+});
+
+function isToday(isoText) {
+  if (!isoText) return false;
+  return new Date(isoText).toDateString() === new Date(nowTick.value).toDateString();
+}
+
+function pairedDateCopy(k) {
+  if (!k?.pairedAt) return "Paired";
+  return isToday(k.pairedAt) ? "Paired today" : `Paired since ${formatKeyDate(k.pairedAt)}`;
+}
+
+// §3.2: one meta line on each row. Paired wins; an old agent that cannot pair
+// needs its Update first; every other unpaired row can pair.
+function pairingLine(k) {
+  if (!k) return null;
+  if (k.paired) return { text: pairedDateCopy(k), tone: "neutral" };
+  const required = pairingRequired.value;
+  if (k.agentVersion != null && k.agentPairs !== true) {
+    return {
+      text: required
+        ? "Needs a software update before it can be paired. Until then it can't report in or follow home automation."
+        : "Needs a software update before it can be paired.",
+      tone: required ? "warn" : "neutral",
+    };
+  }
+  return {
+    text: required
+      ? "Not paired, so it can't report in or follow home automation. It shows a code to type in Pair a screen."
+      : "Not paired. It shows a code to type in Pair a screen.",
+    tone: required ? "warn" : "neutral",
+  };
+}
+
+// §3.1: the count line counts registry rows seen this week, never waiting
+// entries, and changes its warning with the household mode.
+const countLine = computed(() => {
+  const seen = recentKiosks.value;
+  const n = seen.length;
+  if (n === 0) return null;
+  const p = seen.filter(k => k.paired).length;
+  if (p === n) {
+    return {
+      tone: "neutral",
+      text:
+        n === 1
+          ? "The screen seen this week is paired."
+          : `All ${n} screens seen this week are paired.`,
+    };
+  }
+  if (pairingRequired.value) {
+    return {
+      tone: "warn",
+      text: `${p} of ${n} screens seen this week are paired. Only paired screens is on, so the others show the dashboard but can't report in or follow home automation.`,
+    };
+  }
+  if (p === 0) {
+    return {
+      tone: "warn",
+      text:
+        n === 1
+          ? "The screen seen this week isn't paired. Another device on your home network could pretend to be it."
+          : `None of the ${n} screens seen this week are paired. Another device on your home network could pretend to be any of them.`,
+    };
+  }
+  return {
+    tone: "warn",
+    text: `${p} of ${n} screens seen this week are paired. Another device on your home network could pretend to be an unpaired screen.`,
+  };
+});
+
+// --- the Pairing section on the list --------------------------------------
+const pairCode = ref("");
+const pairField = ref(null);
+const pairCodeInvalid = ref(false);
+const pairingBusy = ref(false);
+const pairCooldown = ref(false);
+let pairCooldownTimer = null;
+const pairResult = reactive({ text: "", tone: "ok", target: null });
+
+function clearPairResult() {
+  pairResult.text = "";
+  pairResult.tone = "ok";
+  pairResult.target = null;
+}
+
+function normalizePairCode(value) {
+  return String(value ?? "")
+    .replace(/[\s-]/g, "")
+    .toUpperCase();
+}
+
+function onPairCodeInput(value) {
+  pairCode.value = String(value ?? "").toUpperCase();
+  // A keystroke clears the last answer, except the wait the server named.
+  if (pairCooldown.value) return;
+  pairCodeInvalid.value = false;
+  if (pairResult.text) clearPairResult();
+}
+
+function focusPairField() {
+  nextTick(() => pairField.value?.focus?.());
+}
+
+function retryAfterSeconds(err) {
+  const headers = err?.response?.headers;
+  const raw = headers?.["retry-after"] ?? headers?.get?.("retry-after");
+  const seconds = Number(raw);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+}
+
+function formatWait(seconds) {
+  if (seconds == null) return "a minute";
+  if (seconds <= 60) return `${Math.ceil(seconds)} seconds`;
+  const minutes = Math.ceil(seconds / 60);
+  return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+}
+
+function startPairCooldown(seconds) {
+  pairCooldown.value = true;
+  pairResult.tone = "err";
+  pairResult.text = `Too many wrong codes. Try again in ${formatWait(seconds)}.`;
+  if (pairCooldownTimer !== null) clearTimeout(pairCooldownTimer);
+  pairCooldownTimer = setTimeout(
+    () => {
+      pairCooldownTimer = null;
+      pairCooldown.value = false;
+      clearPairResult();
+    },
+    (seconds ?? 60) * 1000
+  );
+}
+
+async function submitPair() {
+  if (pairingBusy.value || pairCooldown.value) return;
+  pairCodeInvalid.value = false;
+  clearPairResult();
+  const code = normalizePairCode(pairCode.value);
+  if (!code) {
+    pairCodeInvalid.value = true;
+    pairResult.tone = "err";
+    pairResult.text = "Type the code shown on the screen.";
+    focusPairField();
+    return;
+  }
+  if (code.length !== 6) {
+    pairCodeInvalid.value = true;
+    pairResult.tone = "err";
+    pairResult.text = "A code has 6 letters and numbers, like K7Q-4MD.";
+    focusPairField();
+    return;
+  }
+  pairingBusy.value = true;
+  try {
+    const answer = await store.pairScreen(code);
+    const name = answer?.displayName || answer?.id || "";
+    pairResult.tone = "ok";
+    pairResult.text = answer?.replaced
+      ? `${name} is paired again. Its old pairing no longer works.`
+      : `${name} is paired.`;
+    pairResult.target = answer;
+    pairCode.value = "";
+    await Promise.all([store.loadKiosks(), store.loadPairings()]);
+  } catch (err) {
+    const status = err?.response?.status;
+    if (status === 404) {
+      pairCodeInvalid.value = true;
+      pairResult.tone = "err";
+      pairResult.text =
+        "No screen is showing that code. Check the screen and type the code it shows now.";
+    } else if (status === 429) {
+      startPairCooldown(retryAfterSeconds(err));
+    } else {
+      pairResult.tone = "err";
+      pairResult.text = friendlyError(err, "pair a screen");
+    }
+  } finally {
+    pairingBusy.value = false;
+    focusPairField();
+  }
+}
+
+async function openPaired() {
+  const id = pairResult.target?.id;
+  if (id) await select(id);
+}
+
+// --- Only paired screens --------------------------------------------------
+const pairingModeSaving = ref(false);
+const pairingModeError = ref("");
+
+function listNames(names) {
+  if (names.length <= 1) return names[0] ?? "";
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  if (names.length === 3) return `${names[0]}, ${names[1]} and ${names[2]}`;
+  return `${names.slice(0, 3).join(", ")} and ${names.length - 3} more`;
+}
+
+async function savePairingMode(mode) {
+  pairingModeSaving.value = true;
+  pairingModeError.value = "";
+  try {
+    if (typeof saveConfig === "function") await saveConfig({ kioskPairing: mode });
+    else emit("update:config", { kioskPairing: mode });
+  } catch (err) {
+    pairingModeError.value = friendlyError(err, "change Only paired screens");
+  } finally {
+    pairingModeSaving.value = false;
+  }
+}
+
+function onPairingModeToggle(next) {
+  if (pairingModeSaving.value) return;
+  if (!next) return savePairingMode("optional");
+  const unpaired = recentKiosks.value.filter(k => !k.paired);
+  if (unpaired.length === 0) return savePairingMode("required");
+  const names = listNames(unpaired.map(screenLabel));
+  confirm.mode = "pairing-mode";
+  confirm.danger = false;
+  confirm.title = "Turn on Only paired screens?";
+  confirm.message =
+    unpaired.length === 1
+      ? `${names} isn't paired. It'll keep showing the dashboard, but stop reporting in and following home automation.`
+      : `${names} aren't paired. They'll keep showing the dashboard, but stop reporting in and following home automation.`;
+  confirm.confirmText = "Turn on";
+  confirm.show = true;
+}
+
+// --- one screen's Pairing section -----------------------------------------
+const pairingState = computed(() => {
+  const k = selectedKiosk.value;
+  if (!k) return { kind: "can-pair", paired: false };
+  if (k.paired) return { kind: "paired", paired: true };
+  if (k.agentVersion != null && k.agentPairs !== true) {
+    return { kind: "needs-update", paired: false };
+  }
+  return { kind: "can-pair", paired: false };
+});
+
+const screenPairing = computed(() => {
+  const k = selectedKiosk.value;
+  if (!k) return { label: "", description: "" };
+  if (pairingState.value.paired) {
+    const since = k.pairedAt
+      ? isToday(k.pairedAt)
+        ? "Today."
+        : `Since ${formatKeyDate(k.pairedAt)}.`
+      : "";
+    return {
+      label: "Paired",
+      description: `${since ? `${since} ` : ""}Only this screen can report in for itself.`,
+    };
+  }
+  if (pairingState.value.kind === "needs-update") {
+    return {
+      label: "Not paired",
+      description: "Needs a software update before it can be paired.",
+    };
+  }
+  return {
+    label: "Not paired",
+    description: "This screen shows a code at the bottom. Type it in Pair a screen.",
+  };
+});
+
+const unpairBusy = ref(false);
+const unpairResult = noteRef();
+const unpairButton = ref(null);
+const pairScreenButton = ref(null);
+
+function askUnpair() {
+  const k = selectedKiosk.value;
+  if (!k) return;
+  const name = screenLabel(k);
+  confirm.mode = "unpair";
+  confirm.danger = true;
+  confirm.title = `Unpair ${name}?`;
+  confirm.message = `${name} will show a new code and stop reporting in until you pair it again.`;
+  confirm.confirmText = "Unpair";
+  confirm.show = true;
+}
+
+async function unpairSelected() {
+  const id = selectedId.value;
+  const name = selectedName.value;
+  if (!id) return;
+  unpairBusy.value = true;
+  clear(unpairResult);
+  try {
+    const answer = await store.unpairScreen(id);
+    // Re-read the list from the server: it also rewrites the localStorage
+    // cache, so an offline reload cannot show the old paired state.
+    await store.loadKiosks();
+    say(
+      unpairResult,
+      answer?.changed === false
+        ? `${name} wasn't paired.`
+        : `${name} is unpaired. It shows a new code within a minute.`,
+      "neutral"
+    );
+    await nextTick();
+    pairScreenButton.value?.$el?.focus?.();
+  } catch (err) {
+    say(unpairResult, friendlyError(err, `unpair ${name}`), "err");
+  } finally {
+    unpairBusy.value = false;
+  }
+}
+
+// The link on a screen's page lands on the one code field (§1.2). The two-pane
+// layout already shows the list, so only a phone goes back to it.
+async function goToPairField() {
+  if (narrow.value) closeDetail();
+  await nextTick();
+  scrollSectionToTop(document.getElementById("screens-pairing"));
+  focusPairField();
+}
+
 function clearMessages() {
   clear(remoteMsg);
   clear(nameMsg);
@@ -1231,6 +1741,8 @@ function clearMessages() {
   clear(behaviourMsg);
   clear(footerMsg);
   clear(removeMsg);
+  clear(unpairResult);
+  clearPairResult();
 }
 
 function openDefault({ fromRoute = false } = {}) {
@@ -1377,6 +1889,9 @@ const activeOverride = computed(() =>
 // A hold from home automation or Settings (calvin-2ifv) lives in its own
 // registry column, not the layer, and wins until it is changed.
 const powerHold = computed(() => selectedKiosk.value?.powerHold ?? null);
+// A hidden presence row carries no hold fields at all, so the page must not
+// read their absence as "not held" (design §3.4): the controls stay neutral.
+const presenceHidden = computed(() => Boolean(selectedKiosk.value?.presenceHidden));
 // "Turn on/off now" on a held screen makes two calls; both buttons wait for
 // them so a double tap cannot send the pair twice.
 const powerBusy = ref(false);
@@ -1415,7 +1930,8 @@ const untilCopy = computed(() => {
 async function setScreenNow(power) {
   // aria-disabled keeps the button in the keyboard order, so the tap still
   // arrives: do nothing while a pair of calls runs, or when it is already so.
-  if (powerBusy.value || (power === "on") === desiredOnNow.value) return;
+  // A hidden presence row cannot know what is already so.
+  if (powerBusy.value || (!presenceHidden.value && (power === "on") === desiredOnNow.value)) return;
   powerBusy.value = true;
   clear(powerMsg);
   try {
@@ -1498,7 +2014,9 @@ function openCheck() {
   checkOpen.value = true;
 }
 async function followSchedule() {
-  if (powerHold.value) {
+  // A hidden row cannot tell whether a hold is in force, so it asks the server
+  // to clear one instead of editing the layer it cannot see.
+  if (powerHold.value || presenceHidden.value) {
     if (await endHold()) {
       const online = selectedKiosk.value ? isOnline(selectedKiosk.value) : false;
       say(powerMsg, online ? APPLIED_BY_AGENT : OFFLINE_COPY);
@@ -1976,11 +2494,19 @@ function resetBehaviour(key) {
 }
 
 // --- footer: reset everything · use these as the default (§4) ------------
-const confirm = reactive({ show: false, mode: null, title: "", message: "", confirmText: "" });
+const confirm = reactive({
+  show: false,
+  mode: null,
+  title: "",
+  message: "",
+  confirmText: "",
+  danger: true,
+});
 
 function askResetEverything() {
   const count = selectedChangedCount.value;
   confirm.mode = "reset";
+  confirm.danger = true;
   confirm.title = `Reset ${selectedName.value} to the default?`;
   confirm.message = `Its ${count} changed ${count === 1 ? "setting goes" : "settings go"} back to the default. Its name stays.`;
   confirm.confirmText = "Reset";
@@ -1992,6 +2518,7 @@ function askUseAsDefault() {
   const list = formatSettingList(Object.keys(patch));
   if (!list) return;
   confirm.mode = "use-default";
+  confirm.danger = false;
   confirm.title = `Make ${selectedName.value}'s settings the default?`;
   confirm.message = `Default and every screen that follows it will use ${selectedName.value}'s ${list}.`;
   confirm.confirmText = "Make default";
@@ -2007,6 +2534,7 @@ const removeBlockedReason = computed(() =>
 
 function askRemove() {
   confirm.mode = "remove";
+  confirm.danger = true;
   confirm.title = `Remove ${selectedName.value}?`;
   confirm.message =
     "Its own settings and calibration are deleted. If this screen is still running, it will show up again the next time it checks in.";
@@ -2039,6 +2567,8 @@ async function onConfirm() {
   const mode = confirm.mode;
   confirm.show = false;
   if (mode === "remove") return removeSelected();
+  if (mode === "unpair") return unpairSelected();
+  if (mode === "pairing-mode") return savePairingMode("required");
   if (mode === "reset") {
     await persist(
       withoutAllOverrides(overrides.value),
@@ -2121,6 +2651,7 @@ const ONLINE_WINDOW_MS = 120000; // 2 minutes
 
 useIntervalWhenVisible(() => {
   store.refreshKiosks();
+  store.loadPairings();
 }, 30000);
 
 function isPending(k) {
@@ -2161,6 +2692,7 @@ onMounted(async () => {
   refreshBrowserCount();
   await syncInitialPhoneRoute();
   await store.loadKiosks();
+  await store.loadPairings();
   kiosksLoaded.value = true;
   if (phoneNavOn.value && route.query.screen) applyRouteScreen(route.query.screen);
   if (initialOwnScreenId) {
@@ -2189,6 +2721,10 @@ onUnmounted(() => {
   phoneNav?.setTitle("screen", "");
   phoneNav?.setTitle("section", "");
   clearLookNote();
+  if (pairCooldownTimer !== null) {
+    clearTimeout(pairCooldownTimer);
+    pairCooldownTimer = null;
+  }
   window.removeEventListener("beforeunload", flushQueuedOverridesOnPageClose);
   window.removeEventListener("pagehide", flushQueuedOverridesOnPageClose);
   flushQueuedOverrides();

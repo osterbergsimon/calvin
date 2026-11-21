@@ -77,6 +77,10 @@ server's address on your LAN.
    curl -fsSL http://tower:8000/api/kiosks/install.sh | sudo bash
    ```
 
+   To pair the screen as it installs, use the command under **Settings → Screens →
+   Add a screen** instead. It carries a one-time code, so the screen is paired the
+   moment it first reaches Calvin (see [Pairing a screen](#pairing-a-screen)).
+
    **Do not add the signing key to this form.** The script arrives over plain HTTP, and
    a tampered copy could steal the key.
 
@@ -146,6 +150,74 @@ sudo bash scripts/bake-kiosk-firstrun.sh --backend-url http://tower:8000 ...
 never selects an image for the Pi (a kiosk runs a browser, not Calvin). The
 server container's image tag (`CALVIN_IMAGE_TAG`) is the version that matters,
 and `setup.sh` sets it from the same tag.
+
+## Pairing a screen
+
+Every screen can prove which screen it is. Its display agent makes a secret the first
+time it runs, and sends it with each check-in. The secret becomes valid when someone
+signed in to Settings types the short code the screen shows. Until then the screen
+still shows the dashboard.
+
+**A new screen.** Open **Settings → Screens → Add a screen**. The Raspberry Pi card
+mints a one-time code and puts it in the install command. Run that command (or bake it
+into the card). The code works once, for 30 minutes; **New code** makes another. If the
+code has expired by the time the Pi boots, the install still works and the screen falls
+back to showing a code of its own.
+
+Opening **Add a screen** again also makes a new code. The server keeps only the five newest,
+so a command you copied a while ago can stop working if several newer codes have been made.
+If that happens, the install still works, and the screen shows a code to type in
+**Pair a screen**.
+
+**A screen that is already installed.** After an update makes pairing available, the
+screen shows **Pair this screen** and a code such as `K7Q-4MD` along its bottom edge,
+over the dashboard. In **Settings → Screens**, type the code under **Pair a screen**.
+Case and the dash do not matter. Settings names the screen it paired, and the strip
+disappears from the wall within about ten seconds. Nothing is hidden or covered while
+the code is there.
+
+**Only paired screens.** This switch is off by default. With it off, screens that are
+not paired keep working as they did before; a paired screen is protected at once.
+With it on, an unpaired screen still shows the dashboard but cannot report in or follow
+home automation, so Settings is the place to pair it. Turning the switch on while a
+recently seen screen is unpaired asks first and names those screens.
+
+**Pair again, or replace a screen.** Type a new code for a screen that is already
+paired and the new pairing replaces the old one; Settings says the old pairing no
+longer works. **Unpair** on a screen's page makes the screen show a new code and stop
+reporting in until it is paired again.
+
+**A stolen screen.** **Unpair** it at once: the server stops accepting its secret
+immediately, and the screen shows a new code within a minute. If it is not coming back,
+**Remove** it as well. Removing records its id, so an
+older backup restores it unpaired even if that backup still carried its pairing.
+
+**Reinstalling or swapping the card.** Reinstalling keeps `/var/lib/calvin/agent`, and
+with it the screen's secret and id: the screen stays paired. A new SD card on a
+different Pi is a new screen with a new id and no secret, so it appears unpaired and
+shows a code.
+
+**What optional mode leaves open.** An unpaired screen can be imitated by another
+device on the same network, exactly as every screen could before pairing existed: it
+can report status for that screen and read its presence fields. Pairing closes that
+for each screen, and **Only paired screens** closes it for all of them. Two smaller
+things stay true:
+
+- A caller on the local network can start pairings for a screen id and hold its three
+  pending slots for a while. The screen's own code still appears once a slot is free,
+  and only someone signed in to Settings can approve one, but approval can be delayed.
+- Until the screen's browser has swapped its start-URL secret for its cookie, the
+  secret sits in the browser's start URL. On that Pi it can be read from the local
+  DevTools port while the browser starts, and it is kept in the kiosk browser
+  profile's history. The browser removes `#pair=` from its address before its first
+  request, but its navigation timing entry still holds the start URL; a script running
+  on one of Calvin's own pages (for example a web-component plugin, which only an
+  admin installs) could read it. Such a script could already act as the screen
+  through its cookie, so this adds no new access. It speaks for that screen only.
+
+Finally, `GET /api/kiosks/{id}/display-check` is still a public read and its run id is
+not a protection on its own. What protects a display-check report on a paired or
+required-mode screen is the screen's own secret.
 
 ## What the install does
 
@@ -545,5 +617,9 @@ unchanged.
 - **Install log:** `/var/log/calvin-setup.log`. For a baked card, run
   `journalctl -u calvin-kiosk-firstboot` (`ssh calvin-admin@<kiosk>` with the baked key).
 - **Kiosk missing from Settings → Screens:** `systemctl status calvin-display-agent` on the Pi.
+- **The screen shows a code I cannot pair:** make sure you are signed in to Settings as
+  admin, and check that the code has not expired (it lives ten minutes; the screen
+  replaces it with a new one). Another device on the network can hold a screen's three
+  waiting slots for a while; wait for the screen's code and try again.
 - **Wrong server later:** edit `CALVIN_BACKEND_URL` in `/etc/default/calvin-kiosk`, then
   `sudo systemctl restart calvin-kiosk-remote calvin-display-agent`.

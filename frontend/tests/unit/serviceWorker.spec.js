@@ -259,6 +259,19 @@ describe("service worker", () => {
       expect(sw.fetchMock).not.toHaveBeenCalled();
     });
 
+    it("never caches the pending pairings list", async () => {
+      // Admin-only, and it names screens that are not paired yet. It must not
+      // outlive the sign-in in the shared API cache (calvin-0xns).
+      sw.fetchMock.mockResolvedValueOnce(json({ pending: [{ kioskId: "garage" }] }));
+
+      expect(await sw.dispatchFetch(req("/api/kiosks/pairings"))).toBeNull();
+      expect(sw.fetchMock).not.toHaveBeenCalled();
+      for (const name of await sw.caches.keys()) {
+        const keys = await (await sw.caches.open(name)).keys();
+        expect(keys.map(r => r.url).join(" ")).not.toContain("pairings");
+      }
+    });
+
     it("leaves server-sent event streams to the network", async () => {
       const request = req("/api/plugins/x/events", { headers: { Accept: "text/event-stream" } });
 

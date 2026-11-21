@@ -175,6 +175,33 @@ An unauthenticated admin request answers
 `401 {"detail":{"code":"setup_required"}}`. Kiosk dashboards should never see
 either.
 
+## Screens and pairing
+
+A screen proves which screen it is with its own pairing secret, approved once from
+Settings by someone signed in as admin. That secret is **not an API key**: it never
+reaches the key store, never counts as a failed key, never reaches the MCP server and
+never makes a request admin. The browser keeps a separate signed `calvin_kiosk`
+cookie; it is not an admin session and an admin cookie never becomes a kiosk one.
+
+The routes, and who may call them:
+
+| Route | Who |
+|---|---|
+| `POST /api/kiosks/{id}/pair`, `GET /api/kiosks/{id}/pair`, `POST /api/kiosks/{id}/browser-session` | the screen itself (its secret or its cookie). A browser-only screen may start with `{"browser": true}`. |
+| `POST /api/kiosks/pairings` | an admin **session**. An admin API key is refused with `403 session_required`, as key management is. |
+| `DELETE /api/kiosks/{id}/pairing` | any admin: a session or an admin key. |
+| `POST /api/kiosks/install-codes` | an admin **session**. |
+
+The household choice **Only paired screens** is the config key `kioskPairing`. It is
+admin-only and is not one of the display keys the dashboard may write. The list of
+removed screen ids (`kioskRemoved`) is written by Calvin itself, never by a settings
+update.
+
+What does not change: `GET /api/kiosks/{id}/config` never answers `401`, so an
+unpaired screen keeps its dashboard. `GET /api/kiosks/{id}/display-check` also stays a
+public read, and its run id is not a protection on its own; on a paired or
+required-mode screen the report is protected by the screen's own secret.
+
 ## API keys
 
 Apps and scripts (Home Assistant, a cron job) can use Calvin without the admin

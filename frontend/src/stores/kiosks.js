@@ -15,6 +15,9 @@ function withoutScreenNow(overrides) {
 
 export const useKiosksStore = defineStore("kiosks", () => {
   const kiosks = ref([]);
+  // Live pending pairings (Settings' "waiting to be paired" hint). The list has
+  // no code and no hash; a failure leaves it empty rather than an error.
+  const pairings = ref([]);
   let refreshSequence = 0;
 
   async function loadKiosks() {
@@ -161,8 +164,38 @@ export const useKiosksStore = defineStore("kiosks", () => {
     }
   }
 
+  // --- pairing (calvin-0xns) ---------------------------------------------
+  // The routes are in backend/app/api/routes/kiosk_pairing.py. Nothing here
+  // keeps a code: the typed code travels once, in its request body.
+
+  async function pairScreen(code) {
+    const { data } = await api.post("/kiosks/pairings", { code });
+    return data;
+  }
+
+  async function unpairScreen(id) {
+    const { data } = await api.delete(`/kiosks/${encodeURIComponent(id)}/pairing`);
+    return data;
+  }
+
+  async function newInstallCode() {
+    const { data } = await api.post("/kiosks/install-codes");
+    return data;
+  }
+
+  async function loadPairings() {
+    try {
+      const response = await api.get("/kiosks/pairings");
+      pairings.value = response.data?.pending ?? [];
+    } catch {
+      // Waiting rows are a hint, not a feature: keep the list quiet.
+      pairings.value = [];
+    }
+  }
+
   return {
     kiosks,
+    pairings,
     loadKiosks,
     refreshKiosks,
     fetchOverrides,
@@ -175,5 +208,9 @@ export const useKiosksStore = defineStore("kiosks", () => {
     setScreenPower,
     fetchScreenPower,
     fetchAvailableAgentVersion,
+    pairScreen,
+    unpairScreen,
+    newInstallCode,
+    loadPairings,
   };
 });
