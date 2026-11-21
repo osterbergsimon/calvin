@@ -4,6 +4,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import ScreensSettings from "@/components/settings/categories/ScreensSettings.vue";
+import BrightnessGroup from "@/components/settings/shared/BrightnessGroup.vue";
 import { useKiosksStore } from "@/stores/kiosks";
 import { formatKeyDate } from "@/utils/apiKeyFormat";
 
@@ -340,13 +341,25 @@ describe("Pair a screen", () => {
     await form.trigger("submit");
     await flushPromises();
     expect(store.pairScreen).not.toHaveBeenCalled();
-    expect(wrapper.text()).toContain("Type the code shown on the screen.");
+    // One result line carries every message, so the button stays beside the
+    // field instead of dropping under a separate error line (PR #387 F2).
+    expect(wrapper.get("[data-test='pair-result']").text()).toBe(
+      "Type the code shown on the screen."
+    );
+    expect(input(wrapper).attributes("aria-invalid")).toBe("true");
 
     await input(wrapper).setValue("K7Q");
     await form.trigger("submit");
     await flushPromises();
     expect(store.pairScreen).not.toHaveBeenCalled();
-    expect(wrapper.text()).toContain("A code has 6 letters and numbers, like K7Q-4MD.");
+    expect(wrapper.get("[data-test='pair-result']").text()).toBe(
+      "A code has 6 letters and numbers, like K7Q-4MD."
+    );
+
+    // The next keystroke clears it.
+    await input(wrapper).setValue("K7Q4");
+    expect(wrapper.find("[data-test='pair-result']").exists()).toBe(false);
+    expect(input(wrapper).attributes("aria-invalid")).toBe("false");
   });
 
   it("reports the paired screen and clears the field", async () => {
@@ -362,7 +375,10 @@ describe("Pair a screen", () => {
     await wrapper.get("[data-test='pair-form']").trigger("submit");
     await flushPromises();
     expect(wrapper.get("[data-test='pair-result']").text()).toContain("Hall is paired.");
-    expect(wrapper.get("[data-test='pair-result']").text()).toContain("Open Hall");
+    expect(wrapper.get("[data-test='pair-result']").text()).not.toContain("✓");
+    expect(wrapper.get("[data-test='pair-result'] .inline-note__action").text()).toContain(
+      "Open Hall"
+    );
     expect(input(wrapper).element.value).toBe("");
     expect(store.loadKiosks).toHaveBeenCalled();
     expect(store.loadPairings).toHaveBeenCalled();
@@ -567,6 +583,14 @@ describe("One screen's Pairing section", () => {
     store.unpairScreen.mockResolvedValue({ id: "hall", changed: true });
     await flushPromises();
     await openScreen(wrapper);
+    store.loadKiosks.mockImplementation(async () => {
+      const row = store.kiosks.find(item => item.id === "hall");
+      if (row) {
+        row.paired = false;
+        row.pairedAt = null;
+      }
+    });
+    store.loadKiosks.mockClear();
     const section = wrapper.get("#section-screen-pairing");
     expect(section.text()).toContain("Paired");
     expect(section.text()).toContain(
@@ -581,6 +605,9 @@ describe("One screen's Pairing section", () => {
     await wrapper.get("[data-test='confirm-accept']").trigger("click");
     await flushPromises();
     expect(store.unpairScreen).toHaveBeenCalledWith("hall");
+    // The list's localStorage cache is refreshed from the server too, so an
+    // offline reload cannot show the old paired state (PR #387 review).
+    expect(store.loadKiosks).toHaveBeenCalled();
     expect(section.text()).toContain("Not paired");
     expect(section.get("[data-test='unpair-result']").text()).toBe(
       "Hall is unpaired. It shows a new code within a minute."
@@ -595,6 +622,13 @@ describe("One screen's Pairing section", () => {
     store.unpairScreen.mockResolvedValue({ id: "hall", changed: false });
     await flushPromises();
     await openScreen(wrapper);
+    store.loadKiosks.mockImplementation(async () => {
+      const row = store.kiosks.find(item => item.id === "hall");
+      if (row) {
+        row.paired = false;
+        row.pairedAt = null;
+      }
+    });
     await wrapper.get("[data-test='unpair-screen-btn']").trigger("click");
     await wrapper.get("[data-test='confirm-accept']").trigger("click");
     await flushPromises();
@@ -620,7 +654,7 @@ describe("One screen's Pairing section", () => {
     );
   });
 
-  it("shows the can-pair state and sends the person to the Code field", async () => {
+  it("keeps the screen page open and focuses the Code field on a wide layout", async () => {
     const { wrapper } = mountScreens();
     await flushPromises();
     await openScreen(wrapper);
@@ -631,8 +665,35 @@ describe("One screen's Pairing section", () => {
     );
     await section.get("[data-test='pair-screen-link']").trigger("click");
     await flushPromises();
-    expect(wrapper.find("[data-test='screens-detail']").exists()).toBe(false);
+    // The two-pane layout already shows the list: don't empty the right pane
+    // (PR #387 F4).
+    expect(wrapper.find("[data-test='screens-detail']").exists()).toBe(true);
     expect(document.activeElement).toBe(input(wrapper).element);
+  });
+
+  it("goes back to the list and focuses the Code field on a phone", async () => {
+    const matchMedia = window.matchMedia;
+    window.matchMedia = vi.fn(query => ({
+      matches: /\(max-width: 900px\)/.test(query),
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+    try {
+      const { wrapper } = mountScreens();
+      await flushPromises();
+      await openScreen(wrapper);
+      await wrapper.get("[data-test='pair-screen-link']").trigger("click");
+      await flushPromises();
+      expect(wrapper.find("[data-test='screens-detail']").exists()).toBe(false);
+      expect(document.activeElement).toBe(input(wrapper).element);
+    } finally {
+      window.matchMedia = matchMedia;
+    }
   });
 
   it("adds the required-mode warning under a screen that is not paired", async () => {
@@ -667,6 +728,20 @@ describe("One screen's Pairing section", () => {
     expect(power.get("[data-test='screen-now-hidden']").text()).toBe(
       "Sign in as admin to see whether home automation is holding this screen."
     );
+  });
+
+  it("never infers 'no hold' from a hidden presence row", async () => {
+    // With presence hidden, powerHold is absent whether or not a hold exists.
+    // The controls must stay neutral: neither button disabled by the schedule,
+    // a way back to the schedule, and no assumed wake state (design §3.4).
+    const { wrapper } = mountScreens({ kiosks: [kiosk({ presenceHidden: true })] });
+    await flushPromises();
+    await openScreen(wrapper);
+    const power = wrapper.get("#section-screen-power");
+    expect(power.find("[data-test='screen-now-on']").attributes("aria-disabled")).toBeUndefined();
+    expect(power.find("[data-test='screen-now-off']").attributes("aria-disabled")).toBeUndefined();
+    expect(power.find("[data-test='screen-now-follow']").exists()).toBe(true);
+    expect(wrapper.findComponent(BrightnessGroup).props("asleep")).toBe(false);
   });
 });
 

@@ -9,13 +9,14 @@
         <div class="add-kiosk__cmd-row">
           <code
             class="add-kiosk__cmd"
-            :style="installState === 'loading' ? waitStyle : undefined"
+            :class="{ 'add-kiosk__cmd--waiting': installState === 'loading' }"
             data-test="add-kiosk-command"
             >{{ installCommand }}</code
           >
           <Button
+            ref="copyButton"
             data-test="add-kiosk-copy"
-            :disabled="!serverUrl || installState === 'loading'"
+            :disabled="!serverUrl || installState === 'loading' || installState === 'expired'"
             @click="copyCommand"
           >
             {{ copied ? "Copied" : "Copy" }}
@@ -98,12 +99,9 @@ const installState = ref("loading"); // loading | ready | expired | failed | una
 const installCode = ref(null);
 const installError = ref(null);
 const codeAction = ref(null);
+const copyButton = ref(null);
 let expiryTimer = null;
 let focusAction = false;
-
-// The "Getting a one-time code…" line keeps the command block's place and
-// swaps the data face for the UI face (the mock's F2).
-const waitStyle = { fontFamily: "var(--font-ui)", color: "var(--ink-2)" };
 
 // Mirrors the server's kiosk-id allowlist ([A-Za-z0-9._-]{1,64}).
 const safeName = computed(() =>
@@ -190,10 +188,13 @@ function armExpiry(expiresAt) {
 }
 
 async function focusCodeAction() {
-  if (!focusAction) return;
+  const wanted = focusAction;
   focusAction = false;
+  if (!wanted) return;
   await nextTick();
-  codeAction.value?.$el?.focus?.();
+  // New code / Try again unmount while the answer loads. A refusal (401/403)
+  // has no action at all, so focus lands on Copy rather than the page body.
+  (codeAction.value?.$el ?? copyButton.value?.$el)?.focus?.();
 }
 
 async function mintInstallCode() {
@@ -268,5 +269,13 @@ onUnmounted(clearExpiryTimer);
   background: var(--bg-0);
   border: 1px solid var(--line);
   border-radius: var(--radius-control);
+}
+
+.add-kiosk__cmd--waiting {
+  /* "Getting a one-time code…" keeps the block's place and swaps the data face
+     for the UI face (the mock's F2). */
+  font-family: var(--font-ui);
+  color: var(--ink-2);
+  user-select: none;
 }
 </style>

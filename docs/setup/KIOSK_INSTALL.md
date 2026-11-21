@@ -164,6 +164,11 @@ into the card). The code works once, for 30 minutes; **New code** makes another.
 code has expired by the time the Pi boots, the install still works and the screen falls
 back to showing a code of its own.
 
+Opening **Add a screen** again also makes a new code. The server keeps only the five newest,
+so a command you copied a while ago can stop working if several newer codes have been made.
+If that happens, the install still works, and the screen shows a code to type in
+**Pair a screen**.
+
 **A screen that is already installed.** After an update makes pairing available, the
 screen shows **Pair this screen** and a code such as `K7Q-4MD` along its bottom edge,
 over the dashboard. In **Settings → Screens**, type the code under **Pair a screen**.
@@ -182,8 +187,9 @@ paired and the new pairing replaces the old one; Settings says the old pairing n
 longer works. **Unpair** on a screen's page makes the screen show a new code and stop
 reporting in until it is paired again.
 
-**A stolen screen.** **Unpair** it at once, so its secret stops working within a
-minute. If it is not coming back, **Remove** it as well. Removing records its id, so an
+**A stolen screen.** **Unpair** it at once: the server stops accepting its secret
+immediately, and the screen shows a new code within a minute. If it is not coming back,
+**Remove** it as well. Removing records its id, so an
 older backup restores it unpaired even if that backup still carried its pairing.
 
 **Reinstalling or swapping the card.** Reinstalling keeps `/var/lib/calvin/agent`, and

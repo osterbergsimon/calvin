@@ -80,6 +80,9 @@ describe("Add a screen: the one-time install code", () => {
       "This code has run out. Get a new one before you run the command."
     );
     expect(wrapper.get("[data-test='add-kiosk-command']").text()).toBe(READY.command);
+    // The command still carries the dead code, so Copy would hand out a code
+    // that cannot work: wait for New code instead (PR #387 review).
+    expect(wrapper.get("[data-test='add-kiosk-copy']").attributes("disabled")).toBeDefined();
   });
 
   it("falls back to today's plain command when the code cannot be made", async () => {
@@ -103,6 +106,19 @@ describe("Add a screen: the one-time install code", () => {
     const note = wrapper.get("[data-test='add-kiosk-code-note']");
     expect(note.text()).toBe("You need to sign in as admin to make a one-time code.");
     expect(wrapper.find("[data-test='install-new-code']").exists()).toBe(false);
+  });
+
+  it("keeps focus somewhere real when New code is refused", async () => {
+    const { wrapper, store } = mountPanel();
+    await flushPromises();
+    store.newInstallCode.mockRejectedValue({ response: { status: 403, data: {} } });
+    const link = wrapper.get("[data-test='install-new-code']");
+    link.element.focus();
+    await link.trigger("click");
+    await flushPromises();
+    // The note has no action in this state, so focus lands on Copy instead of
+    // falling back to the page (PR #387 review, optional nit).
+    expect(document.activeElement).toBe(wrapper.get("[data-test='add-kiosk-copy']").element);
   });
 
   it("adds the pairing sentence to the browser card", async () => {

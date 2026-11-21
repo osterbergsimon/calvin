@@ -234,7 +234,6 @@
                 enterkeyhint="go"
                 maxlength="12"
                 :readonly="pairingBusy"
-                :error="pairFieldError"
                 :invalid="pairCodeInvalid"
                 @update:model-value="onPairCodeInput"
               />
@@ -258,7 +257,7 @@
               aria-live="polite"
             >
               {{ pairResult.text }}
-              <template v-if="pairResult.target">
+              <template v-if="pairResult.target" #action>
                 <Button variant="link" size="sm" data-test="open-paired-screen" @click="openPaired">
                   Open {{ pairResult.target.displayName }}
                 </Button>
@@ -631,20 +630,20 @@
           </template>
           <Button
             data-test="screen-now-on"
-            :aria-disabled="powerBusy || desiredOnNow ? 'true' : undefined"
+            :aria-disabled="powerBusy || (!presenceHidden && desiredOnNow) ? 'true' : undefined"
             @click="setScreenNow('on')"
           >
             Turn on now
           </Button>
           <Button
             data-test="screen-now-off"
-            :aria-disabled="powerBusy || !desiredOnNow ? 'true' : undefined"
+            :aria-disabled="powerBusy || (!presenceHidden && !desiredOnNow) ? 'true' : undefined"
             @click="setScreenNow('off')"
           >
             Turn off now
           </Button>
           <Button
-            v-if="powerHold || activeOverride"
+            v-if="presenceHidden || powerHold || activeOverride"
             variant="link"
             data-test="screen-now-follow"
             @click="followSchedule"
@@ -656,7 +655,7 @@
           :kiosk="selectedKiosk"
           :overrides="overrides"
           :screen-name="selectedName"
-          :asleep="!desiredOnNow"
+          :asleep="!presenceHidden && !desiredOnNow"
           :online="selectedKiosk ? isOnline(selectedKiosk) : true"
           @patch="patchBrightness"
           @open-check="openCheck"
@@ -665,7 +664,7 @@
           v-model="checkOpen"
           :kiosk-id="selectedId || ''"
           :screen-name="selectedName"
-          :asleep="!desiredOnNow"
+          :asleep="!presenceHidden && !desiredOnNow"
           :on-panel="Boolean(kioskId) && kioskId === selectedId"
           :overrides="overrides"
           :save-patch="patchBrightness"
@@ -1484,7 +1483,6 @@ const countLine = computed(() => {
 // --- the Pairing section on the list --------------------------------------
 const pairCode = ref("");
 const pairField = ref(null);
-const pairFieldError = ref("");
 const pairCodeInvalid = ref(false);
 const pairingBusy = ref(false);
 const pairCooldown = ref(false);
@@ -1507,7 +1505,6 @@ function onPairCodeInput(value) {
   pairCode.value = String(value ?? "").toUpperCase();
   // A keystroke clears the last answer, except the wait the server named.
   if (pairCooldown.value) return;
-  pairFieldError.value = "";
   pairCodeInvalid.value = false;
   if (pairResult.text) clearPairResult();
 }
@@ -1547,17 +1544,20 @@ function startPairCooldown(seconds) {
 
 async function submitPair() {
   if (pairingBusy.value || pairCooldown.value) return;
-  pairFieldError.value = "";
   pairCodeInvalid.value = false;
   clearPairResult();
   const code = normalizePairCode(pairCode.value);
   if (!code) {
-    pairFieldError.value = "Type the code shown on the screen.";
+    pairCodeInvalid.value = true;
+    pairResult.tone = "err";
+    pairResult.text = "Type the code shown on the screen.";
     focusPairField();
     return;
   }
   if (code.length !== 6) {
-    pairFieldError.value = "A code has 6 letters and numbers, like K7Q-4MD.";
+    pairCodeInvalid.value = true;
+    pairResult.tone = "err";
+    pairResult.text = "A code has 6 letters and numbers, like K7Q-4MD.";
     focusPairField();
     return;
   }
@@ -1567,8 +1567,8 @@ async function submitPair() {
     const name = answer?.displayName || answer?.id || "";
     pairResult.tone = "ok";
     pairResult.text = answer?.replaced
-      ? `✓ ${name} is paired again. Its old pairing no longer works.`
-      : `✓ ${name} is paired.`;
+      ? `${name} is paired again. Its old pairing no longer works.`
+      : `${name} is paired.`;
     pairResult.target = answer;
     pairCode.value = "";
     await Promise.all([store.loadKiosks(), store.loadPairings()]);
@@ -1699,11 +1699,9 @@ async function unpairSelected() {
   clear(unpairResult);
   try {
     const answer = await store.unpairScreen(id);
-    const k = store.kiosks.find(item => item.id === id);
-    if (k) {
-      k.paired = false;
-      k.pairedAt = null;
-    }
+    // Re-read the list from the server: it also rewrites the localStorage
+    // cache, so an offline reload cannot show the old paired state.
+    await store.loadKiosks();
     say(
       unpairResult,
       answer?.changed === false
@@ -1720,9 +1718,10 @@ async function unpairSelected() {
   }
 }
 
-// The link on a screen's page lands on the one code field (§1.2).
+// The link on a screen's page lands on the one code field (§1.2). The two-pane
+// layout already shows the list, so only a phone goes back to it.
 async function goToPairField() {
-  closeDetail();
+  if (narrow.value) closeDetail();
   await nextTick();
   scrollSectionToTop(document.getElementById("screens-pairing"));
   focusPairField();
@@ -1890,6 +1889,9 @@ const activeOverride = computed(() =>
 // A hold from home automation or Settings (calvin-2ifv) lives in its own
 // registry column, not the layer, and wins until it is changed.
 const powerHold = computed(() => selectedKiosk.value?.powerHold ?? null);
+// A hidden presence row carries no hold fields at all, so the page must not
+// read their absence as "not held" (design §3.4): the controls stay neutral.
+const presenceHidden = computed(() => Boolean(selectedKiosk.value?.presenceHidden));
 // "Turn on/off now" on a held screen makes two calls; both buttons wait for
 // them so a double tap cannot send the pair twice.
 const powerBusy = ref(false);
@@ -1928,7 +1930,8 @@ const untilCopy = computed(() => {
 async function setScreenNow(power) {
   // aria-disabled keeps the button in the keyboard order, so the tap still
   // arrives: do nothing while a pair of calls runs, or when it is already so.
-  if (powerBusy.value || (power === "on") === desiredOnNow.value) return;
+  // A hidden presence row cannot know what is already so.
+  if (powerBusy.value || (!presenceHidden.value && (power === "on") === desiredOnNow.value)) return;
   powerBusy.value = true;
   clear(powerMsg);
   try {
@@ -2011,7 +2014,9 @@ function openCheck() {
   checkOpen.value = true;
 }
 async function followSchedule() {
-  if (powerHold.value) {
+  // A hidden row cannot tell whether a hold is in force, so it asks the server
+  // to clear one instead of editing the layer it cannot see.
+  if (powerHold.value || presenceHidden.value) {
     if (await endHold()) {
       const online = selectedKiosk.value ? isOnline(selectedKiosk.value) : false;
       say(powerMsg, online ? APPLIED_BY_AGENT : OFFLINE_COPY);

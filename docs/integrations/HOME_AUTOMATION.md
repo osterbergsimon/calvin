@@ -83,15 +83,28 @@ condition on `"held":true` is enough to branch.
 
 ## Paired screens
 
-A screen that is not paired keeps its dashboard, but it may not follow a hold. The
-call still answers `200` and stores the hold with `paired: false`, and `desiredOn`
-tells the truth: a gated, unpaired screen follows its own schedule instead. Pair the
-screen in **Settings → Screens** to let it follow holds again. With **Only paired
-screens** on, this applies to every screen that is not paired yet.
+A hold reaches a screen unless the screen is gated and cannot prove it is itself. A screen
+is gated when it is paired, or when **Only paired screens** is on.
 
-For a paired screen, `PUT` and `GET /api/kiosks/{id}/screen-power` are answered only
-to that screen itself, an admin, or a key with **Turn screens on and off**. A plain
-read key gets `403 insufficient_scope`, and an anonymous caller gets `401`.
+- With **Only paired screens** off, an unpaired screen follows a hold exactly as before.
+- With **Only paired screens** on, every screen is gated. An unpaired screen follows its own
+  schedule instead of the hold. The call still answers `200` and stores the hold with
+  `paired: false`, and `desiredOn` tells the truth.
+- A paired screen is gated too. Its hold reaches it only while its display agent checks in
+  with the screen's own secret. A screen whose software is too old to send that secret, or
+  that has not checked in as itself yet, stays on its schedule; `desiredOn` says so. Choose
+  **Update** for that screen in Settings › Screens.
+
+So a hold is withheld only from a gated screen that is not authenticated: unpaired while
+**Only paired screens** is on, or paired but on software too old to send its secret. Pair an
+unpaired screen, or update one whose software is too old, to let it follow holds again.
+
+`PUT /api/kiosks/{id}/screen-power` is open to an admin and to a key with **Turn screens on
+and off**; a plain read key gets `403 insufficient_scope`, and an anonymous caller gets `401`.
+`GET` on a gated screen (a paired screen, or any screen while **Only paired screens** is on)
+is open to an admin, a key with **Turn screens on and off** and the screen itself; a plain
+read key gets `403 insufficient_scope`, and an anonymous caller gets `401`. `GET` on a screen
+that is not gated stays a public read.
 
 ## Settings and people
 

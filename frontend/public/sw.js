@@ -12,7 +12,8 @@
  *   them as proof the backend is up. The cache is capped.
  * - Never handled (straight to the network, failures stay failures): non-GET
  *   requests, other origins, /api/health, /api/system/* (status, updates,
- *   display power), server-sent event streams and full-size images.
+ *   display power), the admin-only pending pairings list, server-sent event
+ *   streams and full-size images.
  * - Share links (calvin-mwqo): /share/* and /api/guest/* are never handled
  *   either. Their URLs carry the link's token, and a share-link page is not
  *   the dashboard shell, so neither may land in (or be served from) a cache.
@@ -43,6 +44,10 @@ function isUncachedApi(url, request) {
   const path = url.pathname;
   if (path === "/api/health" || path.startsWith("/api/health/")) return true;
   if (path.startsWith("/api/system/")) return true;
+  // The pending pairings list is admin-only and names screens that are not
+  // paired yet (calvin-0xns). It must not outlive the sign-in in the shared
+  // API cache, even though the server also sends Cache-Control: no-store.
+  if (path === "/api/kiosks/pairings" || path.startsWith("/api/kiosks/pairings/")) return true;
   // Full-size photos are large and rotate constantly; thumbnails are small.
   if (path.startsWith("/api/images/") && !path.endsWith("/thumbnail")) return true;
   return (request.headers.get("accept") || "").includes("text/event-stream");

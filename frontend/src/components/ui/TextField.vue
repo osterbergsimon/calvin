@@ -10,7 +10,7 @@
       :id="fieldId"
       ref="inputEl"
       class="text-field__input"
-      :class="{ 'text-field__input--invalid': error }"
+      :class="{ 'text-field__input--invalid': error || invalid }"
       :type="type"
       :value="modelValue"
       :data-test="inputTest || undefined"
