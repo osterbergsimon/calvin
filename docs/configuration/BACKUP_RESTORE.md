@@ -13,7 +13,7 @@ container, or to seed a dev setup instead of entering everything again.
 | Keyboard map | |
 | Plugins and their instances | Calendar sources, image sources, web services and backend plugins, with their ids, names, on/off state, settings and order |
 | Installed plugin and theme packages | Optional, on by default. Restore installs them (and their Python dependencies) on the new server |
-| Kiosks | Each kiosk's id, hostname and per-kiosk settings |
+| Kiosks | Each kiosk's id, hostname, per-kiosk settings and, for a paired screen, a one-way pairing fingerprint. See [Paired screens](#paired-screens) |
 | Passwords and API keys | Optional, on by default. See [Secrets](#secrets) |
 | Kiosk signing key | Optional, off by default. See [Kiosk signing key](#kiosk-signing-key) |
 
@@ -52,6 +52,31 @@ password in Settings and switch it on.
 A setting counts as secret when its name contains `password`, `api_key`,
 `api_token`, `token`, `secret`, `access_token` or `refresh_token`, or when the
 plugin declares it as a password field.
+
+### Paired screens
+
+Each kiosk row for a paired screen carries a **one-way fingerprint** of that
+screen's pairing secret, never the secret itself. It cannot be used to pretend to
+be the screen, and it is not a plugin password. Pending pairings and one-time
+install codes are never exported.
+
+The backup also carries the `kioskRemoved` household setting: the ids of screens
+the owner removed. Ids name screens but authenticate none, so a backup cannot use
+one to act as a screen.
+
+Restoring keeps the current pairing where it matters:
+
+- A screen the server does not have yet takes the backup's pairing, so a restore
+  onto a fresh server keeps the screens paired.
+- A screen the server already has keeps its current pairing, paired or not. A
+  restore never re-pairs a screen that was unpaired after the backup, and never
+  breaks a screen paired since.
+- A screen whose id is in `kioskRemoved` comes back **unpaired**, even when the
+  backup carries its pairing. That is what keeps a removed or stolen screen from
+  coming back usable from an older backup. The effective list is the union of the
+  backup's list and the list the server had before the restore.
+- The result names how many screens came back paired, and how many came back
+  unpaired because they had been removed.
 
 ### Kiosk signing key
 
@@ -124,7 +149,8 @@ deletes one.
 4. **Apply.** Plugin and theme packages from the backup that are not installed
    are installed (with their Python dependencies). Then settings, key
    bindings, plugin on/off state, sources (through the normal plugin instance
-   manager, so they start straight away) and kiosks.
+   manager, so they start straight away) and kiosks. Paired screens keep their
+   pairing as described under [Paired screens](#paired-screens).
 5. **Result.** What was done, sources that need credentials, warnings and
    errors. Reload the UI to see everything.
 
@@ -231,7 +257,9 @@ signing-key                 # only if the key was included
 migration the source was on, for information), `source` (hostname, deploy
 kind), the export `options`, `stripped_secrets`, the `packages` list and
 `data` (`config`, `keyboard_mappings`, `plugin_types`, `plugin_instances`,
-`kiosks`).
+`kiosks`). A paired kiosk row also carries `pairing` (`credentialHash`,
+`pairedAt`). `format_version` stays `1`: an older restorer ignores the field and
+restores that screen unpaired, which is safe.
 
 `format_version` is the backup's own version, separate from the database
 schema. When it changes, a migration step in

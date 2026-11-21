@@ -81,6 +81,18 @@ variant of the card with method `GET` and the same URL and `Authorization` line:
 **Status Code** and **Response** tokens feed the next cards, and a "text contains"
 condition on `"held":true` is enough to branch.
 
+## Paired screens
+
+A screen that is not paired keeps its dashboard, but it may not follow a hold. The
+call still answers `200` and stores the hold with `paired: false`, and `desiredOn`
+tells the truth: a gated, unpaired screen follows its own schedule instead. Pair the
+screen in **Settings → Screens** to let it follow holds again. With **Only paired
+screens** on, this applies to every screen that is not paired yet.
+
+For a paired screen, `PUT` and `GET /api/kiosks/{id}/screen-power` are answered only
+to that screen itself, an admin, or a key with **Turn screens on and off**. A plain
+read key gets `403 insufficient_scope`, and an anonymous caller gets `401`.
+
 ## Settings and people
 
 - On the screen's power row, Settings shows "Off, set by home automation. The schedule is
@@ -101,9 +113,10 @@ condition on `"held":true` is enough to branch.
 - **Plain HTTP on the LAN.** Calvin is usually reached over plain HTTP, so a device that can
   watch your network traffic could copy the key and replay a request. Put Calvin behind
   HTTPS (a reverse proxy) if that matters in your home.
-- **Presence.** Screens read their settings without a password, so any device on your
-  network that knows a screen's id can see that it is held off, which can hint that nobody
-  is home. Calvin never shows which key made the change.
+- **Presence.** A paired screen's hold is hidden from other devices on your network,
+  and so is an unpaired screen's while **Only paired screens** is on. A screen still
+  reads its own settings without a password. Calvin never shows which key made the
+  change.
 - **Backups.** Calvin's own API keys are not in a [backup](../configuration/BACKUP_RESTORE.md),
   and neither is a hold. After moving Calvin to a new server, create a new key and paste it
   into your flows.

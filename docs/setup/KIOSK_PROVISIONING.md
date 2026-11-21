@@ -19,6 +19,9 @@ This is for **Mode B** (remote backend + kiosk Pi). See
 - Your backend URL, e.g. `http://homeserver.local:8000`.
 - Recommended: the server's signing key (see
   [KIOSK_INSTALL.md](KIOSK_INSTALL.md#step-0-get-the-signing-key-from-the-server-recommended)).
+- Optional: a one-time pairing code from **Settings → Screens → Add a screen**. The Pi
+  accepts it with `--pair-code`, and pairs as it installs (see
+  [Pairing files on the Pi](#pairing-files-on-the-pi)).
 
 ## Step 1 — Flash a CLEAN image
 
@@ -43,6 +46,7 @@ sudo bash scripts/bake-kiosk-firstrun.sh \
   --boot-dir /media/$USER/bootfs
 ```
 
+Add `--pair-code clv_pair_…` to pair the screen with a one-time code at install.
 Only `--backend-url` and `--boot-dir` are required. Omit `--wifi-*` if the
 Pi is on Ethernet. `--ssh-pubkey` creates a recovery admin user,
 `calvin-admin` (rename with `--admin-user`), with key-only SSH login and
@@ -66,7 +70,9 @@ Put the card in the Pi and power on. It self-provisions unattended:
    runs the installer. The installer fetches `setup-kiosk.sh` from the server
    (verified against the signed manifest when a key is baked), installs X,
    openbox, Chromium and the Calvin services, and reboots.
-3. **Boot 3** — Chromium opens the dashboard.
+3. **Boot 3** — the kiosk browser opens the dashboard. If a pairing code was baked, the
+   screen is already paired; otherwise it shows a code to type in **Settings → Screens →
+   Pair a screen**.
 
 First provisioning takes several minutes (package installs). Boot 2 prints its
 progress on the screen (tty1): waiting for the server, installing, or the
@@ -79,6 +85,30 @@ The kiosk behaves exactly like one set up by hand with `setup-kiosk.sh`:
 stable `CALVIN_KIOSK_ID`, display-power agent, rotation via
 `/etc/default/calvin-kiosk`. See the [kiosk identity](DEPLOYMENT_TOPOLOGIES.md#kiosk-identity)
 section to rename it.
+
+## Pairing files on the Pi
+
+The display agent keeps pairing state in `/var/lib/calvin/agent`, owned by `calvin`:
+
+| File | What it is |
+|---|---|
+| `kiosk-credential` | This screen's secret, mode `0600`. Written atomically once and reused. It is never put in `/etc/default/calvin-kiosk`, which is world-readable. |
+| `install-pair-code` | The one-time `--pair-code` from the install command, mode `0600`. The agent deletes it after the server approves it or says it is no longer valid. |
+| `kiosk-paired` | A marker written the first time the server says the screen is paired. It is how the agent knows an `unpaired` answer means the pairing was revoked, so it should replace its secret. |
+
+`--pair-code` (or the `?pair=` code in the install command) is single use and lives
+30 minutes. A baked card may boot after that: the install still succeeds and the
+screen falls back to showing its own code under **Settings → Screens → Pair a
+screen**.
+
+Reinstalling or updating keeps `/var/lib/calvin/agent`, so the screen keeps its id and
+its secret, and stays paired. A new SD card is a new screen: it gets a new id and no
+secret, so it appears unpaired with a code.
+
+**What the secret can be read from.** Until the browser has swapped the start-URL
+secret for its cookie, the secret is in the browser's start URL. On that Pi it is
+visible on the local DevTools port while the browser starts and it is kept in the
+kiosk browser profile's history. It speaks for that one screen.
 
 ## Kiosk agent self-update
 
