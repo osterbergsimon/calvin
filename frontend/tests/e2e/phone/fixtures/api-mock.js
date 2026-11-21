@@ -264,7 +264,10 @@ const sampleInstances = {
   ],
 };
 
-const sampleKiosks = [
+// A function, not a constant: `lastSeen` marks presence, and a suite that
+// imports this file minutes before a test runs would otherwise hand that test
+// an offline kiosk (the online window is two minutes).
+const sampleKiosks = () => [
   {
     id: "hallway",
     name: "Hallway",
@@ -395,7 +398,10 @@ export async function installApiMock(page, options = {}) {
     shareFolders: options.shareFolders ? [...options.shareFolders] : ["Guests", "Party"],
     // The kiosk list, with any extra fields a spec needs (displayStack and the
     // saved display-check findings, calvin-29ws). Mutable: a test changes it.
-    kiosks: sampleKiosks.map(kiosk => ({ ...kiosk, ...(options.kioskExtras?.[kiosk.id] || {}) })),
+    kiosks: sampleKiosks().map(kiosk => ({
+      ...kiosk,
+      ...(options.kioskExtras?.[kiosk.id] || {}),
+    })),
     // Kiosk pairing (calvin-0xns): the waiting list, the pair answers a spec
     // plays, and the requests it made, so nothing is ever guessed.
     pendingPairings: options.pendingPairings ? [...options.pendingPairings] : [],

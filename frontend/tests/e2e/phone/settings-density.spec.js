@@ -120,7 +120,6 @@ for (const [name, viewport] of [
       await page.locator("[data-test='screen-default-card']").click();
       await expect(page.locator("[data-test='default-screen-page']")).toBeVisible();
       await openSection(page, "device-power");
-      await openSection(page, "device-power");
       await expect(page.locator("#section-device-keyboard .setting-row").first()).toBeVisible();
 
       await page.evaluate(() => document.fonts.ready);
@@ -200,7 +199,6 @@ for (const [name, viewport] of [
       await openSettings(page, "Screens");
       await page.locator("[data-test='screen-default-card']").click();
       await expect(page.locator("[data-test='default-screen-page']")).toBeVisible();
-      await openSection(page, "device-power");
       await openSection(page, "device-power");
 
       const height = await page.evaluate(() => {
