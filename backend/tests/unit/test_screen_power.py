@@ -1,11 +1,11 @@
 """Screen power: the agent's precedence on the server, the projection, the limiter (calvin-2ifv)."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 import pytest
 
-from app.services.screen_power import ChangeLimiter, desired_on, now_in, project_hold
+from app.services.screen_power import ChangeLimiter, desired_on, now_in, project_mode
 
 pytestmark = pytest.mark.unit
 
@@ -67,19 +67,23 @@ def test_now_is_in_the_screens_timezone():
     assert now_in({"timezone": "Not/AZone"}).tzinfo is not None
 
 
-def test_project_hold_sets_all_four_keys():
+def test_project_external_sets_all_four_keys():
     merged = {"screenNow": {"power": "on", "setAt": "old"}, "screen_now": {"power": "on"}}
-    project_hold(merged, {"power": "off", "setAt": "2026-11-18T12:00:00Z", "by": "automation"})
+    project_mode(
+        merged,
+        "external",
+        {"power": "off", "setAt": "2026-11-18T12:00:00Z", "by": "automation", "mode": "external"},
+    )
     expected = {"power": "off", "setAt": "2026-11-18T12:00:00Z"}
     for key in ("screenHold", "screen_hold", "screenNow", "screen_now"):
         assert merged[key] == expected
     assert "automation" not in str(merged)
 
 
-def test_project_without_hold_changes_nothing():
+def test_project_schedule_without_a_command_projects_none():
     merged = {"screenNow": {"power": "on", "setAt": "x"}}
-    project_hold(merged, None)
-    assert merged == {"screenNow": {"power": "on", "setAt": "x"}}
+    project_mode(merged, "schedule", None)
+    assert "screenNow" not in merged and "screen_now" not in merged
 
 
 def test_limiter_allows_thirty_a_minute():
@@ -97,15 +101,19 @@ def test_agent_view_for_an_agent_that_cannot_hold():
     """An old agent obeys the projected screenNow, so it follows the next boundary."""
     from app.services.screen_power import agent_view
 
-    merged = {**SCHEDULE}
-    project_hold(merged, {"power": "off", "setAt": "2026-11-18T12:00:00Z", "by": "automation"})
+    merged = {**SCHEDULE, "screenPower": "schedule"}
+    project_mode(
+        merged,
+        "schedule",
+        {"power": "off", "setAt": "2026-11-18T12:00:00Z", "by": "automation", "mode": "schedule"},
+    )
     old = agent_view(merged, agent_holds=False)
     assert "screenHold" not in old and "screen_hold" not in old
     assert desired_on(old, _at(15)) is False
     assert desired_on(old, _at(8, day=19)) is True  # past 22:00: the schedule again
     for holds in (True, None):
-        assert desired_on(agent_view(merged, agent_holds=holds), _at(8, day=19)) is False
-    assert "screenHold" in merged  # the input is not changed
+        assert desired_on(agent_view(merged, agent_holds=holds), _at(8, day=19)) is True
+    assert "screenHold" not in merged  # Schedule projects no hold at all
 
 
 def test_strip_holds_drops_a_hold_that_did_not_come_from_the_column():
@@ -114,85 +122,3 @@ def test_strip_holds_drops_a_hold_that_did_not_come_from_the_column():
     merged = {"screenHold": {"power": "off"}, "screen_hold": {"power": "off"}, "x": 1}
     strip_holds(merged)
     assert merged == {"x": 1}
-
-
-def test_drop_superseded_screen_now_keeps_only_a_fresh_choice():
-    from app.services.screen_power import drop_superseded_screen_now
-
-    changed_at = _at(12)
-    now = _at(15)  # nothing in this layer is near "now", so only the old rule runs
-    layer = {
-        "displayName": "Kitchen",
-        "screenNow": {"power": "off", "setAt": "2026-11-18T11:59:59Z"},
-    }
-    assert drop_superseded_screen_now(layer, changed_at, now=now) == {"displayName": "Kitchen"}
-    # Set at exactly the change time: replaced by it.
-    layer["screenNow"] = {"power": "off", "setAt": "2026-11-18T12:00:00Z"}
-    assert drop_superseded_screen_now(layer, changed_at, now=now) == {"displayName": "Kitchen"}
-    # Strictly newer: the person's own fresh choice stays.
-    layer["screenNow"] = {"power": "on", "setAt": "2026-11-18T12:00:01Z"}
-    assert drop_superseded_screen_now(layer, changed_at, now=now) == layer
-    # Both spellings are checked; a malformed one is not a choice.
-    both = {
-        "screenNow": {"power": "on", "setAt": "2026-11-18T12:00:01Z"},
-        "screen_now": {"power": "on", "setAt": "2026-11-18T10:00:00Z"},
-    }
-    assert drop_superseded_screen_now(both, changed_at, now=now) == {
-        "screenNow": {"power": "on", "setAt": "2026-11-18T12:00:01Z"}
-    }
-    for malformed in ({"power": "on"}, {"power": "on", "setAt": "later"}, "on", None):
-        assert drop_superseded_screen_now({"screenNow": malformed}, changed_at, now=now) == {}
-
-
-def test_a_fresh_choice_survives_a_slow_client_clock_and_is_restamped():
-    """The page stamps ``setAt`` with the BROWSER clock; the server judges with its own.
-
-    Ending a hold writes the tombstone on the server, and the page saves the new
-    choice milliseconds later. A phone a few seconds behind, or ahead, must not
-    have that press silently dropped (calvin-ldeu). Its ``setAt`` is re-stamped
-    with the server's now so every later comparison uses one clock.
-    """
-    from app.services.screen_power import drop_superseded_screen_now
-
-    changed_at = _at(12)  # the hold ended at 12:00:00 on the server
-    now = datetime(2026, 11, 18, 12, 0, 0, 400000, tzinfo=UTC)
-    for offset in (-5, 5):
-        set_at = (now + timedelta(seconds=offset)).isoformat()
-        layer = {"displayName": "Kitchen", "screenNow": {"power": "off", "setAt": set_at}}
-        kept = drop_superseded_screen_now(layer, changed_at, now=now)
-        assert kept == {
-            "displayName": "Kitchen",
-            "screenNow": {"power": "off", "setAt": "2026-11-18T12:00:00.400Z"},
-        }
-        assert layer["screenNow"]["setAt"] == set_at  # the input is not changed
-
-
-def test_the_tolerance_does_not_keep_an_old_choice():
-    """A stale page carries the time it was set: minutes or hours old, so it is dropped."""
-    from app.services.screen_power import drop_superseded_screen_now
-
-    now = datetime(2026, 11, 18, 12, 0, 30, tzinfo=UTC)
-    for age_s in (61, 120, 3600):
-        stale = (now - timedelta(seconds=age_s)).isoformat()
-        layer = {"displayName": "Kitchen", "screenNow": {"power": "on", "setAt": stale}}
-        assert drop_superseded_screen_now(layer, _at(12), now=now) == {"displayName": "Kitchen"}
-
-
-def test_a_choice_far_in_the_future_is_not_fresh():
-    """Beyond the tolerance: not re-stamped forward, and the old rule decides."""
-    from app.services.screen_power import drop_superseded_screen_now
-
-    now = datetime(2026, 11, 18, 12, 0, 0, tzinfo=UTC)
-    ahead = (now + timedelta(hours=1)).isoformat()
-    layer = {"screenNow": {"power": "on", "setAt": ahead}}
-    # Strictly newer than the last change: kept as it is, not moved forward.
-    assert drop_superseded_screen_now(layer, _at(12), now=now) == layer
-    # Older than a later change: dropped like any superseded choice.
-    assert drop_superseded_screen_now(layer, _at(13), now=now) == {}
-
-
-def test_drop_superseded_screen_now_without_a_change_keeps_the_layer():
-    from app.services.screen_power import drop_superseded_screen_now
-
-    layer = {"screenNow": {"power": "off", "setAt": "2026-11-18T12:00:00Z"}}
-    assert drop_superseded_screen_now(layer, None) == layer

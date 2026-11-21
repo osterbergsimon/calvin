@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -16,6 +17,7 @@ from app.security.route_policy import (
     admin_error,
     direct_peer_ip,
     is_admin,
+    is_admin_session,
     is_loopback_peer,
     permission_routes,
     request_api_key,
@@ -54,7 +56,9 @@ class OverridesBody(BaseModel):
 async def get_kiosks(request: Request, response: Response):
     """List known kiosks (id, hostname, last-seen, lastAppliedVersion).
 
-    A gated row's presence fields (``powerHold``, ``displayCheckActive`` and the
+    Each row carries the screen's effective ``screenPower`` mode and the
+    command in force as ``powerHold`` (calvin-25g9). A gated row's presence
+    fields (``powerHold``, ``screenPower``, ``displayCheckActive`` and the
     layer's ``screenNow``) go only to an admin or to that screen itself; the
     list has no kiosk id in its path, so only the screen's cookie unlocks its
     own row and a bearer unlocks none (calvin-0xns).
@@ -63,7 +67,18 @@ async def get_kiosks(request: Request, response: Response):
     admin = is_admin(request)
     cookie_id = await kiosk_auth.kiosk_cookie_id(request)
     rows = await kiosk_registry.list_kiosks()
+    base = await build_global_config()
     for row in rows:
+        # The effective mode and the command in force (calvin-25g9): an expired
+        # command, or one from another mode, is not in force and reads as none.
+        overrides = row.get("overrides") or {}
+        merged = merge_overrides(base, overrides)
+        power_mode = screen_power.effective_mode_for(base, overrides)
+        screen_power.set_mode_spellings(merged, power_mode)
+        row["screenPower"] = power_mode
+        row["powerHold"] = screen_power.active_command(
+            row.get("powerHold"), merged, screen_power.now_in(merged), power_mode
+        )
         visible = kiosk_view.can_see_presence(
             admin=admin,
             principal=cookie_id,
@@ -108,29 +123,18 @@ async def _can_see_this_screen_presence(request: Request, kiosk_id: str) -> bool
 async def put_kiosk_overrides(kiosk_id: str, body: OverridesBody):
     """Replace a kiosk's override layer (upsert). Validated + size-capped."""
     _valid_id_or_400(kiosk_id)
-    _check_floor_under_limit(merge_overrides(await build_global_config(), body.overrides))
+    base = await build_global_config()
+    old_layer = await get_overrides(kiosk_id) or {}
+    _check_floor_under_limit(merge_overrides(base, body.overrides))
     _checked_overrides(body.overrides)
-    layer = await _without_superseded_screen_now(kiosk_id, body.overrides)
+    layer = screen_power.without_screen_now(screen_power.sync_mode_keys(body.overrides))
     await set_overrides(kiosk_id, layer)
+    # A replaced layer that changed this screen's mode ends its command (decision 5).
+    if screen_power.effective_mode_for(base, layer) != screen_power.effective_mode_for(
+        base, old_layer
+    ):
+        await kiosk_registry.clear_power_command(kiosk_id)
     return {"id": kiosk_id, "overrides": layer}
-
-
-async def _without_superseded_screen_now(kiosk_id: str, layer: dict) -> dict:
-    """No layer write may bring back a screen choice a power change replaced.
-
-    A hold replaces the manual choice, and ending one does too: both remove
-    ``screenNow`` from the layer. A Settings page opened before the change still
-    carries the old choice and sends it with any save, and its kiosk-list
-    refresh can miss a hold that was set and cleared between two polls, so
-    "while held" alone is not enough (calvin-2ifv review, calvin-ldeu). The
-    server keeps the time of the last power change, so a ``screenNow`` set after
-    it -- a person's own fresh choice -- is kept.
-    """
-    hold, changed_at = await kiosk_registry.power_state(kiosk_id)
-    if hold is not None:
-        # The hold wins while it lasts; it is projected on the next poll.
-        return kiosk_registry.without_screen_now(layer)
-    return screen_power.drop_superseded_screen_now(layer, changed_at)
 
 
 @router.delete("/kiosks/{kiosk_id}")
@@ -224,14 +228,20 @@ async def patch_kiosk_overrides(kiosk_id: str, body: OverridesBody, request: Req
                 },
             )
     stored = await get_overrides(kiosk_id)
+    base = await build_global_config()
     if stored is not None:
         layer = {**stored, **body.overrides}
-        _check_floor_under_limit(merge_overrides(await build_global_config(), layer))
+        _check_floor_under_limit(merge_overrides(base, layer))
     _checked_overrides(body.overrides)
-    partial = await _without_superseded_screen_now(kiosk_id, body.overrides)
+    partial = screen_power.without_screen_now(screen_power.sync_mode_keys(body.overrides))
     merged = await merge_into_overrides(kiosk_id, partial)
     if merged is None:
         raise HTTPException(status_code=404, detail="Unknown kiosk")
+    # A partial write that changed this screen's mode ends its command (decision 5).
+    if screen_power.effective_mode_for(base, merged) != screen_power.effective_mode_for(
+        base, stored or {}
+    ):
+        await kiosk_registry.clear_power_command(kiosk_id)
     # This answer is open to unpaired callers for ``showUI``, so it goes through
     # the same presence projection as the GET and never the host-internal keys
     # (calvin-0xns, PR #385 review).
@@ -242,7 +252,7 @@ async def patch_kiosk_overrides(kiosk_id: str, body: OverridesBody, request: Req
     return answer
 
 
-# -- screen power held from home automation (calvin-2ifv) -------------------
+# -- screen power from home automation or Settings (calvin-2ifv, calvin-25g9) --
 
 # The Screens list counts a kiosk online while it polled in the last 120 s.
 _ONLINE_S = 120
@@ -254,14 +264,39 @@ class ScreenPowerBody(BaseModel):
 
 class ScreenPowerView(BaseModel):
     id: str
+    mode: Literal["schedule", "always_on", "external"]
     power: Literal["on", "off", "schedule"]
-    held: bool
+    held: bool  # deprecated: a command is in force (``power`` says which)
     setAt: str | None  # noqa: N815 - wire name
     by: Literal["automation", "settings"] | None
+    until: str | None  # when a Schedule command ends; null in other modes
+    keyName: str | None  # noqa: N815 - the API key's name, admin sessions only
     desiredOn: bool  # noqa: N815 - what the agent will do, not what the panel reports
     online: bool
     agentHolds: bool | None  # noqa: N815 - False: this screen's agent is too old to hold
     paired: bool
+
+
+def _instant_text(moment: datetime) -> str:
+    return moment.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _conflict(code: str, message: str) -> HTTPException:
+    return HTTPException(status_code=409, detail={"code": code, "message": message})
+
+
+async def _screen_state(
+    status: dict,
+) -> tuple[dict, screen_power.ScreenMode, dict | None, datetime]:
+    """The screen's merged config, mode, command in force and the screen's now."""
+    base = await build_global_config()
+    merged = merge_overrides(base, status["overrides"])
+    mode = screen_power.effective_mode_for(base, status["overrides"])
+    # Both spellings, so the command is judged by the same mode the answer shows.
+    screen_power.set_mode_spellings(merged, mode)
+    now = screen_power.now_in(merged)
+    command = screen_power.active_command(status["command"], merged, now, mode)
+    return merged, mode, command, now
 
 
 async def _power_status_or_404(kiosk_id: str) -> dict:
@@ -273,12 +308,14 @@ async def _power_status_or_404(kiosk_id: str) -> dict:
     return status
 
 
-async def _screen_power_view(kiosk_id: str, status: dict) -> ScreenPowerView:
-    hold = status["hold"]
-    merged = merge_overrides(await build_global_config(), status["overrides"])
+async def _screen_power_view(
+    kiosk_id: str, status: dict, *, include_key_name: bool = False
+) -> ScreenPowerView:
+    merged, mode, command, now = await _screen_state(status)
     screen_power.strip_holds(merged)
-    screen_power.project_hold(merged, hold)
-    # A gated screen receives a hold only when it is paired and its agent's
+    merged = screen_power.without_screen_now(merged)
+    screen_power.project_mode(merged, mode, command)
+    # A gated screen receives a command only when it is paired and its agent's
     # latest poll proved it is the screen (calvin-0xns). An old agent that polls
     # without the secret, like an unpaired screen, follows the schedule; its
     # ``desiredOn`` must say so (design §7).
@@ -287,13 +324,17 @@ async def _screen_power_view(kiosk_id: str, status: dict) -> ScreenPowerView:
         receives_hold = status["paired"] and kiosk_registry.agent_polls_authenticated(kiosk_id)
     agent_cfg = screen_power.agent_view(merged, status["agentHolds"], receives_hold)
     last_seen = status["lastSeen"]
+    until = screen_power.command_until(command, merged, now)
     return ScreenPowerView(
         id=kiosk_id,
-        power=hold["power"] if hold else "schedule",
-        held=hold is not None,
-        setAt=hold["setAt"] if hold else None,
-        by=hold["by"] if hold else None,
-        desiredOn=screen_power.desired_on(agent_cfg, screen_power.now_in(agent_cfg)),
+        mode=mode,
+        power=command["power"] if command else "schedule",
+        held=command is not None,
+        setAt=command["setAt"] if command else None,
+        by=command["by"] if command else None,
+        until=_instant_text(until) if until is not None else None,
+        keyName=command.get("keyName") if command and include_key_name else None,
+        desiredOn=screen_power.desired_on(agent_cfg, now),
         online=last_seen is not None and (utcnow() - last_seen).total_seconds() < _ONLINE_S,
         agentHolds=status["agentHolds"],
         paired=status["paired"],
@@ -329,31 +370,46 @@ async def _may_read_screen_power(request: Request, kiosk_id: str) -> None:
 
 @router.get("/kiosks/{kiosk_id}/screen-power", response_model=ScreenPowerView)
 async def get_screen_power(kiosk_id: str, request: Request):
-    """A screen's power: held on or off, or following its schedule."""
+    """A screen's power mode, and the command in force within it."""
     status = await _power_status_or_404(kiosk_id)
     if kiosk_view.is_gated(status["paired"], await kiosk_view.pairing_mode()):
         await _may_read_screen_power(request, kiosk_id)
-    return await _screen_power_view(kiosk_id, status)
+    return await _screen_power_view(kiosk_id, status, include_key_name=is_admin_session(request))
 
 
 @router.put("/kiosks/{kiosk_id}/screen-power", response_model=ScreenPowerView)
 async def put_screen_power(kiosk_id: str, body: ScreenPowerBody, request: Request):
-    """Hold a screen on or off until changed, or send it back to its schedule.
+    """Store the screen's command in its mode, or send it back to its schedule.
 
-    Open to an admin session, an admin key, and a limited key with the
-    ``screens.power`` permission (``PERMISSION_ROUTES``). A request that changes
-    nothing writes nothing and does not count toward the change limit.
+    Schedule takes on/off or schedule; External takes on/off and refuses
+    schedule; Always on refuses on/off and has nothing to clear. Open to an
+    admin session, an admin key, and a limited key with the ``screens.power``
+    permission (``PERMISSION_ROUTES``). A request that changes nothing writes
+    nothing and does not count toward the change limit.
     """
     status = await _power_status_or_404(kiosk_id)
-    hold = status["hold"]
-    if body.power == "schedule":
-        changes = hold is not None or any(
-            key in status["overrides"] for key in ("screenNow", "screen_now")
+    _merged, mode, command, _now = await _screen_state(status)
+    include_key_name = is_admin_session(request)
+    # Always on has no command: sending one is refused, and "schedule" has
+    # nothing to clear (design decision 3).
+    if mode == "always_on":
+        if body.power != "schedule":
+            raise _conflict(
+                "screen_power_always_on",
+                "This screen is set to Always on. Choose Schedule or External to switch it.",
+            )
+        return await _screen_power_view(kiosk_id, status, include_key_name=include_key_name)
+    if mode == "external" and body.power == "schedule":
+        raise _conflict(
+            "screen_power_external",
+            "This screen is set to External. Send on or off.",
         )
+    if body.power == "schedule":
+        changes = command is not None
     else:
-        changes = hold is None or hold["power"] != body.power
+        changes = command is None or command["power"] != body.power
     if not changes:
-        return await _screen_power_view(kiosk_id, status)
+        return await _screen_power_view(kiosk_id, status, include_key_name=include_key_name)
 
     key = request_api_key(request)
     caller = f"key:{key['id']}" if key is not None else "session"
@@ -369,15 +425,19 @@ async def put_screen_power(kiosk_id: str, body: ScreenPowerBody, request: Reques
             headers={"Retry-After": str(wait)},
         )
     if body.power == "schedule":
-        await kiosk_registry.clear_power_hold(kiosk_id)
+        await kiosk_registry.clear_power_command(kiosk_id)
     else:
         by = "automation" if key is not None else "settings"
-        await kiosk_registry.set_power_hold(kiosk_id, body.power, by)
+        await kiosk_registry.set_power_command(
+            kiosk_id, body.power, by, mode, key_name=key["name"] if key is not None else None
+        )
     screen_power.change_limiter.record(caller)
     # The key's name only: never its secret (the log patcher also redacts keys).
     who = f"API key {key['name']!r}" if key is not None else "an admin session"
-    logger.info(f"Screen {kiosk_id!r} power set to {body.power} by {who}")
-    return await _screen_power_view(kiosk_id, await _power_status_or_404(kiosk_id))
+    logger.info(f"Screen {kiosk_id!r} power set to {body.power} in {mode} mode by {who}")
+    return await _screen_power_view(
+        kiosk_id, await _power_status_or_404(kiosk_id), include_key_name=include_key_name
+    )
 
 
 @router.post("/kiosks/{kiosk_id}/update")
@@ -729,9 +789,10 @@ async def get_kiosk_config(
     its real aspect ratio (CLV-36). ``kfeat`` is what the display agent
     understands, comma-separated (``hold``: it obeys ``screenHold``).
 
-    A held screen power (calvin-2ifv) is projected as ``screenHold`` and as
-    ``screenNow``, so an agent too old to hold still obeys it until the next
-    scheduled change. The stored layer is not changed.
+    A screen's power mode (calvin-25g9) is projected as the agent obeys it:
+    Schedule sends the command as ``screenNow`` (until its boundary), External
+    sends it as both ``screenHold`` and ``screenNow`` with the schedule switch
+    off, and Always on sends neither. The stored layer is not changed.
 
     Only a real poll is recorded (registers a new kiosk and bumps last-seen): one
     that carries ``khost`` (the kiosk browser) or ``kagent`` (the display agent).
@@ -783,9 +844,9 @@ async def get_kiosk_config(
 
     # Whether the agent polls as the screen (calvin-0xns §7): ``desiredOn`` for a
     # paired screen says what its agent will actually receive, so an old agent
-    # that polls without the screen's secret must not be told a hold reaches it.
-    # Only a poll from an address the screen itself proved is trusted to say so;
-    # a forged one cannot make home automation believe the hold is ignored.
+    # that polls without the screen's secret must not be told a command reaches
+    # it. Only a poll from an address the screen itself proved is trusted to say
+    # so; a forged one cannot make home automation believe the command is ignored.
     if kagent and await kiosk_registry.kiosk_has_peer(kiosk_id, direct_peer_ip(request)):
         kiosk_registry.note_agent_poll(kiosk_id, principal == kiosk_id)
 
@@ -800,8 +861,15 @@ async def get_kiosk_config(
     overrides = await get_overrides(kiosk_id)
     merged = merge_overrides(base, overrides)
     merged.pop("_agentUpdateRequested", None)  # never expose the host-internal flag verbatim
-    screen_power.strip_holds(merged)  # only the hold column holds a screen
-    screen_power.project_hold(merged, await kiosk_registry.get_power_hold(kiosk_id))
+    power_mode = screen_power.effective_mode_for(base, overrides)
+    screen_power.set_mode_spellings(merged, power_mode)
+    merged = screen_power.without_screen_now(merged)  # the command is the only source
+    screen_power.strip_holds(merged)  # only the command column switches a screen
+    now = screen_power.now_in(merged)
+    command = screen_power.active_command(
+        await kiosk_registry.get_power_command(kiosk_id), merged, now, power_mode
+    )
+    screen_power.project_mode(merged, power_mode, command)
     version = device_config_version(merged)
     update_requested = agent_update_requested(overrides)
 

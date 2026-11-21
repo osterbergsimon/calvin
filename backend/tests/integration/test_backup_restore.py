@@ -853,6 +853,107 @@ def _restore_seed(client, doc: dict, mode: str = "merge"):
     )
 
 
+@pytest.mark.parametrize("mode", ["merge", "replace"])
+def test_restore_drops_a_stored_screen_now_from_a_layer(test_client, mode):
+    """calvin-25g9: a backup from before the command column carries a Screen now.
+
+    A restored one would otherwise be projected and could switch a screen
+    invisibly, so the restore runs the same idempotent migration as startup.
+    """
+    from app.services import kiosk_registry as kr
+
+    doc = _seed(
+        [
+            {
+                "id": "kitchen-1a2b3c",
+                "hostname": "kitchen",
+                "overrides": {
+                    "displayName": "Kitchen",
+                    "screenNow": {"power": "off", "setAt": "2026-11-18T09:00:00Z"},
+                },
+            }
+        ]
+    )
+    response = _restore_seed(test_client, doc, mode)
+    assert response.status_code == 200, response.text
+
+    layer = _run(kr.get_overrides("kitchen-1a2b3c"))
+    assert "screenNow" not in layer and "screen_now" not in layer
+    assert layer["displayName"] == "Kitchen"
+
+
+@pytest.mark.parametrize("mode", ["merge", "replace"])
+def test_restore_clears_a_command_whose_mode_the_backup_dropped(test_client, mode):
+    """The command column is not in a backup; a restored mode must not revive it."""
+    from app.services import kiosk_registry as kr
+
+    _run(kr.record_kiosk("kitchen-1a2b3c", hostname="kitchen"))
+    _run(kr.set_power_command("kitchen-1a2b3c", "off", "settings", mode="external"))
+    doc = _seed(
+        [{"id": "kitchen-1a2b3c", "hostname": "kitchen", "overrides": {}}],
+        config=[
+            {"key": "screen_power", "value": "schedule", "value_type": "string"},
+            {"key": "display_schedule_enabled", "value": "true", "value_type": "bool"},
+        ],
+    )
+    response = _restore_seed(test_client, doc, mode)
+    assert response.status_code == 200, response.text
+    assert _run(kr.get_power_command("kitchen-1a2b3c")) is None
+
+
+def test_restore_drops_an_invalid_stored_mode_and_warns(test_client):
+    """An invalid mode falls back to the derived one, with a warning (calvin-25g9)."""
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    doc = _seed(
+        [
+            {
+                "id": "kitchen-1a2b3c",
+                "hostname": "kitchen",
+                "overrides": {"displayName": "Kitchen", "screenPower": "dim"},
+            },
+            {
+                "id": "office-4d5e6f",
+                "hostname": "office",
+                "overrides": {"screen_power": "always-on"},
+            },
+        ],
+        config=[{"key": "screen_power", "value": "bogus", "value_type": "string"}],
+    )
+    response = _restore_seed(test_client, doc)
+    assert response.status_code == 200, response.text
+
+    kitchen = _run(kr.get_overrides("kitchen-1a2b3c"))
+    assert "screenPower" not in kitchen and "screen_power" not in kitchen
+    assert kitchen["displayName"] == "Kitchen"
+    office = _run(kr.get_overrides("office-4d5e6f"))
+    assert "screenPower" not in office and "screen_power" not in office
+    assert _run(config_service.get_value("screen_power")) is None
+    assert any("screen power" in w.lower() for w in response.json()["warnings"])
+
+
+def test_restore_keeps_a_mode_outside_the_modes_derived_from_the_switch(test_client):
+    """An invalid mode is dropped, not turned into the derived one silently.
+
+    The household then derives from displayScheduleEnabled, so the screen reads
+    as it did before the invalid value was there.
+    """
+    from app.services.config_service import config_service
+
+    doc = _seed(
+        [],
+        config=[
+            {"key": "screen_power", "value": "bogus", "value_type": "string"},
+            {"key": "display_schedule_enabled", "value": "true", "value_type": "bool"},
+        ],
+    )
+    response = _restore_seed(test_client, doc)
+    assert response.status_code == 200, response.text
+    assert _run(config_service.get_value("screen_power")) is None
+    assert _run(config_service.get_value("display_schedule_enabled")) is True
+
+
 def _principal_request(kiosk_id: str, secret: str) -> Request:
     scope = {
         "type": "http",

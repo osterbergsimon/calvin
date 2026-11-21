@@ -517,15 +517,24 @@ async def lifespan(app: FastAPI):
         logger.info("Keyboard mappings initialized")
         await _initialize_default_config()
         logger.info("Default config initialized")
+        from app.services.config_service import config_service
         from app.services.kiosk_registry import (
+            clear_mode_mismatched_commands,
+            migrate_drop_invalid_modes,
             migrate_global_photo_frame,
             migrate_global_room_name,
             migrate_global_screen_controls,
+            migrate_strip_screen_now,
         )
 
         await migrate_global_room_name()
         await migrate_global_screen_controls()
         await migrate_global_photo_frame()
+        await migrate_strip_screen_now()
+        # The restore warning promises a restart retries these two; both are
+        # idempotent and read only, so a normal start is the retry (calvin-25g9).
+        await migrate_drop_invalid_modes()
+        await clear_mode_mismatched_commands(await config_service.get_config())
         logger.info("Per-screen migrations checked")
         await _start_schedulers()
         logger.info("Schedulers started")

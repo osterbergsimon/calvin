@@ -1034,7 +1034,9 @@ export interface paths {
      * Get Kiosks
      * @description List known kiosks (id, hostname, last-seen, lastAppliedVersion).
      *
-     *     A gated row's presence fields (``powerHold``, ``displayCheckActive`` and the
+     *     Each row carries the screen's effective ``screenPower`` mode and the
+     *     command in force as ``powerHold`` (calvin-25g9). A gated row's presence
+     *     fields (``powerHold``, ``screenPower``, ``displayCheckActive`` and the
      *     layer's ``screenNow``) go only to an admin or to that screen itself; the
      *     list has no kiosk id in its path, so only the screen's cookie unlocks its
      *     own row and a bearer unlocks none (calvin-0xns).
@@ -1238,9 +1240,10 @@ export interface paths {
      *     its real aspect ratio (CLV-36). ``kfeat`` is what the display agent
      *     understands, comma-separated (``hold``: it obeys ``screenHold``).
      *
-     *     A held screen power (calvin-2ifv) is projected as ``screenHold`` and as
-     *     ``screenNow``, so an agent too old to hold still obeys it until the next
-     *     scheduled change. The stored layer is not changed.
+     *     A screen's power mode (calvin-25g9) is projected as the agent obeys it:
+     *     Schedule sends the command as ``screenNow`` (until its boundary), External
+     *     sends it as both ``screenHold`` and ``screenNow`` with the schedule switch
+     *     off, and Always on sends neither. The stored layer is not changed.
      *
      *     Only a real poll is recorded (registers a new kiosk and bumps last-seen): one
      *     that carries ``khost`` (the kiosk browser) or ``kagent`` (the display agent).
@@ -1491,16 +1494,18 @@ export interface paths {
     };
     /**
      * Get Screen Power
-     * @description A screen's power: held on or off, or following its schedule.
+     * @description A screen's power mode, and the command in force within it.
      */
     get: operations["get_screen_power_api_kiosks__kiosk_id__screen_power_get"];
     /**
      * Put Screen Power
-     * @description Hold a screen on or off until changed, or send it back to its schedule.
+     * @description Store the screen's command in its mode, or send it back to its schedule.
      *
-     *     Open to an admin session, an admin key, and a limited key with the
-     *     ``screens.power`` permission (``PERMISSION_ROUTES``). A request that changes
-     *     nothing writes nothing and does not count toward the change limit.
+     *     Schedule takes on/off or schedule; External takes on/off and refuses
+     *     schedule; Always on refuses on/off and has nothing to clear. Open to an
+     *     admin session, an admin key, and a limited key with the ``screens.power``
+     *     permission (``PERMISSION_ROUTES``). A request that changes nothing writes
+     *     nothing and does not count toward the change limit.
      */
     put: operations["put_screen_power_api_kiosks__kiosk_id__screen_power_put"];
     post?: never;
@@ -3194,6 +3199,8 @@ export interface components {
       rebootComboKey1?: string | null;
       /** Rebootcombokey2 */
       rebootComboKey2?: string | null;
+      /** Screenpower */
+      screenPower?: ("schedule" | "always_on" | "external") | null;
       /** Selectedtheme */
       selectedTheme?: string | null;
       /** Showreddays */
@@ -3600,6 +3607,13 @@ export interface components {
       held: boolean;
       /** Id */
       id: string;
+      /** Keyname */
+      keyName: string | null;
+      /**
+       * Mode
+       * @enum {string}
+       */
+      mode: "schedule" | "always_on" | "external";
       /** Online */
       online: boolean;
       /** Paired */
@@ -3611,6 +3625,8 @@ export interface components {
       power: "on" | "off" | "schedule";
       /** Setat */
       setAt: string | null;
+      /** Until */
+      until: string | null;
     };
     /** SealedModeBody */
     SealedModeBody: {

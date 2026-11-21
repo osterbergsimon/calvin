@@ -1,40 +1,42 @@
-"""Screen power held from home automation or Settings (calvin-2ifv).
+"""Screen power modes and the screen's power command (calvin-2ifv, calvin-25g9).
 
 Pure helpers for the screen-power route and the kiosk config poll:
 
+- :func:`effective_mode` is the screen's ``screenPower`` (Schedule, Always on or
+  External), derived from ``displayScheduleEnabled`` when it was never written.
+  :func:`sync_mode_keys` writes the mode and that switch in step.
+- :func:`active_command` decides whether a stored command is in force: one
+  given in another mode, or a Schedule command whose boundary has passed, is
+  absent. It never writes; the route clears the column on the next write.
 - :func:`desired_on` is the display agent's own precedence (hold, then "Screen
   now" until the first schedule boundary after it was set, then the schedule),
   ported from ``deploy/kiosk-agent/calvin_display_agent.py`` so the route can say
   what the agent will do. It never claims the panel *is* off: the agent does not
   report that.
-- :func:`project_hold` puts a hold into a config response: ``screenHold`` for an
-  agent that can hold, and ``screenNow`` so an older agent still obeys it until
-  the next scheduled change.
-- :func:`drop_superseded_screen_now` keeps a stale Settings page from sending an
-  old manual choice back after a power change replaced it, while a fresh press
-  from a phone whose clock is a little off is still kept (calvin-ldeu).
+- :func:`project_mode` puts the mode into a config response as the screen's
+  agent obeys it: ``screenHold``/``screenNow`` for a new agent, and the
+  projected ``screenNow`` an older one already follows.
 - :class:`ChangeLimiter` caps how often one caller may change screens.
 """
 
 import time as time_module
 from collections import deque
 from datetime import UTC, datetime, time, timedelta
-from typing import Any
+from typing import Any, Literal, cast
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+ScreenMode = Literal["schedule", "always_on", "external"]
 
 _HOLD_KEYS = ("screen_hold", "screenHold")
 _NOW_KEYS = ("screen_now", "screenNow")
 
-# How far a ``screenNow.setAt`` may sit from the server's clock and still count
-# as "set just now" (in either direction). The page stamps it with the phone's
-# clock and the server compares it with its own, so the tolerance absorbs clock
-# drift: without it a phone a second behind loses a press made right after a
-# power change, and the page still says Saved (calvin-ldeu). The cost is that a
-# stale page's choice *set during this window* just before a change it missed
-# would still look fresh; a stale page otherwise carries a timestamp minutes or
-# hours old, so it fails the test. A minute covers ordinary NTP drift without
-# stretching "just now" far enough to swallow a deliberate earlier choice.
-FRESH_SKEW_S = 60
+# Screen power modes (calvin-25g9): one plain choice per screen.
+MODES: tuple[ScreenMode, ...] = ("schedule", "always_on", "external")
+_MODE_KEYS = ("screen_power", "screenPower")
+_SWITCH_KEYS = ("display_schedule_enabled", "displayScheduleEnabled")
+
+# A command can only be given in a mode that has commands; Always on has none.
+COMMAND_MODES: tuple[str, ...] = ("schedule", "external")
 
 
 def _get(cfg: dict, *keys: str, default: Any = None) -> Any:
@@ -49,6 +51,82 @@ def _should_be_on(now_t: time, on_t: time, off_t: time) -> bool:
     if off_t < on_t:
         return now_t >= on_t or now_t < off_t
     return on_t <= now_t < off_t
+
+
+def mode_value(value: object) -> ScreenMode | None:
+    """One of :data:`MODES`, or None for anything else (a stale stored value)."""
+    if isinstance(value, str) and value in MODES:
+        return cast(ScreenMode, value)
+    return None
+
+
+def derived_mode(cfg: dict) -> ScreenMode:
+    """The mode an absent ``screenPower`` means: the schedule switch decides.
+
+    With the schedule on it is ``schedule``; with it off it is ``always_on``,
+    which is exactly what every install did before the mode existed.
+    """
+    enabled = _get(cfg, *_SWITCH_KEYS, default=False)
+    return "schedule" if bool(enabled) else "always_on"
+
+
+def effective_mode(cfg: dict) -> ScreenMode:
+    """The screen's ``screenPower``: the stored value, else derived from the switch."""
+    return mode_value(_get(cfg, *_MODE_KEYS)) or derived_mode(cfg)
+
+
+def effective_mode_for(base: dict, layer: dict | None) -> ScreenMode:
+    """The screen's mode from its own layer, else from the household config.
+
+    A layer written before the mode existed carries only
+    ``displayScheduleEnabled``; it must decide that screen's mode even though
+    the merged household config has a ``screenPower`` of its own. The screen's
+    explicit mode wins over its switch, and its switch over the household.
+    """
+    layer = layer or {}
+    explicit = mode_value(_get(layer, *_MODE_KEYS))
+    if explicit is not None:
+        return explicit
+    if any(key in layer for key in _SWITCH_KEYS):
+        return derived_mode(layer)
+    return effective_mode(base)
+
+
+def set_mode_spellings(cfg: dict, mode: ScreenMode) -> None:
+    """Write the mode under both spellings, so no reader can disagree (calvin-25g9).
+
+    The household config stores ``screen_power`` while a merged response can
+    carry both; ``effective_mode`` reads the snake first, so a reader that sees
+    only the camel spelling would derive a different mode.
+    """
+    for key in _MODE_KEYS:
+        cfg[key] = mode
+
+
+def sync_mode_keys(layer: dict, *, snake: bool = False) -> dict:
+    """Return ``layer`` with ``screenPower`` and the schedule switch in step.
+
+    Only when the write carries one of them. A mode is stored with
+    ``displayScheduleEnabled`` true only for ``schedule``, so a restore onto, or
+    a downgrade to, an older backend still behaves sensibly (calvin-25g9). When a
+    write carries both, the mode wins. The schedule itself is never touched.
+
+    ``snake`` selects the household config's stored spelling
+    (``screen_power``/``display_schedule_enabled``); the default is the
+    camelCase the API and a screen's override layer use. The other spelling is
+    dropped so one setting cannot drift between two keys.
+    """
+    mode_key = "screen_power" if snake else "screenPower"
+    switch_key = "display_schedule_enabled" if snake else "displayScheduleEnabled"
+    other_mode = "screenPower" if snake else "screen_power"
+    other_switch = "displayScheduleEnabled" if snake else "display_schedule_enabled"
+    if not any(key in layer for key in (mode_key, other_mode, switch_key, other_switch)):
+        return layer
+    mode = mode_value(layer.get(mode_key, layer.get(other_mode))) or derived_mode(layer)
+    synced = {key: value for key, value in layer.items() if key not in (other_mode, other_switch)}
+    synced[mode_key] = mode
+    synced[switch_key] = mode == "schedule"
+    return synced
 
 
 def _parse_instant(value: object) -> datetime | None:
@@ -140,69 +218,56 @@ def now_in(cfg: dict) -> datetime:
     return datetime.now().astimezone()
 
 
-def _screen_now_is_fresh(value: object, changed_at: datetime) -> bool:
-    """True when this ``screenNow`` was set strictly after ``changed_at``."""
-    if not isinstance(value, dict):
-        return False
-    set_at = _parse_instant(value.get("setAt"))
-    return set_at is not None and set_at > changed_at
+def command_until(command: dict | None, cfg: dict, now: datetime) -> datetime | None:
+    """The boundary at which a Schedule command ends, or None (design decision 7).
 
-
-def _set_at_text(moment: datetime) -> str:
-    """The wire form of a re-stamped ``setAt``: UTC ISO-8601, milliseconds, ``Z``.
-
-    Milliseconds matter: the change time a hold leaves is floored to seconds, so
-    a value stamped in the same second must still read as strictly newer on a
-    later save (calvin-ldeu).
+    None in another mode, for no command, and when no boundary comes within the
+    next 8 days.
     """
-    return moment.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    if not isinstance(command, dict) or command.get("mode") != "schedule":
+        return None
+    set_at = _parse_instant(command.get("setAt"))
+    if set_at is None:
+        return None
+    return _first_boundary_after(cfg, set_at.astimezone(now.tzinfo))
 
 
-def _screen_now_is_set_now(value: object, now: datetime) -> bool:
-    """True when ``setAt`` is within :data:`FRESH_SKEW_S` of the server's now."""
-    if not isinstance(value, dict):
-        return False
-    set_at = _parse_instant(value.get("setAt"))
-    return set_at is not None and abs((now - set_at).total_seconds()) <= FRESH_SKEW_S
+def active_command(
+    command: dict | None,
+    cfg: dict,
+    now: datetime,
+    mode: ScreenMode | None = None,
+) -> dict | None:
+    """The command in force at ``now``, or None (design decisions 4 and 5).
 
+    A command belongs to the mode it was given in: one whose mode differs from
+    the screen's effective mode is absent. A Schedule command is also absent
+    once the first schedule boundary after ``setAt`` has passed. Nothing is
+    written here: the route clears such a command on its next write, so Settings
+    and home automation never show a stale "set by" after the schedule took over.
 
-def drop_superseded_screen_now(
-    layer: dict, changed_at: datetime | None, now: datetime | None = None
-) -> dict:
-    """The layer minus any ``screenNow`` that a screen-power change superseded.
-
-    A manual "Screen now" is set at a moment (``setAt``), and a hold set or
-    cleared later replaced it: both remove ``screenNow`` from the layer. A page
-    that did not see that change still carries the old choice and sends it back
-    with any save, so only a ``screenNow`` strictly newer than the change is a
-    person's fresh choice (calvin-ldeu). ``None`` means no change is known and
-    nothing is dropped.
-
-    ``setAt`` comes from the BROWSER clock, though, and ``changed_at`` from the
-    server's: ending a hold then saving the new choice happens within
-    milliseconds, so a phone even a second behind would look older than the
-    change and its press would be dropped. A ``setAt`` near the server's now
-    (:data:`FRESH_SKEW_S`, either direction) is therefore a person's fresh
-    choice: it is kept and re-stamped with the server's now, so every later
-    comparison uses one clock. Anything else follows the old rule.
-
-    ``now`` is for tests; the route uses the real clock. Returns a new dict.
+    ``mode`` is the mode the caller already computed for this screen (the layer
+    first, then the household). Passing it matters when a merged config carries
+    both spellings; without it the derivation reads the snake one and can
+    disagree with the answer (calvin-25g9 review).
     """
-    if changed_at is None:
-        return layer
-    moment = now if now is not None else datetime.now(UTC)
-    if moment.tzinfo is None:
-        moment = moment.replace(tzinfo=UTC)
-    kept = dict(layer)
-    for key in _NOW_KEYS:
-        if key not in kept:
-            continue
-        value = kept[key]
-        if _screen_now_is_set_now(value, moment):
-            kept[key] = {**value, "setAt": _set_at_text(moment)}
-        elif not _screen_now_is_fresh(value, changed_at):
-            kept.pop(key)
-    return kept
+    effective = mode or effective_mode(cfg)
+    if not isinstance(command, dict) or command.get("mode") != effective:
+        return None
+    if command.get("mode") == "schedule":
+        if _parse_instant(command.get("setAt")) is None:
+            return None
+        expiry = command_until(command, cfg, now)
+        if expiry is not None and now >= expiry:
+            return None
+    return command
+
+
+def public_command(command: dict | None) -> dict | None:
+    """The command without the API key's name (it is for an admin session only)."""
+    if not isinstance(command, dict):
+        return None
+    return {key: value for key, value in command.items() if key != "keyName"}
 
 
 def strip_holds(merged: dict) -> None:
@@ -214,6 +279,15 @@ def strip_holds(merged: dict) -> None:
     """
     for key in _HOLD_KEYS:
         merged.pop(key, None)
+
+
+def without_screen_now(layer: dict) -> dict:
+    """The layer minus any stored ``screenNow``/``screen_now``.
+
+    Settings no longer writes one, and the server strips both from every layer
+    write (calvin-25g9). Returns a new dict.
+    """
+    return {key: value for key, value in layer.items() if key not in _NOW_KEYS}
 
 
 def agent_view(
@@ -244,16 +318,50 @@ def agent_view(
     return view
 
 
-def project_hold(merged: dict, hold: dict | None) -> None:
-    """Put a hold into a config response (both spellings, as the agent reads both).
+def _drop_command_keys(payload: dict) -> None:
+    for key in (*_NOW_KEYS, *_HOLD_KEYS):
+        payload.pop(key, None)
 
-    The stored override layer never changes; ``by`` stays out of the response.
+
+def _set_command_keys(payload: dict, command: dict, *, hold: bool) -> None:
+    value = {"power": command["power"], "setAt": command["setAt"]}
+    for key in _NOW_KEYS:
+        payload[key] = dict(value)
+    if hold:
+        for key in _HOLD_KEYS:
+            payload[key] = dict(value)
+
+
+def project_mode(merged: dict, mode: str, command: dict | None) -> None:
+    """Put the mode into a config response as the screen's agent obeys it.
+
+    Schedule: the schedule switch as stored, and the command as ``screenNow``
+    (an older agent follows it to the next boundary). Always on: the switch off
+    and no command. External: the switch off, and the command as both
+    ``screenNow`` (an older agent, which has no boundary to stop at) and
+    ``screenHold`` (a new one). A screen set to External with no command yet is
+    on, because the projected switch is off and nothing else switches it.
+
+    Both spellings are written, as the agent reads both. The stored layer and
+    the household config never change; ``by`` and the key's name stay out of the
+    response.
     """
-    if hold is None:
+    if mode == "always_on":
+        for key in _SWITCH_KEYS:
+            merged[key] = False
+        _drop_command_keys(merged)
         return
-    value = {"power": hold["power"], "setAt": hold["setAt"]}
-    for key in (*_HOLD_KEYS, *_NOW_KEYS):
-        merged[key] = dict(value)
+    if mode == "external":
+        for key in _SWITCH_KEYS:
+            merged[key] = False
+        _drop_command_keys(merged)
+        if command is not None:
+            _set_command_keys(merged, command, hold=True)
+        return
+    # Schedule: the switch is exactly what the screen stores.
+    _drop_command_keys(merged)
+    if command is not None:
+        _set_command_keys(merged, command, hold=False)
 
 
 class ChangeLimiter:
