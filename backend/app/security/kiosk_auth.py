@@ -11,7 +11,7 @@ import hmac
 import re
 import time
 
-from fastapi import Request, Response
+from fastapi import HTTPException, Request, Response
 from loguru import logger
 
 from app.security.admin_auth import LoginRateLimiter, get_admin_store
@@ -182,6 +182,26 @@ async def _resolve_principal(request: Request) -> str | None:
         return None
     _renew_if_due(request, kiosk_id, active, issued)
     return kiosk_id
+
+
+async def require_screen_itself(request: Request, kiosk_id: str) -> None:
+    """Refuse a gated screen's agent-only write unless the caller is that screen.
+
+    An ungated screen behaves as it does today (peer checks and run ids still
+    apply in the handlers). A gated one accepts only its own secret or cookie:
+    no anonymous caller, no other screen, and no admin (calvin-0xns, design §3).
+    """
+    if await kiosk_principal(request) == kiosk_id:
+        return
+    from app.services.kiosk_view import is_gated, pairing_mode
+
+    paired = await get_credential_hash(kiosk_id) is not None
+    if not is_gated(paired, await pairing_mode()):
+        return
+    raise HTTPException(
+        status_code=401,
+        detail={"code": "kiosk_unpaired", "message": "This screen isn't paired."},
+    )
 
 
 async def kiosk_cookie_id(request: Request) -> str | None:

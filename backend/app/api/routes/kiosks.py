@@ -586,9 +586,14 @@ async def post_display_check_verdict(kiosk_id: str, body: display_check.VerdictR
 
 
 @router.post("/kiosks/{kiosk_id}/display-check")
-async def post_display_check_report(kiosk_id: str, body: display_check.AgentReport):
+async def post_display_check_report(
+    kiosk_id: str, body: display_check.AgentReport, request: Request
+):
     """The display agent's report on a run. Dropped unless it names the stored run."""
     _valid_id_or_400(kiosk_id)
+    # On a gated screen the run id is public, so the screen's own secret is
+    # what protects the report (calvin-0xns, design §8).
+    await kiosk_auth.require_screen_itself(request, kiosk_id)
     try:
         await display_check.record_report(kiosk_id, body)
     except (
@@ -667,7 +672,14 @@ async def kiosk_screen_sleep(kiosk_id: str, request: Request):
     _valid_id_or_400(kiosk_id)
     if not await kiosk_registry.kiosk_exists(kiosk_id):
         raise HTTPException(status_code=404, detail="Unknown kiosk")
-    if not await kiosk_registry.kiosk_has_peer(kiosk_id, direct_peer_ip(request)):
+    gated = kiosk_view.is_gated(
+        await kiosk_registry.get_credential_hash(kiosk_id) is not None,
+        await kiosk_view.pairing_mode(),
+    )
+    # Every KIOSK_ROUTES handler asks the shared gate; it passes on an ungated
+    # screen, which then keeps today's peer check (calvin-0xns).
+    await kiosk_auth.require_screen_itself(request, kiosk_id)
+    if not gated and not await kiosk_registry.kiosk_has_peer(kiosk_id, direct_peer_ip(request)):
         raise HTTPException(status_code=403, detail="Only the kiosk itself can report this")
     lock_kiosk_sessions(kiosk_id)
     logger.info(f"Kiosk {kiosk_id!r} screen asleep: its admin sessions ended")
