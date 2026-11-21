@@ -9,6 +9,7 @@
     <ReloadLight />
     <OnScreenKeyboardLoader />
     <AdminSignInDialog />
+    <PairingStrip />
   </div>
 </template>
 
@@ -22,6 +23,7 @@ import ReloadLight from "./components/ReloadLight.vue";
 import OnScreenKeyboardLoader from "./components/ui/OnScreenKeyboardLoader.vue";
 import AdminSignInDialog from "./components/auth/AdminSignInDialog.vue";
 import ConnectionStatus from "./components/ConnectionStatus.vue";
+import PairingStrip from "./components/PairingStrip.vue";
 import { useClockBarVisible } from "./composables/useClockBarVisible";
 // Drop retired per-browser values once, before anything reads the screen config
 import { removeRetiredBrowserSettings } from "./utils/screenSetting";
@@ -82,7 +84,7 @@ if (!guest) {
 <style>
 .app-shell {
   width: 100%;
-  height: 100vh;
+  height: calc(100vh - var(--pairing-strip-h, 0px));
   margin: 0;
   padding: 0;
 }

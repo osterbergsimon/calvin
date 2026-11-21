@@ -43,6 +43,11 @@ function isUncachedApi(url, request) {
   const path = url.pathname;
   if (path === "/api/health" || path.startsWith("/api/health/")) return true;
   if (path.startsWith("/api/system/")) return true;
+  // Pairing routes: GET .../pair answers a screen's own pending code, and
+  // .../browser-session swaps its secret for the cookie. Never replay either
+  // from a cache (calvin-0xns).
+  if (path === "/api/kiosks/pairings" || path.startsWith("/api/kiosks/pairings/")) return true;
+  if (/^\/api\/kiosks\/[^/]+\/(?:pair|browser-session)$/.test(path)) return true;
   // Full-size photos are large and rotate constantly; thumbnails are small.
   if (path.startsWith("/api/images/") && !path.endsWith("/thumbnail")) return true;
   return (request.headers.get("accept") || "").includes("text/event-stream");

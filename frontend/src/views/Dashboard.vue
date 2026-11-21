@@ -680,7 +680,7 @@ onUnmounted(() => {
 <style scoped>
 .dashboard {
   width: 100%;
-  height: 100vh;
+  height: calc(100vh - var(--pairing-strip-h, 0px));
   display: flex;
   flex-direction: column;
   padding: 0;
@@ -883,7 +883,7 @@ onUnmounted(() => {
 .layout-unlock-banner {
   position: fixed;
   left: 50%;
-  bottom: var(--gap-4);
+  bottom: calc(var(--gap-4) + var(--pairing-strip-h, 0px));
   transform: translateX(-50%);
   z-index: var(--z-dialog);
   display: flex;

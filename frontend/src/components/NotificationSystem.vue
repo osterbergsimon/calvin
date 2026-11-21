@@ -274,7 +274,7 @@ defineExpose({
 }
 
 .hud--bottom {
-  bottom: 1rem;
+  bottom: calc(1rem + var(--pairing-strip-h, 0px));
   left: 50%;
   transform: translateX(-50%);
 }

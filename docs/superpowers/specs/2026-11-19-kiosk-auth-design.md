@@ -660,6 +660,13 @@ plainly what the sections above imply. The owner settled the three remaining que
   screen only.
 - **The fragment hand-off** sends the secret over plain HTTP once per browser start, as every
   later request sends the cookie.
+- **The start URL in the browser's Navigation Timing entry.** Removing `#pair=` with
+  `history.replaceState` clears the address bar, but no web API clears
+  `performance.getEntriesByType("navigation")[0].name`, which keeps the full start URL for the
+  life of the page. A same-origin script (an admin-installed web-component plugin) could read the
+  secret there. It can already act as the screen, because the browser sends the HttpOnly cookie
+  with its requests, so knowing the secret adds no access it lacks. Accepted; Calvin itself keeps
+  the secret in no storage, app state, log line or later request.
 - **A one-time install code** sniffed within its 30 minutes can pair one screen with an id the
   attacker chooses. That gives the attacker a screen of their own, never someone else's. It shows
   up in Screens, and **Remove** deletes it.
