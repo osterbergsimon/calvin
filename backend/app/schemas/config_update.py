@@ -237,6 +237,19 @@ class ConfigUpdate(BaseModel):
                 raise ValueError("send clockBarDesign, not clock_bar_design")
         return data
 
+    @model_validator(mode="before")
+    @classmethod
+    def _check_snake_case_screen_power(cls, data: Any) -> Any:
+        # The stored spelling is still read and written on the household config;
+        # extra="allow" would otherwise let any value through, since only the
+        # camelCase field is typed. An invalid value must be refused, not turned
+        # into the derived mode (calvin-25g9 review).
+        if isinstance(data, dict):
+            value = data.get("screen_power")
+            if value is not None and value not in ("schedule", "always_on", "external"):
+                raise ValueError("screen_power: use schedule, always_on or external")
+        return data
+
     @model_validator(mode="after")
     def _check_floor_under_limit(self) -> ConfigUpdate:
         floor, limit = self.brightnessFloor, self.brightnessLimit

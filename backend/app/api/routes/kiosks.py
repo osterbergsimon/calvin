@@ -74,10 +74,10 @@ async def get_kiosks(request: Request, response: Response):
         overrides = row.get("overrides") or {}
         merged = merge_overrides(base, overrides)
         power_mode = screen_power.effective_mode_for(base, overrides)
-        merged["screenPower"] = power_mode
+        screen_power.set_mode_spellings(merged, power_mode)
         row["screenPower"] = power_mode
         row["powerHold"] = screen_power.active_command(
-            row.get("powerHold"), merged, screen_power.now_in(merged)
+            row.get("powerHold"), merged, screen_power.now_in(merged), power_mode
         )
         visible = kiosk_view.can_see_presence(
             admin=admin,
@@ -123,10 +123,17 @@ async def _can_see_this_screen_presence(request: Request, kiosk_id: str) -> bool
 async def put_kiosk_overrides(kiosk_id: str, body: OverridesBody):
     """Replace a kiosk's override layer (upsert). Validated + size-capped."""
     _valid_id_or_400(kiosk_id)
-    _check_floor_under_limit(merge_overrides(await build_global_config(), body.overrides))
+    base = await build_global_config()
+    old_layer = await get_overrides(kiosk_id) or {}
+    _check_floor_under_limit(merge_overrides(base, body.overrides))
     _checked_overrides(body.overrides)
     layer = screen_power.without_screen_now(screen_power.sync_mode_keys(body.overrides))
     await set_overrides(kiosk_id, layer)
+    # A replaced layer that changed this screen's mode ends its command (decision 5).
+    if screen_power.effective_mode_for(base, layer) != screen_power.effective_mode_for(
+        base, old_layer
+    ):
+        await kiosk_registry.clear_power_command(kiosk_id)
     return {"id": kiosk_id, "overrides": layer}
 
 
@@ -221,14 +228,20 @@ async def patch_kiosk_overrides(kiosk_id: str, body: OverridesBody, request: Req
                 },
             )
     stored = await get_overrides(kiosk_id)
+    base = await build_global_config()
     if stored is not None:
         layer = {**stored, **body.overrides}
-        _check_floor_under_limit(merge_overrides(await build_global_config(), layer))
+        _check_floor_under_limit(merge_overrides(base, layer))
     _checked_overrides(body.overrides)
     partial = screen_power.without_screen_now(screen_power.sync_mode_keys(body.overrides))
     merged = await merge_into_overrides(kiosk_id, partial)
     if merged is None:
         raise HTTPException(status_code=404, detail="Unknown kiosk")
+    # A partial write that changed this screen's mode ends its command (decision 5).
+    if screen_power.effective_mode_for(base, merged) != screen_power.effective_mode_for(
+        base, stored or {}
+    ):
+        await kiosk_registry.clear_power_command(kiosk_id)
     # This answer is open to unpaired callers for ``showUI``, so it goes through
     # the same presence projection as the GET and never the host-internal keys
     # (calvin-0xns, PR #385 review).
@@ -279,9 +292,10 @@ async def _screen_state(
     base = await build_global_config()
     merged = merge_overrides(base, status["overrides"])
     mode = screen_power.effective_mode_for(base, status["overrides"])
-    merged["screenPower"] = mode  # the command is judged against the effective mode
+    # Both spellings, so the command is judged by the same mode the answer shows.
+    screen_power.set_mode_spellings(merged, mode)
     now = screen_power.now_in(merged)
-    command = screen_power.active_command(status["command"], merged, now)
+    command = screen_power.active_command(status["command"], merged, now, mode)
     return merged, mode, command, now
 
 
@@ -848,12 +862,12 @@ async def get_kiosk_config(
     merged = merge_overrides(base, overrides)
     merged.pop("_agentUpdateRequested", None)  # never expose the host-internal flag verbatim
     power_mode = screen_power.effective_mode_for(base, overrides)
-    merged["screenPower"] = power_mode
+    screen_power.set_mode_spellings(merged, power_mode)
     merged = screen_power.without_screen_now(merged)  # the command is the only source
     screen_power.strip_holds(merged)  # only the command column switches a screen
     now = screen_power.now_in(merged)
     command = screen_power.active_command(
-        await kiosk_registry.get_power_command(kiosk_id), merged, now
+        await kiosk_registry.get_power_command(kiosk_id), merged, now, power_mode
     )
     screen_power.project_mode(merged, power_mode, command)
     version = device_config_version(merged)

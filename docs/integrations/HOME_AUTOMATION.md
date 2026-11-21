@@ -9,10 +9,12 @@ Each screen has one **Screen power** mode, chosen in Settings:
 | **Always on** | Never turns off on a schedule. Turn off when idle still applies. |
 | **External** | Homey, Home Assistant or a script with an API key turns it on and off. |
 
-Home automation switches only a screen set to **External**. A screen follows the household
-default on the Default screen page until it has its own choice (**Changed here**). Changing
-the mode never edits the screen's schedule: it is only hidden in Always on and External, and
-comes back unchanged when Schedule is chosen again.
+Home automation normally switches a screen set to **External**. A screen set to **Schedule**
+also accepts a command: it stands until the screen's next scheduled change, or, when no
+scheduled change is ahead at all, until the next command or mode change. A screen follows the
+household default on the Default screen page until it has its own choice (**Changed here**).
+Changing the mode never edits the screen's schedule: it is only hidden in Always on and
+External, and comes back unchanged when Schedule is chosen again.
 
 It uses a limited API key that can switch screens and read their state.
 
@@ -52,7 +54,9 @@ What the call does follows the screen's mode:
 | **Always on** | `409 screen_power_always_on`: **This screen is set to Always on. Choose Schedule or External to switch it.** | Nothing to clear: the screen stays on. |
 
 A request that changes nothing writes nothing and does not count toward the change limit.
-Repeating a call is harmless.
+Repeating a call is harmless. Changing the mode ends the current command, so a screen that
+leaves External and comes back starts with no command yet (on); in Schedule it follows its
+schedule again.
 
 ```bash
 curl -X PUT -H "Authorization: Bearer clv_YOUR_KEY_HERE" \
@@ -79,7 +83,9 @@ The answer, and `GET` on the same path, is the screen's state:
   a signed-in admin.
 - `setAt` is when that command was given.
 - `until` is when a Schedule command ends: the next scheduled change. It is `null` in External
-  and Always on, when there is no command, and when no change comes in the next 8 days.
+  and Always on, when there is no command, and when no change comes in the next 8 days. With
+  no scheduled change ahead at all (for example every day disabled), a Schedule command
+  stands until the next command or mode change.
 - `keyName` is the API key's name, for a signed-in admin only. Every other caller, this key
   included, gets `null`; then the screen reads **set by home automation**.
 - `desiredOn` is what the screen will do. The screen does not report whether its panel is

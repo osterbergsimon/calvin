@@ -105,6 +105,20 @@ def test_the_schema_accepts_only_the_three_modes():
         ConfigUpdate(screenPower="always-on")
 
 
+def test_the_schema_validates_the_snake_case_spelling_too():
+    assert ConfigUpdate(screen_power="external").model_dump()["screen_power"] == "external"
+    with pytest.raises(ValidationError):
+        ConfigUpdate(screen_power="always-on")
+
+
+def test_set_mode_spellings_writes_both():
+    from app.services.screen_power import set_mode_spellings
+
+    cfg = {"screen_power": "external", "screenPower": "external", "display_schedule_enabled": False}
+    set_mode_spellings(cfg, "schedule")
+    assert cfg["screen_power"] == cfg["screenPower"] == "schedule"
+
+
 def test_sanitize_drops_an_invalid_stored_mode():
     assert sanitize_overrides({"screenPower": "dim", "displayName": "Hall"}) == {
         "displayName": "Hall"

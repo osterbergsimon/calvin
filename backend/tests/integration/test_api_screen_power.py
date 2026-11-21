@@ -261,12 +261,17 @@ def test_an_expired_command_reads_as_schedule_without_a_write(test_client: TestC
 
 
 @pytest.mark.integration
-def test_a_command_from_another_mode_is_absent(test_client: TestClient):
-    """Decision 5: changing the mode ends the command, with no write on the read."""
+def test_a_command_from_another_mode_is_read_as_absent(test_client: TestClient):
+    """Decision 5's read rule: a mismatched command is absent, and a read keeps it."""
+    from app.services import kiosk_registry
+
     _register(test_client)
-    _set_command("off", "schedule", datetime.now(UTC))
+    # A command from another mode, as an older backend or a hand-edited row
+    # could leave it; a household change now clears it on the write itself.
+    asyncio.run(kiosk_registry.set_power_command(KIOSK, "off", "automation", mode="external"))
     stored_before = _stored_command()
-    test_client.post("/api/config", json={"screenPower": "external"})
+    assert stored_before["mode"] == "external"
+
     body = test_client.get(URL).json()
     assert (body["power"], body["held"], body["setAt"], body["by"]) == (
         "schedule",
@@ -274,12 +279,12 @@ def test_a_command_from_another_mode_is_absent(test_client: TestClient):
         None,
         None,
     )
-    assert body["desiredOn"] is True  # External without a command means on
-    assert _stored_command() == stored_before
+    assert body["desiredOn"] is True  # Schedule without a command follows the schedule
+    assert _stored_command() == stored_before  # a read never clears
 
-    # The next write in External starts a fresh command.
-    assert test_client.put(URL, json={"power": "off"}).status_code == 200
-    assert _stored_command()["mode"] == "external"
+    # The next write replaces it with a command in the screen's own mode.
+    assert test_client.put(URL, json={"power": "on"}).status_code == 200
+    assert _stored_command()["mode"] == "schedule" and _stored_command()["power"] == "on"
 
 
 @pytest.mark.integration
@@ -558,6 +563,188 @@ def test_a_gated_list_row_hides_the_mode_like_the_other_presence_fields(
     assert row["presenceHidden"] is True
     assert "screenPower" not in row
     assert "powerHold" not in row
+
+
+# -- a mode change ends the command (design decision 5) ---------------------
+
+
+@pytest.mark.integration
+def test_leaving_and_reentering_external_starts_with_no_command(test_client: TestClient):
+    _register(test_client, mode="external")
+    assert test_client.put(URL, json={"power": "off"}).json()["power"] == "off"
+    assert _stored_command()["mode"] == "external"
+
+    _set_mode(test_client, "always_on")
+    _set_mode(test_client, "external")
+    view = test_client.get(URL).json()
+    assert view["mode"] == "external"
+    assert (view["power"], view["held"], view["setAt"], view["by"]) == (
+        "schedule",
+        False,
+        None,
+        None,
+    )
+    assert view["desiredOn"] is True
+    assert _stored_command() is None
+
+
+@pytest.mark.integration
+def test_leaving_and_reentering_schedule_ends_the_command(test_client: TestClient):
+    _register(test_client, mode="schedule")
+    assert test_client.put(URL, json={"power": "off"}).json()["power"] == "off"
+    assert _stored_command()["mode"] == "schedule"
+
+    _set_mode(test_client, "external")
+    _set_mode(test_client, "schedule")
+    view = test_client.get(URL).json()
+    assert view["mode"] == "schedule"
+    assert (view["power"], view["held"], view["setAt"], view["until"]) == (
+        "schedule",
+        False,
+        None,
+        None,
+    )
+    assert view["desiredOn"] is True
+    assert _stored_command() is None
+
+
+@pytest.mark.integration
+def test_a_household_mode_change_ends_a_following_screens_command_only(
+    test_client: TestClient,
+):
+    _register(test_client, mode="external")
+    assert test_client.get("/api/kiosks/hall/config?khost=pi-hall").status_code == 200
+    test_client.put(URL, json={"power": "off"})  # kitchen follows the household
+    # Hall has its own mode (Schedule) and a command of its own.
+    test_client.patch("/api/kiosks/hall/overrides", json={"overrides": {"screenPower": "schedule"}})
+    assert (
+        test_client.put("/api/kiosks/hall/screen-power", json={"power": "off"}).status_code == 200
+    )
+    assert _stored_command()["mode"] == "external"
+    assert _stored_command("hall")["mode"] == "schedule"
+
+    _set_mode(test_client, "always_on")
+    assert _stored_command() is None  # kitchen followed the household mode
+    assert _stored_command("hall")["mode"] == "schedule"  # hall kept its own mode
+    hall = test_client.get("/api/kiosks/hall/screen-power").json()
+    assert hall["mode"] == "schedule" and hall["power"] == "off"
+
+
+@pytest.mark.integration
+def test_an_override_mode_change_ends_the_command(test_client: TestClient):
+    _register(test_client, mode="external")
+    test_client.put(URL, json={"power": "off"})
+
+    test_client.patch(OVERRIDES_URL, json={"overrides": {"screenPower": "schedule"}})
+    assert _stored_command() is None
+    view = test_client.get(URL).json()
+    assert view["mode"] == "schedule" and view["power"] == "schedule"
+    assert view["desiredOn"] is True
+
+    # Coming back to External still starts with no command, which is on.
+    test_client.patch(OVERRIDES_URL, json={"overrides": {"screenPower": "external"}})
+    assert _stored_command() is None
+    view = test_client.get(URL).json()
+    assert view["mode"] == "external" and view["power"] == "schedule"
+    assert view["desiredOn"] is True
+
+
+@pytest.mark.integration
+def test_replacing_a_layer_with_another_mode_ends_the_command(test_client: TestClient):
+    _register(test_client, mode="schedule")
+    test_client.put(URL, json={"power": "off"})
+    assert _stored_command()["mode"] == "schedule"
+
+    response = test_client.put(OVERRIDES_URL, json={"overrides": {"screenPower": "external"}})
+    assert response.status_code == 200
+    assert _stored_command() is None
+    view = test_client.get(URL).json()
+    assert view["mode"] == "external" and view["power"] == "schedule"
+    assert view["desiredOn"] is True
+
+
+# -- a legacy layer agrees on its mode everywhere (calvin-25g9 review) ------
+
+
+@pytest.mark.integration
+def test_a_legacy_layer_under_an_external_household_agrees_everywhere(
+    test_client: TestClient,
+):
+    """A layer from before the mode existed carries only displayScheduleEnabled."""
+    from app.services import kiosk_registry
+
+    _register(test_client, mode="external")
+    asyncio.run(
+        kiosk_registry.set_overrides(
+            KIOSK, {"displayScheduleEnabled": True, "displaySchedule": NO_SCHEDULE}
+        )
+    )
+    # The screen's own switch decides: it is Schedule, not the household External.
+    assert test_client.get(URL).json()["mode"] == "schedule"
+
+    put = test_client.put(URL, json={"power": "off"}).json()
+    assert put["mode"] == "schedule"
+    assert put["power"] == "off" and put["held"] is True
+    assert put["desiredOn"] is False
+
+    config = test_client.get(f"/api/kiosks/{KIOSK}/config").json()
+    assert config["screenNow"]["power"] == "off"
+    assert "screenHold" not in config and "screen_hold" not in config
+
+    row = _listed(test_client)
+    assert row["screenPower"] == "schedule"
+    assert row["powerHold"]["power"] == "off"
+
+
+@pytest.mark.integration
+def test_a_layer_without_mode_keys_follows_external_everywhere(test_client: TestClient):
+    from app.services import kiosk_registry
+
+    _register(test_client, mode="external")
+    asyncio.run(kiosk_registry.set_overrides(KIOSK, {"displayName": "Kitchen"}))
+    assert test_client.get(URL).json()["mode"] == "external"
+
+    put = test_client.put(URL, json={"power": "off"}).json()
+    assert put["mode"] == "external" and put["power"] == "off" and put["held"] is True
+
+    config = test_client.get(f"/api/kiosks/{KIOSK}/config").json()
+    assert config["screenNow"]["power"] == "off"
+    assert config["screenHold"]["power"] == "off"
+    assert config["displayScheduleEnabled"] is False
+    assert config["display_schedule_enabled"] is False
+
+    row = _listed(test_client)
+    assert row["screenPower"] == "external"
+    assert row["powerHold"]["power"] == "off"
+
+
+# -- a value outside the modes is refused (calvin-25g9 review) --------------
+
+
+@pytest.mark.integration
+def test_an_invalid_snake_household_mode_is_422(test_client: TestClient):
+    assert test_client.post("/api/config", json={"screen_power": "bogus"}).status_code == 422
+    assert test_client.post("/api/config", json={"screen_power": "always-on"}).status_code == 422
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("verb", ["put", "patch"])
+def test_an_invalid_snake_screen_mode_is_400(test_client: TestClient, verb):
+    _register(test_client)
+    response = getattr(test_client, verb)(
+        OVERRIDES_URL, json={"overrides": {"screen_power": "bogus"}}
+    )
+    assert response.status_code == 400
+
+
+@pytest.mark.integration
+def test_a_valid_snake_household_mode_is_accepted(test_client: TestClient):
+    response = test_client.post("/api/config", json={"screen_power": "external"})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["screenPower"] == "external"
+    assert body["displayScheduleEnabled"] is False
+    assert body["screen_power"] == "external"
 
 
 # -- projection to the agent (design decision 6) ----------------------------

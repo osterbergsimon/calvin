@@ -672,7 +672,19 @@ async def update_config(config_update: ConfigUpdate, request: Request):
 
         await calendar_scheduler.set_refresh_interval(calendar_refresh_interval)
 
+    # A household write that moves the mode ends the command on every screen
+    # that follows the household (decision 5); a screen with its own mode keeps
+    # it. Snapshot the old config only for a write that can touch the mode.
+    old_config = None
+    if "screen_power" in update_dict or "display_schedule_enabled" in update_dict:
+        old_config = await config_service.get_config()
     await config_service.update_config(update_dict)
+    if old_config is not None:
+        new_config = await config_service.get_config()
+        if screen_power.effective_mode(old_config) != screen_power.effective_mode(new_config):
+            from app.services.kiosk_registry import clear_commands_for_mode_change
+
+            await clear_commands_for_mode_change(old_config, new_config)
 
     # Apply display orientation if orientation settings changed and rotation is enabled
     if (

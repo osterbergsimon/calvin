@@ -7,6 +7,7 @@ import pytest
 from app.services.screen_power import (
     active_command,
     command_until,
+    effective_mode,
     public_command,
 )
 
@@ -56,6 +57,19 @@ def test_a_command_from_another_mode_is_absent():
     assert active_command(_command(mode="external"), SCHEDULE, _at(15)) is None
     assert active_command(_command(mode="schedule"), EXTERNAL, _at(15)) is None
     assert active_command(_command(mode="schedule"), {"screenPower": "always_on"}, _at(15)) is None
+
+
+def test_the_callers_mode_decides_over_a_disagreeing_config():
+    """A merged config can carry the household's snake value next to the screen's.
+
+    The caller has already computed the screen's mode (its own layer first), so
+    it must be the one the command is judged against (calvin-25g9 review).
+    """
+    cfg = {**SCHEDULE, "screen_power": "external", "screenPower": "schedule"}
+    assert effective_mode(cfg) == "external"  # the snake spelling is read first
+    assert active_command(_command(mode="schedule"), cfg, _at(15)) is None
+    assert active_command(_command(mode="schedule"), cfg, _at(15), "schedule") is not None
+    assert active_command(_command(mode="external"), cfg, _at(15), "external") is not None
 
 
 def test_absent_or_malformed_commands_are_absent():

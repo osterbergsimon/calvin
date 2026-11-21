@@ -53,7 +53,7 @@ def _should_be_on(now_t: time, on_t: time, off_t: time) -> bool:
     return on_t <= now_t < off_t
 
 
-def _mode_value(value: object) -> ScreenMode | None:
+def mode_value(value: object) -> ScreenMode | None:
     """One of :data:`MODES`, or None for anything else (a stale stored value)."""
     if isinstance(value, str) and value in MODES:
         return cast(ScreenMode, value)
@@ -72,7 +72,7 @@ def derived_mode(cfg: dict) -> ScreenMode:
 
 def effective_mode(cfg: dict) -> ScreenMode:
     """The screen's ``screenPower``: the stored value, else derived from the switch."""
-    return _mode_value(_get(cfg, *_MODE_KEYS)) or derived_mode(cfg)
+    return mode_value(_get(cfg, *_MODE_KEYS)) or derived_mode(cfg)
 
 
 def effective_mode_for(base: dict, layer: dict | None) -> ScreenMode:
@@ -84,12 +84,23 @@ def effective_mode_for(base: dict, layer: dict | None) -> ScreenMode:
     explicit mode wins over its switch, and its switch over the household.
     """
     layer = layer or {}
-    explicit = _mode_value(_get(layer, *_MODE_KEYS))
+    explicit = mode_value(_get(layer, *_MODE_KEYS))
     if explicit is not None:
         return explicit
     if any(key in layer for key in _SWITCH_KEYS):
         return derived_mode(layer)
     return effective_mode(base)
+
+
+def set_mode_spellings(cfg: dict, mode: ScreenMode) -> None:
+    """Write the mode under both spellings, so no reader can disagree (calvin-25g9).
+
+    The household config stores ``screen_power`` while a merged response can
+    carry both; ``effective_mode`` reads the snake first, so a reader that sees
+    only the camel spelling would derive a different mode.
+    """
+    for key in _MODE_KEYS:
+        cfg[key] = mode
 
 
 def sync_mode_keys(layer: dict, *, snake: bool = False) -> dict:
@@ -111,7 +122,7 @@ def sync_mode_keys(layer: dict, *, snake: bool = False) -> dict:
     other_switch = "displayScheduleEnabled" if snake else "display_schedule_enabled"
     if not any(key in layer for key in (mode_key, other_mode, switch_key, other_switch)):
         return layer
-    mode = _mode_value(layer.get(mode_key, layer.get(other_mode))) or derived_mode(layer)
+    mode = mode_value(layer.get(mode_key, layer.get(other_mode))) or derived_mode(layer)
     synced = {key: value for key, value in layer.items() if key not in (other_mode, other_switch)}
     synced[mode_key] = mode
     synced[switch_key] = mode == "schedule"
@@ -221,7 +232,12 @@ def command_until(command: dict | None, cfg: dict, now: datetime) -> datetime | 
     return _first_boundary_after(cfg, set_at.astimezone(now.tzinfo))
 
 
-def active_command(command: dict | None, cfg: dict, now: datetime) -> dict | None:
+def active_command(
+    command: dict | None,
+    cfg: dict,
+    now: datetime,
+    mode: ScreenMode | None = None,
+) -> dict | None:
     """The command in force at ``now``, or None (design decisions 4 and 5).
 
     A command belongs to the mode it was given in: one whose mode differs from
@@ -229,8 +245,14 @@ def active_command(command: dict | None, cfg: dict, now: datetime) -> dict | Non
     once the first schedule boundary after ``setAt`` has passed. Nothing is
     written here: the route clears such a command on its next write, so Settings
     and home automation never show a stale "set by" after the schedule took over.
+
+    ``mode`` is the mode the caller already computed for this screen (the layer
+    first, then the household). Passing it matters when a merged config carries
+    both spellings; without it the derivation reads the snake one and can
+    disagree with the answer (calvin-25g9 review).
     """
-    if not isinstance(command, dict) or command.get("mode") != effective_mode(cfg):
+    effective = mode or effective_mode(cfg)
+    if not isinstance(command, dict) or command.get("mode") != effective:
         return None
     if command.get("mode") == "schedule":
         if _parse_instant(command.get("setAt")) is None:

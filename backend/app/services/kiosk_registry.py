@@ -1271,3 +1271,92 @@ async def migrate_strip_screen_now() -> int:
     if changed:
         logger.info(f"Dropped a stored Screen now from {changed} screen(s)")
     return changed
+
+
+@retry_on_db_locked()
+async def clear_commands_for_mode_change(old_cfg: dict, new_cfg: dict) -> int:
+    """Clear a command on every screen whose effective mode this write changed.
+
+    Decision 5: changing the mode ends the command, so leaving and re-entering
+    External cannot bring an old off back. A screen with its own mode keys keeps
+    its mode (and its command); the others follow the household and lose the
+    command when the household mode moved. Schedule and the layer spellings are
+    read exactly as :func:`screen_power.effective_mode_for` reads them.
+    Returns how many commands it cleared.
+    """
+    cleared = 0
+    for row in await KioskDB.objects.all():
+        layer = sanitize_overrides(row.overrides, kiosk_id=row.id)
+        before = screen_power.effective_mode_for(old_cfg, layer)
+        after = screen_power.effective_mode_for(new_cfg, layer)
+        if before == after or _valid_command(row.power_hold) is None:
+            continue
+        row.power_hold = None
+        await row.update(_columns=["power_hold"])
+        cleared += 1
+    if cleared:
+        logger.info(f"Cleared a screen power command on {cleared} screen(s) after a mode change")
+    return cleared
+
+
+@retry_on_db_locked()
+async def clear_mode_mismatched_commands(household: dict) -> int:
+    """Clear stored commands that the screen's effective mode no longer allows.
+
+    The restore counterpart of the write-time clear: a backup does not carry
+    the command column, so a pre-restore command can belong to a mode the
+    restored config no longer has. Dropping it keeps it from reviving when the
+    mode later returns. Returns how many it cleared.
+    """
+    cleared = 0
+    for row in await KioskDB.objects.all():
+        command = _valid_command(row.power_hold)
+        if command is None:
+            continue
+        layer = sanitize_overrides(row.overrides, kiosk_id=row.id)
+        if command["mode"] == screen_power.effective_mode_for(household, layer):
+            continue
+        row.power_hold = None
+        await row.update(_columns=["power_hold"])
+        cleared += 1
+    if cleared:
+        logger.info(f"Cleared {cleared} stored screen power command(s) after a restore")
+    return cleared
+
+
+@retry_on_db_locked()
+async def migrate_drop_invalid_modes() -> int:
+    """Drop a stored mode that is not one of the three, and warn (calvin-25g9).
+
+    A backup can carry anything. Removing the value falls back to the mode
+    derived from ``displayScheduleEnabled`` instead of breaking the config, and
+    the warning names what was dropped. Idempotent. Returns how many values it
+    dropped across the household config and every layer.
+    """
+    from app.services.config_service import config_service
+
+    dropped = 0
+    for key in ("screen_power", "screenPower"):
+        value = await config_service.get_value(key)
+        if value is None or screen_power.mode_value(value) is not None:
+            continue
+        logger.warning(
+            f"Dropping invalid household screen power {value!r}; deriving it from the schedule"
+        )
+        await config_service.delete_value(key)
+        dropped += 1
+    for row in await KioskDB.objects.all():
+        layer = dict(row.overrides or {})
+        changed = False
+        for key in ("screen_power", "screenPower"):
+            value = layer.get(key)
+            if value is None or screen_power.mode_value(value) is not None:
+                continue
+            logger.warning(f"Dropping invalid screen power {value!r} on screen {row.id!r}")
+            del layer[key]
+            changed = True
+        if changed:
+            row.overrides = layer
+            await row.update(_columns=["overrides"])
+            dropped += 1
+    return dropped
