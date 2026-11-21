@@ -114,6 +114,128 @@ describe("pairing poll", () => {
   });
 });
 
+describe("a poll failure while a code is showing", () => {
+  it.each([
+    ["a dropped network", () => new Error("network down")],
+    ["a 5xx answer", () => ({ response: { status: 503 } })],
+  ])("keeps the code and schedules the next poll after %s", async (_name, failure) => {
+    vi.useFakeTimers();
+    api.get
+      .mockResolvedValueOnce({ data: PENDING })
+      .mockRejectedValueOnce(failure())
+      .mockResolvedValueOnce({ data: { state: "paired" } });
+
+    const store = usePairingStore();
+    await store.poll();
+    expect(store.state).toBe("pending");
+
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(api.get).toHaveBeenCalledTimes(2);
+    expect(store.state).toBe("pending");
+    expect(store.code).toBe("K7Q-4MD");
+    expect(store.showStrip).toBe(true);
+
+    // The timer was kept, so a later answer still ends the pairing.
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(api.get).toHaveBeenCalledTimes(3);
+    expect(store.state).toBe("paired");
+    expect(store.showStrip).toBe(false);
+  });
+
+  it.each([401, 404])("ends the strip on a %i", async status => {
+    vi.useFakeTimers();
+    api.get
+      .mockResolvedValueOnce({ data: PENDING })
+      .mockRejectedValueOnce({ response: { status } });
+
+    const store = usePairingStore();
+    await store.poll();
+    expect(store.state).toBe("pending");
+
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(store.state).toBe("none");
+    expect(store.showStrip).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(60000);
+    expect(api.get).toHaveBeenCalledTimes(2);
+  });
+
+  it("clears the strip when the server answers none", async () => {
+    api.get.mockResolvedValueOnce({ data: PENDING }).mockResolvedValueOnce({ data: NONE });
+
+    const store = usePairingStore();
+    await store.poll();
+    expect(store.showStrip).toBe(true);
+
+    await store.poll();
+    expect(store.state).toBe("none");
+    expect(store.showStrip).toBe(false);
+  });
+});
+
+describe("overlapping polls", () => {
+  it("ignores an older poll's late pending answer after a newer poll paired", async () => {
+    vi.useFakeTimers();
+    let resolveFirst;
+    api.get
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveFirst = resolve;
+          })
+      )
+      .mockResolvedValueOnce({ data: { state: "paired" } });
+
+    const store = usePairingStore();
+    const first = store.poll();
+    await store.poll();
+    expect(store.state).toBe("paired");
+
+    // The first request now answers pending: it is stale, and must not put the
+    // strip back or restart the timer.
+    resolveFirst({ data: PENDING });
+    await first;
+    expect(store.state).toBe("paired");
+    expect(store.code).toBeNull();
+    expect(store.showStrip).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(60000);
+    expect(api.get).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("a paired screen", () => {
+  const paired = {
+    state: "paired",
+    mode: "optional",
+    hasAgent: true,
+    browser: "paired",
+  };
+
+  it("makes no pairing request on a config answer when both say paired", async () => {
+    api.get.mockResolvedValueOnce({ data: { state: "paired" } });
+
+    const store = usePairingStore();
+    await store.poll();
+    expect(store.state).toBe("paired");
+    api.get.mockClear();
+
+    await store.observeConfig(paired);
+    expect(api.get).not.toHaveBeenCalled();
+  });
+
+  it("still reads its state when the config does not say paired", async () => {
+    api.get.mockResolvedValue({ data: { state: "paired" } });
+
+    const store = usePairingStore();
+    await store.poll();
+    api.get.mockClear();
+
+    await store.observeConfig({ ...paired, state: "unpaired", browser: "unpaired" });
+    expect(api.get).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("browser-only pairing", () => {
   const unpairedNoAgent = {
     state: "unpaired",

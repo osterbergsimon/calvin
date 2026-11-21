@@ -1,5 +1,5 @@
 <template>
-  <div class="settings-page">
+  <div class="settings-page" :class="{ 'settings-page--pinned': pairing.showStrip }">
     <SettingsTopBar
       :category-label="auth.authenticated ? topBarTitle : 'Settings'"
       :section-label="auth.authenticated && !phone ? sectionLabel : ''"
@@ -127,6 +127,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useConfigForm } from "@/composables/useConfigForm";
 import { useModeStore } from "@/stores/mode";
 import { useAuthStore } from "@/stores/auth";
+import { usePairingStore } from "@/stores/kioskPairing";
 import { resolveScrollView, pickActiveEyebrow } from "@/utils/settingsSectionSpy";
 import { expandSettingsSection } from "@/utils/settingsSectionExpansion";
 import { scrollBehavior } from "@/utils/scrollIntoViewMotion";
@@ -171,6 +172,7 @@ const SecuritySettings = defineAsyncComponent(
 const router = useRouter();
 const route = useRoute();
 const modeStore = useModeStore();
+const pairing = usePairingStore();
 const auth = useAuthStore();
 
 const categories = settingsCategories;
@@ -599,7 +601,7 @@ onUnmounted(() => {
 
 <style scoped>
 .settings-page {
-  height: 100dvh;
+  height: calc(100dvh - var(--pairing-strip-h, 0px));
   overflow: hidden;
   background: var(--bg-1);
   color: var(--ink);
@@ -689,7 +691,7 @@ onUnmounted(() => {
 
   .settings-page {
     height: auto;
-    min-height: 100dvh;
+    min-height: calc(100dvh - var(--pairing-strip-h, 0px));
     overflow: visible;
   }
   .settings-content {
@@ -706,7 +708,7 @@ onUnmounted(() => {
 @media (max-height: 600px) and (--bp-phone) {
   .settings-page {
     height: auto;
-    min-height: 100dvh;
+    min-height: calc(100dvh - var(--pairing-strip-h, 0px));
     overflow: visible;
   }
   .settings-body {
@@ -715,5 +717,17 @@ onUnmounted(() => {
   .settings-content {
     overflow-y: visible;
   }
+}
+
+/* A kiosk showing the pairing strip has no page scroll: whatever the width,
+   keep the constrained internal scroll so the strip stays on screen
+   (docs/design/2026-11-21-kiosk-pairing.md, G1). */
+.settings-page.settings-page--pinned {
+  height: calc(100dvh - var(--pairing-strip-h, 0px));
+  min-height: 0;
+  overflow: hidden;
+}
+.settings-page--pinned .settings-body {
+  overflow-y: auto;
 }
 </style>

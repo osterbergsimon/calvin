@@ -78,6 +78,16 @@ test("removes #pair before any request and shows the code until approval", async
     })
   );
 
+  // Boot order, pinned at request time: when the first /api call leaves the
+  // page, the fragment must already be gone from the address bar (review of
+  // PR #386, minor 8). A route handler that only checks page.url() afterwards
+  // would miss a fragment removed after the first request.
+  const urlsAtRequest = [];
+  await page.route("**/api/**", async route => {
+    urlsAtRequest.push(page.url());
+    await route.fallback();
+  });
+
   await page.goto(`/?kiosk=kitchen&khost=kiosk#pair=${SECRET}`);
 
   const strip = page.locator(".pairing-strip");
@@ -91,6 +101,9 @@ test("removes #pair before any request and shows the code until approval", async
   // The secret left the address bar and never entered a URL or a Referer.
   // Router boot must not put the fragment back after its first navigation.
   await page.waitForTimeout(300);
+  expect(urlsAtRequest.length).toBeGreaterThan(0);
+  expect(urlsAtRequest[0]).not.toContain("#pair");
+  expect(urlsAtRequest[0]).not.toContain("clv_kiosk_");
   expect(page.url()).not.toContain("#pair");
   expect(page.url()).not.toContain("clv_kiosk_");
   for (const request of requests) {
@@ -112,6 +125,55 @@ test("removes #pair before any request and shows the code until approval", async
       page.evaluate(() => document.documentElement.style.getPropertyValue("--pairing-strip-h"))
     )
     .toBe("0px");
+});
+
+test.describe("the strip stays on screen on the Settings route", () => {
+  // G1: the strip shows on every route, Settings included. `.settings-page`
+  // used to be a full 100dvh tall, so the strip was drawn just below the
+  // screen, where a chromeless kiosk cannot scroll to it (design-lead F1).
+  const frames = [
+    { name: "settings-landscape", width: 800, height: 480 },
+    { name: "settings-portrait", width: 480, height: 800 },
+  ];
+
+  for (const frame of frames) {
+    test(`${frame.name}`, async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: frame.width, height: frame.height });
+      const pair = { value: { state: "pending", code: CODE, expiresAt: "2026-11-21T10:10:00Z" } };
+      await installPairingMock(page, pair);
+
+      await page.goto(`/settings?kiosk=kitchen&khost=kiosk#pair=${SECRET}`);
+
+      const strip = page.locator(".pairing-strip");
+      await expect(strip).toBeVisible();
+      await expect(page.locator(".settings-page")).toBeVisible();
+      await expect(page.locator(".settings-page")).toHaveClass(/settings-page--pinned/);
+
+      const measured = await page.evaluate(() => {
+        const rect = document.querySelector(".pairing-strip").getBoundingClientRect();
+        const settings = document.querySelector(".settings-page");
+        return {
+          top: rect.top,
+          bottom: rect.bottom,
+          viewport: window.innerHeight,
+          pageHeight: settings.getBoundingClientRect().height,
+          scrollHeight: document.documentElement.scrollHeight,
+        };
+      });
+
+      // The whole strip is inside the viewport, and the page itself does not
+      // scroll: Settings keeps its own scroll above the strip.
+      expect(measured.top).toBeGreaterThanOrEqual(0);
+      expect(measured.bottom).toBeLessThanOrEqual(measured.viewport + 1);
+      expect(measured.pageHeight).toBeLessThanOrEqual(measured.viewport + 1);
+      expect(measured.scrollHeight).toBe(measured.viewport);
+
+      await page.screenshot({
+        path: testInfo.outputPath(`pairing-strip-${frame.name}.png`),
+        fullPage: false,
+      });
+    });
+  }
 });
 
 test.describe("the strip takes its own space at the bottom edge", () => {

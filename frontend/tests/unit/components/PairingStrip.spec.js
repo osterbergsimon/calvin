@@ -107,6 +107,9 @@ describe("PairingStrip", () => {
     const strip = wrapper.find(".pairing-strip");
     const title = wrapper.find(`#${strip.attributes("aria-labelledby")}`);
     expect(title.text()).toBe(TITLE);
+    // A paragraph role cannot be named: `role="img"` is what makes the label
+    // the code's accessible name (design-lead F2).
+    expect(wrapper.find(".pairing-strip__code").attributes("role")).toBe("img");
     expect(wrapper.find(".pairing-strip__code").attributes("aria-label")).toBe(
       "Code: K 7 Q, 4 M D"
     );

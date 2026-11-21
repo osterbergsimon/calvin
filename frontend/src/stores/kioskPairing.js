@@ -32,6 +32,10 @@ export const usePairingStore = defineStore("kioskPairing", () => {
 
   let started = false;
   let pollTimer = null;
+  // Every poll takes a token; only the newest one may apply its answer. A poll
+  // that started before approval and answers after a newer one paired can
+  // therefore never put a stale "pending" back (review of PR #386, minor 6).
+  let pollToken = 0;
   // Consecutive config answers with no agent; reset by any other answer.
   let streak = { count: 0, firstAt: 0 };
 
@@ -88,12 +92,25 @@ export const usePairingStore = defineStore("kioskPairing", () => {
   const poll = async () => {
     const id = getKioskId();
     if (!id || !isTopLevelPage()) return null;
+    const token = ++pollToken;
     try {
       const { data } = await api.get(pairPath(id));
+      // A newer poll has started since; its answer, not this one, owns the state.
+      if (token !== pollToken) return null;
       apply(data);
       return data;
-    } catch {
-      // An old server (404), a reset cookie (401) or a dropped network: the
+    } catch (error) {
+      if (token !== pollToken) return null;
+      const status = error?.response?.status;
+      // A blip while a code is showing must not take it off the wall: keep the
+      // state and try again in 10 s (review of PR #386, minor 5). The strip
+      // still ends at once when the server says this caller has no pairing:
+      // 401, 404 or an answer of "none" (apply() clears that).
+      if (state.value === "pending" && (status === undefined || status >= 500)) {
+        schedulePoll();
+        return null;
+      }
+      // An old server (404), a reset cookie (401) or any other refusal: the
       // strip stays away. There is no error state on the wall, and nothing is
       // logged (a pairing code or secret must never reach a log line).
       clear();
@@ -145,11 +162,15 @@ export const usePairingStore = defineStore("kioskPairing", () => {
   /**
    * A config answer arrived (Task 5's `kioskAuth`). Absent means an old server:
    * nothing happens. Otherwise refresh the state on each answer, except while
-   * the 10-second poll already owns it, and consider browser-only pairing.
+   * the 10-second poll already owns it and except when both the store and the
+   * answer say paired: a paired screen makes no request per config answer, so
+   * nothing changes (review of PR #386, minor 4). Then consider browser-only
+   * pairing.
    */
   const observeConfig = async auth => {
     if (!active() || !auth || typeof auth !== "object") return;
-    if (state.value !== "pending") await poll();
+    const bothPaired = state.value === "paired" && auth.state === "paired";
+    if (state.value !== "pending" && !bothPaired) await poll();
     await noteBrowserOnly(auth);
   };
 

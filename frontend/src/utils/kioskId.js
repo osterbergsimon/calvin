@@ -72,6 +72,14 @@ export function takePairFragment() {
   if (!hash.startsWith("#pair=")) return null;
   const secret = PAIR_FRAGMENT.exec(hash)?.[1] ?? null;
   try {
+    // replaceState clears the address bar but NOT the Navigation Timing entry:
+    // performance.getEntriesByType("navigation")[0].name still holds the full
+    // start URL, fragment included, and no web API can clear it. Accepted, not
+    // fixed (review of PR #386, major 1): a same-origin script (an
+    // admin-installed web-component plugin) can already act as this screen,
+    // because the browser sends the HttpOnly cookie with its requests; reading
+    // the secret adds no access it lacks. The secret is still not kept by
+    // Calvin: no storage, no Pinia state, no log line, no later request.
     window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
   } catch {
     // A blocked History API still leaves the fragment, but boot must not throw.

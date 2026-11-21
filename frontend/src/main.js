@@ -1,4 +1,4 @@
-import { bootPairSecret } from "./utils/kioskBoot";
+import { takeBootPairSecret } from "./utils/kioskBoot";
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import { VueQueryPlugin } from "@tanstack/vue-query";
@@ -22,9 +22,9 @@ import {
 } from "./utils/serviceWorkerUpdate";
 
 // kioskBoot has already stored ?kiosk=/&khost= and removed the kiosk units'
-// #pair= secret before the router captured the URL. It is handed to the server
-// once below, and kept nowhere.
-const pairSecret = bootPairSecret;
+// #pair= secret before the router captured the URL. main.js takes it once here,
+// hands it to the server below, and no module keeps it afterwards.
+const pairSecret = takeBootPairSecret();
 
 // Apply the persisted typeface before mount so the dashboard boots with the
 // saved font instead of the default (previously only applied on opening Settings).

@@ -13,7 +13,7 @@
       On your phone or computer, open Settings › Screens in Calvin and type this code under Pair a
       screen.
     </p>
-    <p class="pairing-strip__code" data-test="pairing-code" :aria-label="codeLabel">
+    <p class="pairing-strip__code" data-test="pairing-code" role="img" :aria-label="codeLabel">
       {{ store.code }}
     </p>
   </aside>
