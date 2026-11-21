@@ -672,24 +672,27 @@ async def apply_restore(
 
         await _install_packages(loaded, plan, out)
         await _restore_config(doc, mode)
+        # Straight after the config restore, before anything slow (an instance
+        # start, the network): a later failure must not leave the household mode
+        # loosened or the removed list lost (calvin-0xns, PR #385 review).
+        if "kioskPairing" not in {row.key for row in doc.data.config} and (
+            pre_pairing_mode is not None
+        ):
+            await config_service.set_value("kioskPairing", pre_pairing_mode)
+        restored_removed = await removed_kiosk_ids()
+        # The current list is authoritative: keep it last so the cap drops
+        # backup-only ids first, never one this server still lists (design §12).
+        backup_only = [k for k in restored_removed if k not in pre_removed]
+        effective_removed = (backup_only + pre_removed)[-REMOVED_KIOSK_CAP:]
+        if effective_removed != restored_removed:
+            await config_service.set_value("kioskRemoved", effective_removed, value_type="json")
+
         await _restore_keyboard(doc, mode)
         await _restore_instances(doc, plan, mode, out)
         # After instances: updating a running instance through the instance
         # manager also writes its type's enabled flag.
         await _restore_plugin_types(doc, out)
 
-        if "kioskPairing" not in {row.key for row in doc.data.config} and (
-            pre_pairing_mode is not None
-        ):
-            await config_service.set_value("kioskPairing", pre_pairing_mode)
-        restored_removed = await removed_kiosk_ids()
-        effective_removed = list(restored_removed)
-        for kiosk_id in pre_removed:
-            if kiosk_id not in effective_removed:
-                effective_removed.append(kiosk_id)
-        effective_removed = effective_removed[-REMOVED_KIOSK_CAP:]
-        if effective_removed != restored_removed:
-            await config_service.set_value("kioskRemoved", effective_removed, value_type="json")
         await _restore_kiosks(doc, frozenset(effective_removed), out)
         await _migrate_room_name(out)
         await _migrate_screen_controls(out)

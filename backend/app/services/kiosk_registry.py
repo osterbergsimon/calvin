@@ -6,7 +6,7 @@ import re
 import sqlite3
 import time
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 from sqlalchemy.exc import IntegrityError as SAIntegrityError
@@ -16,6 +16,9 @@ from app.schemas.config_update import sanitize_overrides
 from app.services import display_check
 from app.utils.db_retry import retry_on_db_locked
 from app.utils.utc import as_utc, utcnow
+
+if TYPE_CHECKING:
+    from app.services.kiosk_view import PairingMode
 
 # Shape allowlist for kiosk ids. Covers the default `<hostname>-<6hex>` ids and
 # friendly operator-chosen names like `kitchen`. Anything else (whitespace,
@@ -211,6 +214,19 @@ def _with_peer(raw: object, peer_ip: str, now: float) -> dict[str, float] | None
     return dict(newest)
 
 
+async def _pairing_mode() -> "PairingMode":
+    """The household mode, read from its own table (never a screen's layer)."""
+    from app.services.kiosk_view import pairing_mode
+
+    return await pairing_mode()
+
+
+def _is_gated(paired: bool, mode: "PairingMode") -> bool:
+    from app.services.kiosk_view import is_gated
+
+    return is_gated(paired, mode)
+
+
 async def kiosk_for_peer(peer_ip: str | None, now: float | None = None) -> str | None:
     """The kiosk whose polls most recently came from this address, if any (calvin-q4o8).
 
@@ -218,26 +234,42 @@ async def kiosk_for_peer(peer_ip: str | None, now: float | None = None) -> str |
     peer, never ``X-Forwarded-*``, and callers skip it for proxied requests. When
     two kiosks have had the same address (a reused lease) the newer one wins, and
     an address nobody has used for two hours is forgotten.
+
+    On a gated screen only an address its own authenticated poll wrote counts, so
+    a poll forged before pairing cannot make the attacker's sign-in kiosk-length
+    (calvin-0xns, design §7).
     """
     if not peer_ip:
         return None
     current = _now() if now is None else now
+    mode = await _pairing_mode()
     best: tuple[float, str] | None = None
     for row in await KioskDB.objects.all():
-        seen = _live_peers(row.peer_ips, current).get(peer_ip)
+        peers = (
+            _auth_peers(row.id, current)
+            if _is_gated(row.credential_hash is not None, mode)
+            else _live_peers(row.peer_ips, current)
+        )
+        seen = peers.get(peer_ip)
         if seen is not None and (best is None or seen > best[0]):
             best = (seen, row.id)
     return best[1] if best else None
 
 
 async def kiosk_has_peer(kiosk_id: str, peer_ip: str | None, now: float | None = None) -> bool:
-    """True when this kiosk's polls recently came from ``peer_ip``."""
+    """True when this kiosk's polls recently came from ``peer_ip``.
+
+    A gated screen only counts addresses its own authenticated polls came from.
+    """
     if not peer_ip:
         return False
     row = await KioskDB.objects.get_or_none(id=kiosk_id)
     if row is None:
         return False
-    return peer_ip in _live_peers(row.peer_ips, _now() if now is None else now)
+    current = _now() if now is None else now
+    if _is_gated(row.credential_hash is not None, await _pairing_mode()):
+        return peer_ip in _auth_peers(kiosk_id, current)
+    return peer_ip in _live_peers(row.peer_ips, current)
 
 
 # Whether the screen's latest browser poll carried a valid kiosk cookie
@@ -246,6 +278,53 @@ async def kiosk_has_peer(kiosk_id: str, peer_ip: str | None, now: float | None =
 # restart just reads "unknown", which never restarts a browser.
 BROWSER_SEEN_TTL_S = 180
 browser_seen: dict[str, tuple[float, bool]] = {}
+
+# Addresses whose polls proved they were the screen itself (calvin-0xns, §7:
+# "for a gated screen, peer_ips holds only addresses its authenticated polls
+# came from"). Written only from an authenticated poll, so an address recorded
+# before pairing -- or before required mode was turned on -- stops counting the
+# moment the screen is gated, without a row scan or a schema change. In memory,
+# like ``browser_seen``: the agent's next authenticated poll (seconds) refills
+# it, and an empty map only means "no kiosk-length sign-in here yet".
+auth_peer_ips: dict[str, dict[str, float]] = {}
+
+# Whether the screen's latest agent poll carried the screen's own secret
+# (calvin-0xns, §7 ``desiredOn``). ``(when, authenticated)``; unknown reads as
+# "not authenticated", so a gated screen whose old agent never proves itself is
+# reported as following its schedule instead of a hold it never receives.
+agent_polls: dict[str, tuple[float, bool]] = {}
+
+
+def _note_auth_peer(kiosk_id: str, peer_ip: str | None, now: float | None = None) -> None:
+    """Remember that ``peer_ip`` polled as this screen, and prune stale peers."""
+    if not peer_ip:
+        return
+    current = _now() if now is None else now
+    peers = _live_peers(auth_peer_ips.get(kiosk_id), current)
+    peers[peer_ip] = current
+    auth_peer_ips[kiosk_id] = dict(sorted(peers.items(), key=lambda item: item[1])[-_MAX_PEER_IPS:])
+
+
+def _auth_peers(kiosk_id: str, now: float | None = None) -> dict[str, float]:
+    return _live_peers(auth_peer_ips.get(kiosk_id), _now() if now is None else now)
+
+
+def note_agent_poll(kiosk_id: str, authenticated: bool, now: float | None = None) -> None:
+    """Remember whether the agent's latest poll proved it was this screen."""
+    agent_polls[kiosk_id] = (_now() if now is None else now, bool(authenticated))
+
+
+def agent_polls_authenticated(kiosk_id: str) -> bool:
+    """True when the screen's agent last polled with the screen's own secret."""
+    entry = agent_polls.get(kiosk_id)
+    return bool(entry and entry[1])
+
+
+def _forget_view_state(kiosk_id: str) -> None:
+    """Drop the in-memory evidence for a screen (pairing, removal)."""
+    browser_seen.pop(kiosk_id, None)
+    auth_peer_ips.pop(kiosk_id, None)
+    agent_polls.pop(kiosk_id, None)
 
 
 def note_browser_seen(kiosk_id: str, carried_cookie: bool, now: float | None = None) -> None:
@@ -315,11 +394,14 @@ async def record_kiosk(
     wifi_power_save: str | None = None,
     peer_ip: str | None = None,
     agent_features: str | None = None,
+    authenticated: bool = False,
 ) -> None:
     """Upsert a kiosk's registry row. No-op when kiosk_id is empty/None.
 
     ``agent_features`` is stored only on an agent poll (one with
     ``agent_version``): the kiosk browser's own poll must not erase it.
+    ``authenticated`` says the caller proved it was this screen; only such a
+    poll makes its address count on a gated screen (calvin-0xns).
     """
     if not kiosk_id:
         return
@@ -354,6 +436,8 @@ async def record_kiosk(
                 agent_features=features,
             )
             logger.info(f"Registered new kiosk: {kiosk_id!r} (hostname={hostname!r})")
+            if authenticated:
+                _note_auth_peer(kiosk_id, peer_ip)
             await _adopt_global_settings()
             return
         except _INTEGRITY_ERRORS:
@@ -392,6 +476,8 @@ async def record_kiosk(
         if peers is not None:
             existing.peer_ips = peers
             changed = True
+        if authenticated:
+            _note_auth_peer(kiosk_id, peer_ip)
     if wifi_power_save is not None and existing.wifi_power_save != wifi_power_save:
         existing.wifi_power_save = wifi_power_save
         changed = True
@@ -524,6 +610,7 @@ async def create_paired_kiosk(
         )
     except _INTEGRITY_ERRORS:
         return False
+    _forget_view_state(kiosk_id)
     await _adopt_global_settings()
     return True
 
@@ -560,11 +647,16 @@ async def set_credential(
             if existing is None:
                 return
         else:
+            _forget_view_state(kiosk_id)
             await _adopt_global_settings()
             return
     existing.credential_hash = secret_hash
     existing.paired_at = moment
-    await existing.update(_columns=["credential_hash", "paired_at"])
+    # A screen becomes gated the moment it is paired: anything recorded about
+    # its addresses or browser before that no longer counts (calvin-0xns §7).
+    existing.peer_ips = {}
+    _forget_view_state(kiosk_id)
+    await existing.update(_columns=["credential_hash", "paired_at", "peer_ips"])
 
 
 @retry_on_db_locked()
@@ -583,6 +675,7 @@ async def clear_credential(kiosk_id: str) -> bool | None:
         return False
     row.credential_hash = None
     row.paired_at = None
+    _forget_view_state(kiosk_id)
     await row.update(_columns=["credential_hash", "paired_at"])
     return True
 
@@ -675,6 +768,7 @@ async def remove_kiosk(kiosk_id: str) -> bool:
         if current and current["active"]:
             raise display_check.RunActiveError(current)
         await row.delete()
+    _forget_view_state(kiosk_id)
     logger.info(f"Removed kiosk {kiosk_id!r}")
     return True
 

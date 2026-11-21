@@ -237,13 +237,30 @@ async def list_pages(ctx: Context) -> str:
 
 @scoped("read")
 async def list_kiosks(ctx: Context) -> str:
-    """Known kiosks with last-seen, agent version and their per-kiosk overrides."""
-    from app.services import kiosk_registry
+    """Known kiosks with last-seen, agent version and their per-kiosk overrides.
 
+    A gated row's presence fields go only to an admin key: a plain read key is
+    for dashboard scripts, not presence (calvin-0xns, design §7 and §14).
+    """
+    from app.services import kiosk_registry, kiosk_view
+
+    key = _request_key(ctx)
+    admin = key is not None and key_rank(key) >= SCOPE_RANK["admin"]
+    mode = await kiosk_view.pairing_mode()
     kiosks = await kiosk_registry.list_kiosks()
     for kiosk in kiosks:
         overrides = await kiosk_registry.get_overrides(kiosk["id"]) or {}
-        kiosk["overrides"] = {k: v for k, v in overrides.items() if not k.startswith("_")}
+        kiosk["overrides"] = kiosk_registry.public_overrides(overrides)
+        visible = kiosk_view.can_see_presence(
+            admin=admin,
+            principal=None,  # an MCP call is an API key, never a screen cookie
+            kiosk_id=kiosk["id"],
+            paired=bool(kiosk.get("paired")),
+            mode=mode,
+        )
+        if not visible:
+            kiosk_view.strip_list_row(kiosk)
+            kiosk["presenceHidden"] = True
     return _dump(kiosks)
 
 

@@ -970,6 +970,28 @@ def test_removed_screen_restores_unpaired(test_client):
     assert restored.json()["counts"]["removedScreens"] == 1
 
 
+def test_a_failed_restore_keeps_the_removed_list_and_the_mode(test_client, monkeypatch):
+    """m2: a later failure cannot lose the removed union or the household mode."""
+    from app.services import kiosk_registry
+    from app.services.backup import restorer
+    from app.services.backup.format import load_document
+    from app.services.config_service import config_service as cfg
+
+    _run(cfg.set_value("kioskPairing", "required"))
+    _run(kiosk_registry.note_kiosk_removed("kitchen"))
+    loaded = restorer.LoadedBackup(document=load_document(_seed([], config=[])))
+
+    async def boom(*args, **kwargs):
+        raise RuntimeError("instance restore failed")
+
+    monkeypatch.setattr(restorer, "_restore_instances", boom)
+    with pytest.raises(RuntimeError):
+        _run(restorer.apply_restore(loaded, mode="replace", safety_backup=False))
+
+    assert _removed_ids() == ["kitchen"]
+    assert _run(cfg.get_value("kioskPairing")) == "required"
+
+
 @pytest.mark.parametrize("mode", ["merge", "replace"])
 def test_removed_after_the_backup_still_comes_back_unpaired(test_client, mode):
     _pair_screen("kitchen")
@@ -1057,6 +1079,31 @@ def test_removed_list_keeps_last_50(test_client):
     )
     assert restored.status_code == 200
     assert _credential("screen-0") == backup_hash
+
+
+def test_the_removed_cap_keeps_the_current_list_over_backup_only_ids(test_client):
+    """n1: the current removed list wins the cap; backup-only ids are dropped first."""
+    from app.services.config_service import config_service
+
+    current = [f"screen-{index:02d}" for index in range(50)]
+    _run(config_service.set_value("kioskRemoved", current, value_type="json"))
+    backup_only = [f"old-{index}" for index in range(5)]
+    restored = _restore_seed(
+        test_client,
+        _seed(
+            [],
+            config=[
+                {
+                    "key": "kioskRemoved",
+                    "value": json.dumps(backup_only),
+                    "value_type": "json",
+                }
+            ],
+        ),
+        "replace",
+    )
+    assert restored.status_code == 200, restored.text
+    assert _removed_ids() == current
 
 
 @pytest.mark.parametrize("mode", ["merge", "replace"])

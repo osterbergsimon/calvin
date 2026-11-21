@@ -170,8 +170,70 @@ async def test_list_kiosks_includes_overrides_but_not_internal_flags(monkeypatch
         "app.services.kiosk_registry.get_overrides",
         AsyncMock(return_value={"orientation": "portrait", "_agentUpdateRequested": True}),
     )
+    monkeypatch.setattr("app.services.kiosk_view.pairing_mode", AsyncMock(return_value="optional"))
     data = run_json(await tools.list_kiosks(ctx=READ))
     assert data == [{"id": "kitchen", "hostname": "pi", "overrides": {"orientation": "portrait"}}]
+
+
+@pytest.mark.parametrize("mode", ["optional", "required"])
+@pytest.mark.parametrize("paired", [False, True])
+async def test_list_kiosks_hides_a_gated_rows_presence_from_a_read_key(monkeypatch, mode, paired):
+    """A plain read key is not an admin: a gated row loses its presence (calvin-0xns)."""
+    row = {
+        "id": "kitchen",
+        "hostname": "pi",
+        "paired": paired,
+        "powerHold": {"power": "off", "setAt": "2026-11-19T10:00:00Z", "by": "automation"},
+        "displayCheckActive": True,
+        "overrides": {},
+    }
+    monkeypatch.setattr(
+        "app.services.kiosk_registry.list_kiosks", AsyncMock(return_value=[dict(row)])
+    )
+    monkeypatch.setattr(
+        "app.services.kiosk_registry.get_overrides",
+        AsyncMock(
+            return_value={
+                "orientation": "portrait",
+                "screenNow": {"power": "off", "setAt": "2026-11-19T10:00:00Z"},
+                "_agentUpdateRequested": True,
+            }
+        ),
+    )
+    monkeypatch.setattr("app.services.kiosk_view.pairing_mode", AsyncMock(return_value=mode))
+
+    data = run_json(await tools.list_kiosks(ctx=READ))[0]
+    gated = paired or mode == "required"
+    assert ("powerHold" in data) is (not gated)
+    assert ("displayCheckActive" in data) is (not gated)
+    assert ("screenNow" in data["overrides"]) is (not gated)
+    assert (data.get("presenceHidden") is True) is gated
+    assert data["overrides"]["orientation"] == "portrait"
+    assert "_agentUpdateRequested" not in data["overrides"]
+
+
+async def test_list_kiosks_keeps_presence_for_an_admin_key(monkeypatch):
+    row = {
+        "id": "kitchen",
+        "paired": True,
+        "powerHold": {"power": "off", "setAt": "2026-11-19T10:00:00Z", "by": "automation"},
+        "displayCheckActive": True,
+        "overrides": {},
+    }
+    monkeypatch.setattr(
+        "app.services.kiosk_registry.list_kiosks", AsyncMock(return_value=[dict(row)])
+    )
+    monkeypatch.setattr(
+        "app.services.kiosk_registry.get_overrides",
+        AsyncMock(return_value={"screenNow": {"power": "off"}}),
+    )
+    monkeypatch.setattr("app.services.kiosk_view.pairing_mode", AsyncMock(return_value="optional"))
+
+    data = run_json(await tools.list_kiosks(ctx=ADMIN))[0]
+    assert data["powerHold"]["power"] == "off"
+    assert data["displayCheckActive"] is True
+    assert "screenNow" in data["overrides"]
+    assert "presenceHidden" not in data
 
 
 async def test_list_plugins_is_compact(monkeypatch):

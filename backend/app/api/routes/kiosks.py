@@ -232,7 +232,14 @@ async def patch_kiosk_overrides(kiosk_id: str, body: OverridesBody, request: Req
     merged = await merge_into_overrides(kiosk_id, partial)
     if merged is None:
         raise HTTPException(status_code=404, detail="Unknown kiosk")
-    return {"id": kiosk_id, "overrides": merged}
+    # This answer is open to unpaired callers for ``showUI``, so it goes through
+    # the same presence projection as the GET and never the host-internal keys
+    # (calvin-0xns, PR #385 review).
+    answer: dict = {"id": kiosk_id, "overrides": public_overrides(merged)}
+    if not await _can_see_this_screen_presence(request, kiosk_id):
+        kiosk_view.strip_layer_presence(answer["overrides"])
+        answer["presenceHidden"] = True
+    return answer
 
 
 # -- screen power held from home automation (calvin-2ifv) -------------------
@@ -271,15 +278,13 @@ async def _screen_power_view(kiosk_id: str, status: dict) -> ScreenPowerView:
     merged = merge_overrides(await build_global_config(), status["overrides"])
     screen_power.strip_holds(merged)
     screen_power.project_hold(merged, hold)
-    # A gated screen that is not paired receives no hold (calvin-0xns), not even
-    # the projected screenNow: its agent follows the schedule, and desiredOn
-    # says what the agent will do. Paired screens keep the projection.
+    # A gated screen receives a hold only when it is paired and its agent's
+    # latest poll proved it is the screen (calvin-0xns). An old agent that polls
+    # without the secret, like an unpaired screen, follows the schedule; its
+    # ``desiredOn`` must say so (design §7).
     receives_hold = None
-    if (
-        kiosk_view.is_gated(status["paired"], await kiosk_view.pairing_mode())
-        and not status["paired"]
-    ):
-        receives_hold = False
+    if kiosk_view.is_gated(status["paired"], await kiosk_view.pairing_mode()):
+        receives_hold = status["paired"] and kiosk_registry.agent_polls_authenticated(kiosk_id)
     agent_cfg = screen_power.agent_view(merged, status["agentHolds"], receives_hold)
     last_seen = status["lastSeen"]
     return ScreenPowerView(
@@ -771,9 +776,18 @@ async def get_kiosk_config(
                 wifi_power_save=kwifi,
                 peer_ip=direct_peer_ip(request),
                 agent_features=kfeat,
+                authenticated=principal == kiosk_id,
             )
     except Exception as exc:
         logger.warning(f"Failed to record kiosk {kiosk_id!r}: {exc}")
+
+    # Whether the agent polls as the screen (calvin-0xns §7): ``desiredOn`` for a
+    # paired screen says what its agent will actually receive, so an old agent
+    # that polls without the screen's secret must not be told a hold reaches it.
+    # Only a poll from an address the screen itself proved is trusted to say so;
+    # a forged one cannot make home automation believe the hold is ignored.
+    if kagent and await kiosk_registry.kiosk_has_peer(kiosk_id, direct_peer_ip(request)):
+        kiosk_registry.note_agent_poll(kiosk_id, principal == kiosk_id)
 
     # Whether the screen's own browser still has its cookie (calvin-0xns): only
     # a browser poll from one of the screen's recorded addresses counts, so a

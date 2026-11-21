@@ -34,10 +34,16 @@ def _clean_pairing_store():
     pairing_store._pending.clear()
     pairing_store._install_codes.clear()
     pairing_store._new_by_address.clear()
+    kiosk_registry.browser_seen.clear()
+    getattr(kiosk_registry, "auth_peer_ips", {}).clear()
+    getattr(kiosk_registry, "agent_polls", {}).clear()
     yield
     pairing_store._pending.clear()
     pairing_store._install_codes.clear()
     pairing_store._new_by_address.clear()
+    kiosk_registry.browser_seen.clear()
+    getattr(kiosk_registry, "auth_peer_ips", {}).clear()
+    getattr(kiosk_registry, "agent_polls", {}).clear()
 
 
 @pytest.fixture(autouse=True)
@@ -159,7 +165,12 @@ def test_list_and_overrides_hide_presence_per_row(test_client: TestClient, mode,
     if paired:
         _pair()
     _hold()
-    _run(kiosk_registry.set_overrides(KIOSK, {"screenNow": {"power": "off", "setAt": "x"}}))
+    _run(
+        kiosk_registry.set_overrides(
+            KIOSK,
+            {"screenNow": {"power": "off", "setAt": "x"}, "_agentUpdateRequested": True},
+        )
+    )
     headers, principal, admin = _credentials(test_client, paired=paired)["anonymous"]
 
     listed = test_client.get(LIST_URL, headers=headers)
@@ -183,6 +194,18 @@ def test_list_and_overrides_hide_presence_per_row(test_client: TestClient, mode,
     layer = overrides.json()["overrides"]
     assert ("screenNow" in layer or "screen_now" in layer) is visible
     assert (overrides.json().get("presenceHidden") is True) is (not visible)
+
+    # The PATCH answer (a screen's own "Hide controls" write, open to anyone)
+    # goes through the same projection, and never the host-internal flag.
+    patched = test_client.patch(
+        OVERRIDES_URL, headers=headers, json={"overrides": {"showUI": True}}
+    )
+    assert patched.status_code == 200, patched.text
+    answer = patched.json()
+    patched_layer = answer["overrides"]
+    assert "_agentUpdateRequested" not in patched_layer
+    assert ("screenNow" in patched_layer or "screen_now" in patched_layer) is visible
+    assert (answer.get("presenceHidden") is True) is (not visible)
 
 
 @pytest.mark.integration
@@ -251,6 +274,56 @@ def test_screen_power_of_a_gated_screen_needs_admin_power_key_or_the_screen(test
 
 
 @pytest.mark.integration
+def test_a_paired_screen_whose_agent_polls_without_its_secret_follows_its_schedule(
+    test_client: TestClient, monkeypatch
+):
+    """m3: desiredOn is what the agent will actually receive (design §7)."""
+    _set_mode("optional")
+    _register_unpaired()
+    secret = _pair()
+    _hold()  # held off
+    _run(config_service.set_value("displayScheduleEnabled", True))
+    _run(
+        config_service.set_value(
+            "displaySchedule",
+            [{"day": d, "enabled": True, "onTime": "00:00", "offTime": "23:59"} for d in range(7)],
+            value_type="json",
+        )
+    )
+
+    # An old agent: it polls without the screen's secret, so the hold never
+    # reaches it and it follows its schedule.
+    assert test_client.get(f"{CONFIG_URL}?khost=pi&kagent=v1&kstat=ok").status_code == 200
+    body = test_client.get(POWER_URL).json()
+    assert body["paired"] is True and body["held"] is True
+    assert body["desiredOn"] is True
+
+    # Once the agent proves it is the screen, the hold reaches it.
+    assert (
+        test_client.get(
+            f"{CONFIG_URL}?khost=pi&kagent=v2&kstat=ok", headers=_auth_bearer(secret)
+        ).status_code
+        == 200
+    )
+    assert test_client.get(POWER_URL).json()["desiredOn"] is False
+
+    # A forged agent poll from another address cannot claim it stopped holding.
+    monkeypatch.setattr("app.api.routes.kiosks.direct_peer_ip", lambda request: "203.0.113.9")
+    assert test_client.get(f"{CONFIG_URL}?kagent=v2&kstat=ok").status_code == 200
+    assert test_client.get(POWER_URL).json()["desiredOn"] is False
+
+    # A rolled-back agent from the screen's own address does: its poll carries no
+    # secret, so the hold no longer reaches it.
+    monkeypatch.setattr("app.api.routes.kiosks.direct_peer_ip", lambda request: "testclient")
+    assert test_client.get(f"{CONFIG_URL}?kagent=v2&kstat=ok").status_code == 200
+    assert test_client.get(POWER_URL).json()["desiredOn"] is True
+
+
+def _auth_bearer(secret: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {secret}"}
+
+
+@pytest.mark.integration
 def test_gated_unpaired_screen_follows_its_schedule_and_says_unpaired(test_client: TestClient):
     _set_mode("required")
     _register_unpaired()
@@ -267,6 +340,33 @@ def test_gated_unpaired_screen_follows_its_schedule_and_says_unpaired(test_clien
     assert body["paired"] is False
     assert body["held"] is True  # the admin still sees the stored hold
     assert body["desiredOn"] is True  # but the screen follows its schedule
+
+
+@pytest.mark.integration
+def test_screen_power_of_an_optional_paired_screen_refuses_a_plain_read_key(test_client):
+    _set_mode("optional")
+    _register_unpaired()
+    _pair()  # optional + paired is gated too
+    assert (
+        test_client.post("/api/auth/login", json={"password": "test-admin-password"}).status_code
+        == 200
+    )
+    limited = test_client.post(
+        "/api/auth/keys",
+        json={"name": "Homey", "scope": "read", "permissions": ["screens.power"]},
+    ).json()["secret"]
+    plain = test_client.post("/api/auth/keys", json={"name": "Script", "scope": "read"}).json()[
+        "secret"
+    ]
+    test_client.cookies.clear()
+
+    assert (
+        test_client.get(POWER_URL, headers={"Authorization": f"Bearer {limited}"}).status_code
+        == 200
+    )
+    plain_response = test_client.get(POWER_URL, headers={"Authorization": f"Bearer {plain}"})
+    assert plain_response.status_code == 403
+    assert plain_response.json()["detail"]["code"] == "insufficient_scope"
 
 
 @pytest.mark.integration
@@ -320,6 +420,44 @@ def test_a_bad_or_stale_credential_is_no_credential_on_the_config_read(test_clie
     response = test_client.get(CONFIG_URL, headers=headers)
     assert response.status_code == 200, response.text
     assert response.json()["kioskAuth"]["state"] == "unpaired"
+
+
+@pytest.mark.integration
+def test_another_screens_or_a_revoked_credential_is_no_credential_on_the_config_read(
+    test_client,
+):
+    _register_unpaired()
+    revoked = _pair()
+    active = _pair()  # re-pairing revokes the first secret
+    other = _pair("hall")
+    test_client.cookies.clear()
+
+    for secret in (other, revoked):
+        response = test_client.get(CONFIG_URL, headers={"Authorization": f"Bearer {secret}"})
+        assert response.status_code == 200, response.text
+        assert response.json()["kioskAuth"]["state"] == "unpaired"
+
+    own = test_client.get(CONFIG_URL, headers={"Authorization": f"Bearer {active}"})
+    assert own.json()["kioskAuth"]["state"] == "paired"
+
+
+@pytest.mark.integration
+def test_a_foreign_or_stale_cookie_is_not_resigned_on_another_screens_config_read(test_client):
+    _register_unpaired()
+    hall_hash = hash_secret(new_secret())
+    _run(kiosk_registry.set_credential("hall", hall_hash))
+    stale = issue_kiosk_cookie("hall", hall_hash, now=time.time() - 40 * 24 * 3600)
+    test_client.cookies.clear()
+
+    other = test_client.get(CONFIG_URL, headers={"cookie": f"{KIOSK_COOKIE}={stale}"})
+    assert other.status_code == 200, other.text
+    assert other.json()["kioskAuth"]["state"] == "unpaired"
+    assert "set-cookie" not in other.headers
+
+    own = test_client.get("/api/kiosks/hall/config", headers={"cookie": f"{KIOSK_COOKIE}={stale}"})
+    assert own.status_code == 200, own.text
+    assert own.json()["kioskAuth"]["state"] == "paired"
+    assert KIOSK_COOKIE in own.headers["set-cookie"]
 
 
 @pytest.mark.integration
