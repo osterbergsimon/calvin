@@ -9,6 +9,8 @@ from app.config import settings
 from app.security import kiosk_auth
 from app.security.admin_auth import COOKIE_NAME, get_admin_store
 from app.security.kiosk_auth import (
+    COOKIE_CLOCK_SKEW_S,
+    COOKIE_MAX_AGE_S,
     KIOSK_COOKIE,
     issue_kiosk_cookie,
     kiosk_holder,
@@ -21,7 +23,6 @@ from app.services.kiosk_pairing import hash_secret, new_secret, pairing_store
 pytestmark = [pytest.mark.asyncio, pytest.mark.unit]
 
 PASSWORD = "test-admin-password"
-COOKIE_MAX_AGE_S = 34560000
 
 
 @pytest.fixture
@@ -80,7 +81,7 @@ async def test_cookie_round_trip(admin_store):
     assert value.startswith("k1.")
     assert kiosk_hash[:16] in value
     assert secret not in value
-    assert read_kiosk_cookie(value) == ("kitchen", kiosk_hash[:16], 1000)
+    assert read_kiosk_cookie(value, now=1000) == ("kitchen", kiosk_hash[:16], 1000)
 
 
 async def test_tampered_cookie_mac_is_rejected(admin_store):
@@ -89,6 +90,43 @@ async def test_tampered_cookie_mac_is_rejected(admin_store):
     assert read_kiosk_cookie(tampered) is None
     assert read_kiosk_cookie("") is None
     assert read_kiosk_cookie("k1.garbage") is None
+
+
+@pytest.mark.parametrize(
+    "cookie",
+    [
+        # An id that is not lowercase hex.
+        "k1.zz.0123456789abcdef.1." + "0" * 64,
+        # An odd-length id can never be bytes.fromhex input.
+        "k1.abc.0123456789abcdef.1." + "0" * 64,
+        # The fingerprint is lowercase 16-hex.
+        "k1.68616c6c.0123456789ABCDEF.1." + "0" * 64,
+        "k1.68616c6c.0123456789abcde.1." + "0" * 64,
+        # ``issued`` is a plain non-negative int.
+        "k1.68616c6c.0123456789abcdef.notanint." + "0" * 64,
+        "k1.68616c6c.0123456789abcdef.-1." + "0" * 64,
+        # The MAC is lowercase 64-hex; anything else is refused before the
+        # compare, which would raise TypeError on a non-ASCII string.
+        "k1.68616c6c.0123456789abcdef.1." + "0" * 63,
+        "k1.68616c6c.0123456789abcdef.1." + "é" * 64,
+        "k1.68616c6c.0123456789abcdef.1." + "A" * 64,
+    ],
+)
+async def test_a_malformed_cookie_is_no_credential(admin_store, test_db, cookie):
+    assert read_kiosk_cookie(cookie) is None
+    assert await kiosk_principal(_request(cookie=cookie)) is None
+
+
+async def test_cookie_is_refused_past_its_max_age(admin_store):
+    value = issue_kiosk_cookie("kitchen", hash_secret(new_secret()), now=1000)
+    assert read_kiosk_cookie(value, now=1000 + COOKIE_MAX_AGE_S) is not None
+    assert read_kiosk_cookie(value, now=1000 + COOKIE_MAX_AGE_S + 1) is None
+
+
+async def test_cookie_issued_in_the_future_is_refused(admin_store):
+    value = issue_kiosk_cookie("kitchen", hash_secret(new_secret()), now=1000)
+    assert read_kiosk_cookie(value, now=1000 - COOKIE_CLOCK_SKEW_S) is not None
+    assert read_kiosk_cookie(value, now=1000 - COOKIE_CLOCK_SKEW_S - 1) is None
 
 
 async def test_cookie_fingerprint_for_another_hash_is_rejected(admin_store, test_db):

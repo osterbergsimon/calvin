@@ -8,6 +8,7 @@ from app.services.kiosk_registry import (
     _HEARTBEAT_COLUMNS,
     agent_pairs,
     clear_credential,
+    create_paired_kiosk,
     get_credential_hash,
     list_kiosks,
     record_kiosk,
@@ -53,6 +54,23 @@ async def test_set_credential_creates_a_missing_row_with_its_hostname(test_db):
     assert row.credential_hash == HASH_A
     assert row.paired_at is not None
     assert row.hostname == "pi-new"
+    # Approval is not a poll: the screen has no last_seen until it asks once.
+    assert row.last_seen is None
+
+
+async def test_create_paired_kiosk_only_ever_creates(test_db):
+    """The install-code write: create-if-absent, never update someone's row."""
+    assert await create_paired_kiosk("fresh", HASH_A, hostname="pi-fresh") is True
+    row = await KioskDB.objects.get(id="fresh")
+    assert row.credential_hash == HASH_A
+    assert row.hostname == "pi-fresh"
+    assert row.paired_at is not None
+    assert row.last_seen is None
+
+    await record_kiosk(KIOSK, hostname="pi-kitchen")
+    assert await create_paired_kiosk(KIOSK, HASH_B) is False
+    assert await get_credential_hash(KIOSK) is None
+    assert await KioskDB.objects.count() == 2
 
 
 async def test_set_credential_keeps_an_existing_hostname(test_db):

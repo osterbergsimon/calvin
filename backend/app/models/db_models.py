@@ -160,7 +160,7 @@ class KioskDB(ormar.Model):
 
     id: str = ormar.String(max_length=255, primary_key=True, index=True)  # CALVIN_KIOSK_ID
     hostname: str | None = ormar.String(max_length=255, nullable=True)  # reported by the kiosk
-    last_seen: datetime = UTCDateTime(default=utcnow, nullable=False)
+    last_seen: datetime | None = UTCDateTime(default=utcnow, nullable=True)
     last_applied_version: str | None = ormar.String(
         max_length=64, nullable=True
     )  # device-config version the display-agent last confirmed applied (used by dd9.3)

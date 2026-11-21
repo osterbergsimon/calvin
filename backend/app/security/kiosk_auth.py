@@ -22,8 +22,12 @@ from app.services.kiosk_registry import get_credential_hash, valid_kiosk_id
 KIOSK_COOKIE = "calvin_kiosk"
 COOKIE_MAX_AGE_S = 34560000  # 400 days, as the design fixes
 COOKIE_RENEW_AFTER_S = 30 * 24 * 3600
+COOKIE_CLOCK_SKEW_S = 60  # accept a clock this far fast, like read_session
 _COOKIE_VERSION = "k1"
 _FINGERPRINT_RE = re.compile(r"^[0-9a-f]{16}$")
+_HEX_ID_RE = re.compile(r"^(?:[0-9a-f]{2})+$")
+_ISSUED_RE = re.compile(r"^[0-9]{1,12}$")
+_MAC_RE = re.compile(r"^[0-9a-f]{64}$")
 
 # Wrong kiosk secrets get their own bucket: a 256-bit secret cannot be guessed,
 # so this only keeps the log quiet.
@@ -74,12 +78,26 @@ def set_kiosk_cookie(response: Response, value: str) -> None:
     )
 
 
-def read_kiosk_cookie(value: str | None) -> tuple[str, str, int] | None:
-    """``(kiosk_id, fingerprint, issued)`` for an untampered cookie, else None."""
+def read_kiosk_cookie(value: str | None, now: float | None = None) -> tuple[str, str, int] | None:
+    """``(kiosk_id, fingerprint, issued)`` for a live, untampered cookie, else None.
+
+    Every part is shape-checked before ``hmac.compare_digest``, which raises
+    ``TypeError`` on a non-ASCII string: a garbled cookie from the wire is "no
+    credential", never a 500. A cookie older than :data:`COOKIE_MAX_AGE_S`, or
+    issued more than :data:`COOKIE_CLOCK_SKEW_S` in the future, is refused just
+    like :meth:`AdminAuthStore.read_session` does for the admin cookie.
+    """
     if not value:
         return None
     parts = value.split(".")
     if len(parts) != 5 or parts[0] != _COOKIE_VERSION:
+        return None
+    if (
+        not _HEX_ID_RE.fullmatch(parts[1])
+        or not _FINGERPRINT_RE.fullmatch(parts[2])
+        or not _ISSUED_RE.fullmatch(parts[3])
+        or not _MAC_RE.fullmatch(parts[4])
+    ):
         return None
     secret = _server_secret()
     if secret is None:
@@ -89,10 +107,15 @@ def read_kiosk_cookie(value: str | None) -> tuple[str, str, int] | None:
         return None
     try:
         kiosk_id = bytes.fromhex(parts[1]).decode()
-        issued = int(parts[3])
     except (ValueError, UnicodeDecodeError):
         return None
-    if not kiosk_id or not _FINGERPRINT_RE.fullmatch(parts[2]):
+    if not kiosk_id:
+        return None
+    issued = int(parts[3])
+    current = _now() if now is None else now
+    if issued > current + COOKIE_CLOCK_SKEW_S:
+        return None
+    if current - issued > COOKIE_MAX_AGE_S:
         return None
     return (kiosk_id, parts[2], issued)
 

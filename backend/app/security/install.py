@@ -42,25 +42,35 @@ def redact_share_tokens(text: str) -> str:
     )
 
 
+def redact_log_text(text: str) -> str:
+    """Redact share tokens and anything shaped like a Calvin secret.
+
+    The uvicorn access log has its own non-propagating handler, so it never
+    passes through loguru's patcher; this is the one helper both paths use. It
+    covers a ``clv_pair_`` install code in ``?pair=`` and a ``clv_kiosk_``
+    secret alike (calvin-0xns).
+    """
+    from app.security.api_keys import SECRET_PATTERN
+
+    return redact_share_tokens(SECRET_PATTERN.sub("clv_[redacted]", text))
+
+
 class ShareTokenRedactor(logging.Filter):
     """stdlib filter for uvicorn's access log, which logs every request path."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         if isinstance(record.args, tuple):
             record.args = tuple(
-                redact_share_tokens(arg) if isinstance(arg, str) else arg for arg in record.args
+                redact_log_text(arg) if isinstance(arg, str) else arg for arg in record.args
             )
         if isinstance(record.msg, str):
-            record.msg = redact_share_tokens(record.msg)
+            record.msg = redact_log_text(record.msg)
         return True
 
 
 def redact_secrets(record: Any) -> None:
     """Loguru patcher: blank anything shaped like an API key or share token in every log line."""
-    from app.security.api_keys import SECRET_PATTERN
-
-    message = SECRET_PATTERN.sub("clv_[redacted]", record["message"])
-    record["message"] = redact_share_tokens(message)
+    record["message"] = redact_log_text(record["message"])
 
 
 def install_security(app: FastAPI) -> None:

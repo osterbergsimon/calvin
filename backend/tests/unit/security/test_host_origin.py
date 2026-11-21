@@ -145,3 +145,28 @@ def test_asgi_origin_check_skips_non_api(asgi_client):
 def test_asgi_same_origin_passes(asgi_client):
     response = asgi_client.post("/api/x", headers={"origin": "http://testserver"})
     assert response.status_code == 200
+
+
+def test_asgi_regular_bearer_skips_the_origin_check(asgi_client):
+    # A real API key can't be forged cross-site (the header needs a CORS
+    # preflight), so the Origin check does not apply to it.
+    response = asgi_client.post(
+        "/api/x",
+        headers={"origin": "http://evil.example", "authorization": "Bearer clv_" + "b" * 43},
+    )
+    assert response.status_code == 200
+
+
+def test_asgi_kiosk_bearer_does_not_skip_the_origin_check(asgi_client):
+    # A kiosk bearer is honoured beside an admin cookie (design §3), so it
+    # must not exempt a cross-site write from the Origin check.
+    response = asgi_client.post(
+        "/api/x",
+        headers={
+            "origin": "http://evil.example",
+            "authorization": "Bearer clv_kiosk_" + "A" * 43,
+            "cookie": "calvin_admin=not-checked-here",
+        },
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "cross_origin"

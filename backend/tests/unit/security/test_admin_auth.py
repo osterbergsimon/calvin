@@ -68,6 +68,12 @@ def test_cookie_roundtrip(store: AdminAuthStore):
     assert store.verify_cookie("garbage") is False
 
 
+def test_non_ascii_cookie_mac_is_refused_not_raised(store: AdminAuthStore):
+    store.set_password("correct horse")
+    value = store.issue_cookie(now=1000)
+    assert store.verify_cookie(value[:-1] + "é", now=1000) is False
+
+
 def test_device_session_lasts_30_days_from_last_use(store: AdminAuthStore):
     store.set_password("correct horse")
     value = store.issue_cookie(now=1000)

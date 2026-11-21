@@ -467,6 +467,40 @@ async def get_credential_hash(kiosk_id: str) -> str | None:
 
 
 @retry_on_db_locked()
+async def create_paired_kiosk(
+    kiosk_id: str,
+    secret_hash: str,
+    hostname: str | None = None,
+    now: datetime | None = None,
+) -> bool:
+    """Pair a screen that has no row yet; False when the id already exists.
+
+    Used by the install-code path, where the code may only ever give someone a
+    screen of their own: create-if-absent, never an update. A concurrent
+    approval or a second install code that registers the id between the caller's
+    check and this insert makes the create fail, so neither pairing is
+    overwritten. ``last_seen`` stays the schema's "never polled" value: the row
+    is paired, not seen.
+    """
+    if not valid_kiosk_id(kiosk_id):
+        logger.warning(f"Refusing to pair a malformed kiosk_id: {kiosk_id!r}")
+        return False
+    moment = as_utc(now) if now is not None else utcnow()
+    try:
+        await KioskDB.objects.create(
+            id=kiosk_id,
+            hostname=hostname,
+            last_seen=None,
+            credential_hash=secret_hash,
+            paired_at=moment,
+        )
+    except _INTEGRITY_ERRORS:
+        return False
+    await _adopt_global_settings()
+    return True
+
+
+@retry_on_db_locked()
 async def set_credential(
     kiosk_id: str,
     secret_hash: str,
@@ -488,7 +522,7 @@ async def set_credential(
             await KioskDB.objects.create(
                 id=kiosk_id,
                 hostname=hostname,
-                last_seen=moment,
+                last_seen=None,  # approval is not a poll: see create_paired_kiosk
                 credential_hash=secret_hash,
                 paired_at=moment,
             )

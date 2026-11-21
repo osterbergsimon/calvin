@@ -84,3 +84,75 @@ def test_log_masking_shows_no_characters_of_the_secret():
     masked = mask_sensitive_config({"api_key": "abcdef", "url": "http://x"})
 
     assert masked == {"api_key": "***", "url": "http://x"}
+
+
+def test_uvicorn_access_log_redacts_an_install_code(monkeypatch):
+    """The real uvicorn config has its own non-propagating handler (no loguru)."""
+    import io
+    import logging.config
+    import sys
+
+    import uvicorn.config
+
+    from app.security.install import ShareTokenRedactor
+
+    saved = {}
+    for name in ("", "uvicorn", "uvicorn.error", "uvicorn.access"):
+        log = logging.getLogger(name)
+        saved[name] = (log.level, list(log.handlers), log.propagate)
+    stream = io.StringIO()
+    monkeypatch.setattr(sys, "stdout", stream)
+    try:
+        logging.config.dictConfig(uvicorn.config.LOGGING_CONFIG)
+        access = logging.getLogger("uvicorn.access")
+        access.addFilter(ShareTokenRedactor())
+        code = "clv_pair_" + "a" * 22
+        access.info(
+            '%s - "%s %s HTTP/%s" %d',
+            "10.0.0.9:5000",
+            "GET",
+            f"/api/kiosks/install.sh?pair={code}",
+            "1.1",
+            200,
+        )
+        output = stream.getvalue()
+    finally:
+        for name, (level, handlers, propagate) in saved.items():
+            log = logging.getLogger(name)
+            log.setLevel(level)
+            log.handlers[:] = handlers
+            log.propagate = propagate
+
+    assert "10.0.0.9:5000" in output  # the line really went through the handler
+    assert code not in output
+    assert "clv_[redacted]" in output
+
+
+def test_loguru_tracebacks_do_not_print_secret_locals():
+    """With diagnose on, loguru annotates each frame with its local values."""
+    from app.main import LOGURU_SINK_OPTIONS
+
+    lines: list[str] = []
+    sink = logger.add(lambda message: lines.append(str(message)), **LOGURU_SINK_OPTIONS)
+    try:
+
+        def _fails_with_a_screen_secret():
+            secret = "clv_kiosk_" + "A" * 43  # noqa: F841 - the point is the frame local
+            raise RuntimeError("pairing failed")
+
+        try:
+            _fails_with_a_screen_secret()
+        except RuntimeError as exc:
+            logger.opt(exception=exc).error("pairing failed")
+    finally:
+        logger.remove(sink)
+
+    joined = "".join(lines)
+    assert "RuntimeError" in joined
+    assert "clv_kiosk_" not in joined
+
+
+def test_every_app_loguru_sink_has_diagnostics_off():
+    from app.main import LOGURU_SINK_OPTIONS
+
+    assert LOGURU_SINK_OPTIONS["diagnose"] is False

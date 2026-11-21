@@ -225,9 +225,20 @@ class PairingStore:
             self._prune(current)
             return list(self._pending)
 
-    def has_agent_pending(self, kiosk_id: str, now: float | None = None) -> bool:
-        """Whether this screen's agent started a live pairing itself."""
-        return any(pending.kiosk_id == kiosk_id and pending.by_agent for pending in self.live(now))
+    def has_agent_pending(
+        self, kiosk_id: str, secret_hash: str | None = None, now: float | None = None
+    ) -> bool:
+        """Whether this screen's agent started a live pairing itself.
+
+        With ``secret_hash``, only an entry for a *different* secret counts: the
+        caller asking about its own hash is the agent continuing its own pairing.
+        """
+        return any(
+            pending.kiosk_id == kiosk_id
+            and pending.by_agent
+            and (secret_hash is None or not hmac.compare_digest(pending.secret_hash, secret_hash))
+            for pending in self.live(now)
+        )
 
     def take_by_code(self, code: str, now: float | None = None) -> Pending | None:
         """Approve one code, atomically, and drop that screen's other entries.

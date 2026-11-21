@@ -33,7 +33,14 @@ log_level_map = {
 }
 log_level = log_level_map.get(settings.log_level.upper(), "INFO")
 
-# Add handler with our desired format
+# Add handler with our desired format. ``diagnose`` annotates each traceback
+# frame with its local values, and pairing frames hold screen secrets and
+# install codes, so it must stay off (the message patcher never sees them).
+LOGURU_SINK_OPTIONS: dict[str, Any] = {
+    "level": log_level,
+    "colorize": True,  # Enable colors for better readability
+    "diagnose": False,
+}
 logger.add(
     sys.stderr,
     format=(
@@ -42,8 +49,7 @@ logger.add(
         "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
         "<level>{message}</level>"
     ),
-    level=log_level,
-    colorize=True,  # Enable colors for better readability
+    **LOGURU_SINK_OPTIONS,
 )
 
 

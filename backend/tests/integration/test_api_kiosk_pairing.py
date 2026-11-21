@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 from loguru import logger
 
-from app.security.admin_auth import get_admin_store
+from app.security.admin_auth import COOKIE_NAME, get_admin_store
 from app.services.kiosk_pairing import CODE_ALPHABET, approve_limiter, pairing_store
 
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent
@@ -73,6 +73,13 @@ def _code_of(body: dict) -> str:
     assert CODE_RE.fullmatch(body["code"]), body
     assert body["expiresAt"].endswith("Z")
     return body["code"]
+
+
+def _set_cookie_value(response, name: str = "calvin_kiosk") -> str:
+    first = response.headers["set-cookie"].split(";", 1)[0]
+    cookie_name, _, value = first.partition("=")
+    assert cookie_name == name
+    return value
 
 
 @pytest.mark.integration
@@ -292,6 +299,36 @@ def test_six_wrong_codes_are_rate_limited(test_client: TestClient):
 
 
 @pytest.mark.integration
+def test_pairing_limits_key_on_the_client_host_not_proxy_headers(test_client: TestClient):
+    """The per-address bucket follows design §14: request.client.host, not a header."""
+    for index in range(20):
+        _, started = _start(test_client, f"screen-{index}")
+        assert started.status_code == 200, started.text
+
+    # Old code keyed this on the (absent) direct peer and called it "unknown",
+    # giving a forged header a fresh bucket. The limit must not move.
+    refused = test_client.post(
+        "/api/kiosks/screen-20/pair",
+        json={},
+        headers={**_auth(_new_secret()), "X-Forwarded-For": "203.0.113.9"},
+    )
+    assert refused.status_code == 429
+    assert refused.json()["detail"]["code"] == "rate_limited"
+
+
+@pytest.mark.integration
+def test_a_garbled_cookie_is_no_credential_not_a_500(test_client: TestClient):
+    """A cookie Starlette unquotes to non-ASCII must not reach compare_digest."""
+    test_client.cookies.clear()
+    garbled = "k1.68616c6c.0123456789abcdef.1.\\351"
+    response = test_client.get(
+        "/api/kiosks/hall/pair", headers={"cookie": f'calvin_kiosk="{garbled}"'}
+    )
+    assert response.status_code == 200
+    assert response.json()["state"] == "none"
+
+
+@pytest.mark.integration
 def test_approving_drops_the_other_pending_entries(test_client: TestClient):
     _, first = _start(test_client)
     other_secret, _second = _start(test_client)
@@ -423,6 +460,49 @@ def test_browser_only_pairing_sets_a_cookie_and_no_secret(test_client: TestClien
 
 
 @pytest.mark.integration
+def test_browser_only_callers_with_one_peer_never_share_a_secret(test_client: TestClient):
+    """A shared address (or a proxy header) is never proof of holding an entry."""
+    admin = test_client.cookies.get(COOKIE_NAME)
+    assert admin
+    test_client.cookies.clear()
+    # Both callers look like the same ("unknown") peer: the same forged proxy
+    # header, which is what a reverse proxy or an attacker can arrange.
+    proxy = {"X-Forwarded-For": "198.51.100.9", "cookie": f"{COOKIE_NAME}={admin}"}
+
+    first = test_client.post("/api/kiosks/hall/pair", json={"browser": True}, headers=proxy)
+    second = test_client.post("/api/kiosks/hall/pair", json={"browser": True}, headers=proxy)
+    assert first.status_code == 200, first.text
+    assert second.status_code == 200, second.text
+    first_cookie = _set_cookie_value(first)
+    second_cookie = _set_cookie_value(second)
+    assert first_cookie != second_cookie
+    assert first_cookie.split(".")[2] != second_cookie.split(".")[2]  # fingerprints
+
+    def state(cookie: str) -> dict:
+        return test_client.get(
+            "/api/kiosks/hall/pair",
+            headers={**proxy, "cookie": f"{COOKIE_NAME}={admin}; calvin_kiosk={cookie}"},
+        ).json()
+
+    assert state(first_cookie)["state"] == "pending"
+    assert state(second_cookie)["state"] == "pending"
+    code_a = state(first_cookie)["code"]
+    code_b = state(second_cookie)["code"]
+    assert code_a and code_b and code_a != code_b
+
+    approved = test_client.post(
+        "/api/kiosks/pairings",
+        json={"code": code_a},
+        headers={"cookie": f"{COOKIE_NAME}={admin}"},
+    )
+    assert approved.status_code == 200
+    assert state(first_cookie)["state"] == "paired"
+    # Approving the first caller's code never makes the second caller's cookie
+    # a principal for the screen.
+    assert state(second_cookie)["state"] == "none"
+
+
+@pytest.mark.integration
 def test_browser_session_sets_the_cookie_for_a_pending_secret(test_client: TestClient):
     secret, started = _start(test_client)
     code = _code_of(started.json())
@@ -445,19 +525,25 @@ def test_browser_session_refuses_an_unknown_secret(test_client: TestClient):
 
 
 @pytest.mark.integration
-def test_install_script_embeds_a_valid_pair_code(test_client: TestClient):
+def test_install_script_passes_the_pair_code_to_the_renderer(test_client: TestClient, monkeypatch):
+    from app.services import kiosk_bundle
+
+    rendered: list[str | None] = []
+
+    def render(base_url: str, pair_code: str | None = None) -> str:
+        rendered.append(pair_code)
+        return "the script"
+
+    monkeypatch.setattr(kiosk_bundle, "render_install_script", render)
     code = "clv_pair_" + "a" * 22
     embedded = test_client.get(f"/api/kiosks/install.sh?pair={code}")
     assert embedded.status_code == 200
-    # The Part A installer has no placeholder yet (Part C adds it); a malformed
-    # code must be ignored exactly like no code at all.
+    assert embedded.text == "the script"
+    assert rendered == [code]
+
     plain = test_client.get("/api/kiosks/install.sh")
     assert plain.status_code == 200
-    assert embedded.text == plain.text
-
-    malformed = test_client.get("/api/kiosks/install.sh?pair=not-a-code")
-    assert malformed.status_code == 200
-    assert malformed.text == plain.text
+    assert rendered[-1] is None
 
 
 @pytest.mark.integration
@@ -509,3 +595,102 @@ def test_install_code_never_takes_over_a_paired_screen(test_client: TestClient):
     )
     assert fresh.status_code == 200
     assert fresh.json()["state"] == "paired"
+
+
+@pytest.mark.integration
+def test_install_code_refuses_a_registered_unpaired_screen(test_client: TestClient):
+    """A sniffed code gives a screen of one's own, never a registered screen's."""
+    _register(test_client, "kitchen")  # a row exists, still unpaired
+    minted = test_client.post("/api/kiosks/install-codes").json()["code"]
+    attacker_secret = _new_secret()
+
+    refused = test_client.post(
+        "/api/kiosks/kitchen/pair",
+        json={"installCode": minted},
+        headers=_auth(attacker_secret),
+    )
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["code"] == "install_code_invalid"
+    row = next(k for k in test_client.get("/api/kiosks").json()["kiosks"] if k["id"] == "kitchen")
+    assert row["paired"] is False
+    assert (
+        test_client.get("/api/kiosks/kitchen/pair", headers=_auth(attacker_secret)).json()["state"]
+        == "none"
+    )
+
+    # Refused before it was consumed: it still pairs a screen of the attacker's own.
+    fresh = test_client.post(
+        "/api/kiosks/hall/pair",
+        json={"installCode": minted},
+        headers=_auth(attacker_secret),
+    )
+    assert fresh.status_code == 200
+    assert fresh.json()["state"] == "paired"
+
+
+@pytest.mark.integration
+def test_install_code_refuses_a_screen_whose_agent_is_pending(test_client: TestClient):
+    """The real screen's in-flight agent pairing is not overwritten either."""
+    agent_secret, started = _start(test_client)
+    agent_code = _code_of(started.json())
+    minted = test_client.post("/api/kiosks/install-codes").json()["code"]
+    attacker_secret = _new_secret()
+
+    refused = test_client.post(
+        "/api/kiosks/kitchen/pair",
+        json={"installCode": minted},
+        headers=_auth(attacker_secret),
+    )
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["code"] == "install_code_invalid"
+    # The real screen's pending entry and code are untouched.
+    assert (
+        test_client.get("/api/kiosks/kitchen/pair", headers=_auth(agent_secret)).json()["code"]
+        == agent_code
+    )
+    assert (
+        test_client.get("/api/kiosks/kitchen/pair", headers=_auth(attacker_secret)).json()["state"]
+        == "none"
+    )
+
+    # The refused code was not consumed.
+    fresh = test_client.post(
+        "/api/kiosks/hall/pair",
+        json={"installCode": minted},
+        headers=_auth(attacker_secret),
+    )
+    assert fresh.status_code == 200
+
+
+@pytest.mark.integration
+def test_install_code_write_is_create_only(test_client: TestClient, monkeypatch):
+    """A row that appears after the pre-check is never overwritten by an install code.
+
+    ``kiosk_exists`` is made to say "no row" after a poll registered one: that is
+    the check-then-act window a concurrent approval (or a second install code)
+    opens. The write must be create-if-absent and refuse, not update the row.
+    """
+    from app.services import kiosk_registry
+
+    _register(test_client, "kitchen")  # the row already exists at the write
+
+    async def no_row(_kiosk_id: str) -> bool:
+        return False
+
+    monkeypatch.setattr(kiosk_registry, "kiosk_exists", no_row)
+
+    minted = test_client.post("/api/kiosks/install-codes").json()["code"]
+    attacker_secret = _new_secret()
+    refused = test_client.post(
+        "/api/kiosks/kitchen/pair",
+        json={"installCode": minted},
+        headers=_auth(attacker_secret),
+    )
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["code"] == "install_code_invalid"
+    row = next(k for k in test_client.get("/api/kiosks").json()["kiosks"] if k["id"] == "kitchen")
+    assert row["paired"] is False
+    assert (
+        test_client.get("/api/kiosks/kitchen/pair", headers=_auth(attacker_secret)).json()["state"]
+        == "none"
+    )

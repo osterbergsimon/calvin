@@ -32,7 +32,13 @@ from app.services.kiosk_pairing import (
     new_secret,
     pairing_store,
 )
-from app.services.kiosk_registry import _KIOSK_ID_RE, get_credential_hash, get_overrides
+from app.services.kiosk_registry import (
+    _KIOSK_ID_RE,
+    create_paired_kiosk,
+    get_credential_hash,
+    get_overrides,
+    kiosk_exists,
+)
 from app.utils.public_url import public_base_url
 from app.utils.utc import as_utc, utcnow
 
@@ -56,10 +62,9 @@ def _stamp(moment: datetime) -> str:
     return as_utc(moment).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
-def _peer(request: Request) -> str:
-    from app.security.route_policy import direct_peer_ip
-
-    return direct_peer_ip(request) or "unknown"
+def _limit_key(request: Request) -> str:
+    """The pairing limits' per-address key (design §14), as the api key limiter uses."""
+    return request.client.host if request.client else "unknown"
 
 
 def _setup_required() -> HTTPException:
@@ -223,15 +228,15 @@ async def post_pair(
                     "message": "This screen has an agent, so its agent does the pairing.",
                 },
             )
-        peer = _peer(request)
-        pending = next(
-            (
-                entry
-                for entry in pairing_store.live()
-                if entry.kiosk_id == kiosk_id and not entry.by_agent and entry.peer == peer
-            ),
-            None,
-        )
+        peer = _limit_key(request)
+        pending = None
+        # Reuse an entry only when the caller proves it already holds that
+        # entry's secret (its cookie). A matching address is not proof: behind a
+        # proxy, or with a forged header, every caller shares one peer, and the
+        # cookie would hand one caller's pending secret to another.
+        holder = await kiosk_holder(request)
+        if holder is not None and holder[0] == kiosk_id:
+            pending = pairing_store.pending_for(kiosk_id, holder[1])
         if pending is None:
             browser_secret = new_secret()
             try:
@@ -260,19 +265,25 @@ async def post_pair(
     if body.installCode is not None:
         if secret is None or not is_install_code(body.installCode):
             raise _install_code_invalid()
-        # A sniffed install code may give an attacker a screen of their own, never
-        # someone else's: it never replaces an existing pairing (design, Security).
-        if await get_credential_hash(kiosk_id) is not None:
+        secret_hash = hash_secret(secret)
+        # A sniffed install code may give an attacker a screen of their own,
+        # never someone else's (design, Security): it only ever pairs an id no
+        # screen has registered, and never one whose agent is already asking.
+        if await kiosk_exists(kiosk_id):
             raise _install_code_invalid()
+        if pairing_store.has_agent_pending(kiosk_id, secret_hash):
+            raise _install_code_invalid()
+        # Consume before the write, so one code can never pair two screens. The
+        # write itself is create-if-absent: a row an approval or a second
+        # install code creates in this window is refused, not overwritten.
         if not pairing_store.use_install_code(body.installCode):
             raise _install_code_invalid()
-        now = utcnow()
-        await kiosk_registry.set_credential(
+        if not await create_paired_kiosk(
             kiosk_id,
-            hash_secret(secret),
+            secret_hash,
             hostname=hostname,
-            now=now,
-        )
+        ):
+            raise _install_code_invalid()
         pairing_store.drop_kiosk(kiosk_id)
         logger.info(f"Screen {kiosk_id!r} paired with a one-time install code")
         return PairState(state="paired")
@@ -289,7 +300,7 @@ async def post_pair(
             pending = pairing_store.start(
                 kiosk_id,
                 secret_hash,
-                _peer(request),
+                _limit_key(request),
                 hostname=hostname,
                 by_agent=True,
             )
