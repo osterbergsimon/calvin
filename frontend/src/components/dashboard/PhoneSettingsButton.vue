@@ -55,7 +55,7 @@ const openSettings = () => {
 <style scoped>
 .phone-settings-button--floating {
   position: fixed;
-  bottom: calc(var(--gap-4) + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--gap-4) + env(safe-area-inset-bottom, 0px) + var(--pairing-strip-h, 0px));
   z-index: var(--z-sticky);
   box-shadow: var(--elev-1);
 }

@@ -96,7 +96,7 @@ onUnmounted(() => {
 .status-rail {
   position: fixed;
   right: 1rem;
-  bottom: 1rem;
+  bottom: calc(1rem + var(--pairing-strip-h, 0px));
   z-index: var(--z-toast);
   display: flex;
   flex-direction: column;

@@ -44,10 +44,13 @@ function isUncachedApi(url, request) {
   const path = url.pathname;
   if (path === "/api/health" || path.startsWith("/api/health/")) return true;
   if (path.startsWith("/api/system/")) return true;
-  // The pending pairings list is admin-only and names screens that are not
-  // paired yet (calvin-0xns). It must not outlive the sign-in in the shared
-  // API cache, even though the server also sends Cache-Control: no-store.
+  // Pairing routes (calvin-0xns): the pending pairings list is admin-only and
+  // names screens that are not paired yet, GET .../pair answers a screen's own
+  // pending code, and .../browser-session swaps its secret for the cookie. None
+  // may outlive the sign-in in the shared API cache or be replayed from it,
+  // even though the server also sends Cache-Control: no-store.
   if (path === "/api/kiosks/pairings" || path.startsWith("/api/kiosks/pairings/")) return true;
+  if (/^\/api\/kiosks\/[^/]+\/(?:pair|browser-session)$/.test(path)) return true;
   // Full-size photos are large and rotate constantly; thumbnails are small.
   if (path.startsWith("/api/images/") && !path.endsWith("/thumbnail")) return true;
   return (request.headers.get("accept") || "").includes("text/event-stream");

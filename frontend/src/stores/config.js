@@ -25,6 +25,7 @@ import {
   writeScreenSetting,
 } from "../utils/screenSetting";
 import { useKiosksStore } from "./kiosks";
+import { usePairingStore } from "./kioskPairing";
 import { useNotificationsStore } from "./notifications";
 import { SCREEN_SWITCH_SOURCE_ID, SCREEN_SWITCH_TIMING, useProgressStore } from "./progress";
 
@@ -406,6 +407,10 @@ export const useConfigStore = defineStore("config", () => {
     };
     try {
       const response = await api.get(path);
+      // The screen's own pairing state (Part B's kioskAuth, absent on an old
+      // server). The pairing store reads its code and considers browser-only
+      // pairing; the secret never travels through the config.
+      void usePairingStore().observeConfig(response.data?.kioskAuth);
       const applied = applyFetched(response.data);
       if (applied) {
         await migrateDisplaySettingsOnce(response.data);

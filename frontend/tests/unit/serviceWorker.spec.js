@@ -251,6 +251,9 @@ describe("service worker", () => {
       ["/api/system/status"],
       ["/api/system/update/stream"],
       ["/api/images/abc123"],
+      ["/api/kiosks/kitchen/pair"],
+      ["/api/kiosks/kitchen/browser-session"],
+      ["/api/kiosks/pairings"],
     ])("leaves %s to the network, uncached", async path => {
       expect(await sw.dispatchFetch(req(path))).toBeNull();
       expect(sw.fetchMock).not.toHaveBeenCalled();
