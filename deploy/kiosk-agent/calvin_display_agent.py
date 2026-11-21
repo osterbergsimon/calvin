@@ -8,6 +8,7 @@ Python 3 stdlib — no third-party deps (the kiosk Pi has no venv).
 
 import base64
 import hashlib
+import http.client
 import json
 import os
 import re
@@ -174,11 +175,15 @@ def is_install_code(value):
 
 
 def read_secret(path=CREDENTIAL_FILE):
-    """The secret in `path`, or None when it is missing or not secret-shaped."""
+    """The secret in `path`, or None when it is missing or not secret-shaped.
+
+    A cut write or a corrupt block can leave bytes that are not UTF-8: that is a
+    missing secret, not a crash (the next poll replaces the file).
+    """
     try:
         with open(path) as f:
             value = f.read().strip()
-    except OSError:
+    except (OSError, ValueError):
         return None
     return value if is_secret(value) else None
 
@@ -187,7 +192,9 @@ def _write_private_file(path, text, mode=0o600):
     """Write `text` atomically with `mode`; False when the directory is unusable.
 
     The temp file lives beside the target, so the rename stays on one filesystem
-    and a reader never sees a partial secret.
+    and a reader never sees a partial secret. Both the file and the directory
+    are fsynced: a Pi power cut right after the rename must not leave a
+    zero-length secret or marker behind.
     """
     directory = os.path.dirname(path) or "."
     if not os.path.isdir(directory):
@@ -198,16 +205,26 @@ def _write_private_file(path, text, mode=0o600):
         try:
             os.fchmod(fd, mode)
             os.write(fd, text.encode())
+            os.fsync(fd)
         finally:
             os.close(fd)
         os.replace(tmp, path)
-        return True
-    except OSError:
+    except (OSError, ValueError):
         try:
             os.unlink(tmp)
         except OSError:
             pass
         return False
+    try:
+        dir_fd = os.open(directory, os.O_RDONLY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
+    except OSError:
+        # Some filesystems refuse a directory fsync; the rename already happened.
+        pass
+    return True
 
 
 def rotate_secret(path=CREDENTIAL_FILE):
@@ -231,7 +248,7 @@ def read_install_code(path=INSTALL_CODE_FILE):
     try:
         with open(path) as f:
             value = f.read().strip()
-    except OSError:
+    except (OSError, ValueError):
         return None
     return value if is_install_code(value) else None
 
@@ -239,14 +256,14 @@ def read_install_code(path=INSTALL_CODE_FILE):
 def _paired_marker_exists(path=PAIRED_MARKER):
     try:
         return os.path.exists(path)
-    except OSError:
+    except (OSError, ValueError):
         return False
 
 
 def _remove_file(path):
     try:
         os.unlink(path)
-    except OSError:
+    except (OSError, ValueError):
         pass
 
 
@@ -274,6 +291,47 @@ def auth_headers(now=None):
     return {"Authorization": f"Bearer {secret}"}
 
 
+def kiosk_hostname():
+    """The name this screen is known by, for the config poll and the pair body."""
+    return os.environ.get("CALVIN_KIOSK_HOSTNAME", "").strip() or socket.gethostname()
+
+
+def _origin(url):
+    parts = urllib.parse.urlsplit(url)
+    try:
+        return (parts.scheme.lower(), (parts.hostname or "").lower(), parts.port)
+    except ValueError:
+        return (parts.scheme.lower(), (parts.hostname or "").lower(), None)
+
+
+class _SameOriginRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Drop the kiosk bearer when a redirect leaves the request's origin.
+
+    urllib copies Authorization onto the redirected request. The backend URL is
+    trusted, but a misconfigured proxy or a plain-http hop must never receive the
+    secret (review m3).
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if new is not None and _origin(newurl) != _origin(req.full_url):
+            new.remove_header("Authorization")
+        return new
+
+
+class _UrlOpener:
+    """The agent's default opener: same API as urllib.request.urlopen."""
+
+    def __init__(self):
+        self._opener = urllib.request.build_opener(_SameOriginRedirectHandler())
+
+    def urlopen(self, request, timeout=None):
+        return self._opener.open(request, timeout=timeout)
+
+
+DEFAULT_OPENER = _UrlOpener()
+
+
 def _http_error_code(exc):
     """The server's error code in an HTTPError body, or None."""
     try:
@@ -299,7 +357,7 @@ def _request(url, *, data=None, method=None, headers=None, opener=None,
     for an hour and the request is repeated once without it. Every other answer
     is returned or raised unchanged.
     """
-    opener = opener or urllib.request
+    opener = opener or DEFAULT_OPENER
     extra = dict(headers or {})
     auth = auth_headers()
     timeout = HTTP_TIMEOUT if timeout is None else timeout
@@ -325,6 +383,9 @@ def _post_pair(backend_url, secret, install_code=None, opener=None,
     base = backend_url.rstrip("/")
     url = f"{base}/api/kiosks/{urllib.parse.quote(kiosk_id)}/pair"
     body = {}
+    host = kiosk_hostname().strip()[:255]
+    if host:
+        body["hostname"] = host
     if install_code is not None:
         body["installCode"] = install_code
     data = json.dumps(body).encode()
@@ -338,7 +399,7 @@ def _post_pair(backend_url, secret, install_code=None, opener=None,
         },
         method="POST",
     )
-    opener = opener or urllib.request
+    opener = opener or DEFAULT_OPENER
     try:
         with opener.urlopen(request, timeout=timeout) as response:
             raw = response.read()
@@ -346,7 +407,7 @@ def _post_pair(backend_url, secret, install_code=None, opener=None,
         return (payload if isinstance(payload, dict) else None), None
     except urllib.error.HTTPError as exc:
         return None, _http_error_code(exc)
-    except (OSError, TypeError, ValueError):
+    except (OSError, TypeError, ValueError, http.client.HTTPException):
         return None, None
 
 
@@ -378,19 +439,30 @@ class Pairing:
         self.secret = None
         self._rotated_for_this_unpair = False
         self._install_code_sent = False
+        # A rotation that could not be written is retried on the next poll; until
+        # it succeeds, step() must not offer the old secret again (review m1).
+        self._awaiting_rotation = False
 
     def ensure_secret(self, now=None):
-        """Create the secret on first start. True when this call created it."""
+        """Create the secret on first start. Returns a bool: True when created."""
         existing = read_secret(self.secret_path)
         if existing is not None:
             self.secret = existing
             return False
         secret = rotate_secret(self.secret_path)
         self.secret = secret
-        return secret is not None
+        created = secret is not None
+        return created
 
-    def on_config(self, cfg, now=None):
-        """Read one config answer. True when the secret had to be rotated."""
+    def on_config(self, cfg, now=None, auth_sent=True):
+        """Read one config answer. True when the secret was rotated.
+
+        `auth_sent` says whether the request this answer replies to carried the
+        kiosk bearer. An "unpaired" answer to a bearer-less request (the bearer
+        is suspended after an old server's 401, or the file is unreadable) says
+        nothing about this screen: rotating then would lose a pairing the
+        design promises survives a rollback (design section 11, review M2).
+        """
         auth = cfg.get("kioskAuth") if isinstance(cfg, dict) else None
         if not isinstance(auth, dict):
             self.state = "unsupported"
@@ -399,27 +471,37 @@ class Pairing:
         if state == "paired":
             self.state = "paired"
             self._rotated_for_this_unpair = False
+            self._awaiting_rotation = False
             self._install_code_sent = False
             if not _paired_marker_exists(self.marker_path):
                 _write_private_file(self.marker_path, "paired\n")
             return False
         if state == "unpaired":
+            if not auth_sent:
+                return False
             self.state = "pairing"
             if _paired_marker_exists(self.marker_path) and not (
                 self._rotated_for_this_unpair
             ):
-                self.secret = rotate_secret(self.secret_path)
+                secret = rotate_secret(self.secret_path)
+                self.secret = secret
+                if secret is None:
+                    # Keep the marker so the next poll tries again, and stay out
+                    # of step(): the old secret must never be re-paired.
+                    self._awaiting_rotation = True
+                    return False
                 _remove_file(self.marker_path)
                 self._rotated_for_this_unpair = True
+                self._awaiting_rotation = False
                 self._install_code_sent = False
-                return self.secret is not None
+                return True
             return False
         # An answer this agent does not understand: keep the state as it was.
         return False
 
     def step(self, backend_url, opener=None, now=None):
         """POST .../pair once for this poll. True when the screen became paired."""
-        if self.state != "pairing":
+        if self.state != "pairing" or self._awaiting_rotation:
             return False
         secret = read_secret(self.secret_path)
         if secret is None:
@@ -3001,7 +3083,7 @@ def _config_url(
 
 def fetch_config(backend_url, kstat=None, kmsg=None, timeout=HTTP_TIMEOUT, opener=None):
     kiosk_id = os.environ.get("CALVIN_KIOSK_ID", "").strip()
-    host = os.environ.get("CALVIN_KIOSK_HOSTNAME", "").strip() or socket.gethostname()
+    host = kiosk_hostname()
     if kstat is None:
         kstat, kmsg = update_report()
     url = _config_url(
@@ -3064,9 +3146,18 @@ def run(
         try:
             restart_kiosk_browsers()
         except Exception as e:
-            log(f"pairing: could not restart the browser ({e})")
+            # Never the message: it is not the pairing code's business to reach a
+            # log, and the class is all a reader needs (review M1).
+            log(f"pairing: {type(e).__name__}")
 
-    if pairing.ensure_secret():
+    created = False
+    try:
+        created = pairing.ensure_secret()
+    except Exception as e:
+        # A credential file is not allowed to keep the agent from polling: the
+        # screen keeps its schedule even when pairing is unusable (review M1).
+        log(f"pairing: {type(e).__name__}")
+    if created:
         # The browser has never had this secret: one restart lets its unit
         # rebuild the start URL with #pair=, so a pending screen shows its code.
         restart_browser_once()
@@ -3137,23 +3228,6 @@ def run(
                     controller.state_dir, cfg
                 )
             now = now_in(cfg)
-            # Pairing rides the config poll: one look at this answer, then at
-            # most one POST .../pair. A missing kioskAuth (an old backend) never
-            # starts it, and no answer can change the secret except an "unpaired"
-            # for a screen that had been paired.
-            if pairing.on_config(cfg, now):
-                restart_browser_once()
-            if pairing.state == "pairing":
-                pairing.step(backend_url)
-            auth_info = cfg.get("kioskAuth")
-            if isinstance(auth_info, dict):
-                paired = (
-                    auth_info.get("state") == "paired" or pairing.state == "paired"
-                )
-                if browser_restart.observe(
-                    auth_info.get("browser"), paired, time_module.monotonic()
-                ):
-                    restart_browser_once()
             prev = last
             if controller is None:
                 last = reconcile(cfg, now, last)
@@ -3162,6 +3236,29 @@ def run(
                 last = controller.reconcile(
                     cfg, now, last, cancel=ramp_cancel(desired)
                 )
+            # Pairing rides the config poll, but only after the screen is
+            # reconciled: no pairing trouble may skip turning the display on or
+            # off for this poll (review M1). It is isolated from the loop for the
+            # same reason; only the exception class is logged (never a secret).
+            try:
+                # An "unpaired" answer counts only when the request it answers
+                # actually carried the bearer (review M2).
+                bearer_sent = bool(auth_headers())
+                if pairing.on_config(cfg, now, auth_sent=bearer_sent):
+                    restart_browser_once()
+                if bearer_sent and pairing.state == "pairing":
+                    pairing.step(backend_url)
+                auth_info = cfg.get("kioskAuth")
+                if isinstance(auth_info, dict):
+                    paired = (
+                        auth_info.get("state") == "paired" or pairing.state == "paired"
+                    )
+                    if browser_restart.observe(
+                        auth_info.get("browser"), paired, time_module.monotonic()
+                    ):
+                        restart_browser_once()
+            except Exception as e:
+                log(f"pairing: {type(e).__name__}")
             if first_pass:
                 # Recover an interrupted check only once the first reconcile
                 # has powered the panel and let it settle.
@@ -3634,6 +3731,10 @@ KIOSK_UNITS = (
 # its start URL is rebuilt with the secret in the fragment (calvin-0xns). The
 # all-in-one calvin-kiosk.service has no kiosk id and never pairs.
 BROWSER_UNITS = ("calvin-kiosk-remote.service", COG_UNIT)
+# The CDP watchdog probes Chromium's DevTools port; cog/WPE has none, so cog is
+# never watched there (it would look unreachable forever). BROWSER_UNITS still
+# covers the pairing restart.
+WATCHDOG_UNITS = ("calvin-kiosk-remote.service", "calvin-kiosk.service")
 PAGE_OK = "ok"
 PAGE_DEAD = "dead"
 PAGE_UNREACHABLE = "unreachable"
@@ -3980,7 +4081,7 @@ def kiosk_unit_state(unit, run=None, monotonic=None):
     }
 
 
-def watched_kiosk_unit(units=KIOSK_UNITS, state=None):
+def watched_kiosk_unit(units=WATCHDOG_UNITS, state=None):
     """State of the running kiosk unit (remote first, then all-in-one), or None."""
     if state is None:
         state = kiosk_unit_state
