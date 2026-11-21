@@ -44,7 +44,7 @@ async function openSettings(page, category = null) {
 
 /** Rows with a toggle / segmented control / select in their control column. */
 function compactRows(page) {
-  return page.$$eval(".setting-row:not(.setting-row--stacked)", rows =>
+  return page.$$eval(".screens-layout__detail .setting-row:not(.setting-row--stacked)", rows =>
     rows
       .filter(row => row.offsetParent !== null)
       .filter(row =>

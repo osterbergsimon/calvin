@@ -2,13 +2,17 @@
 <template>
   <div
     class="page-thumb"
-    :class="[`page-thumb--${size}`, `is-${orientation}`]"
+    :class="[
+      `page-thumb--${size}`,
+      `is-${orientation}`,
+      { 'page-thumb--placeholder': placeholder },
+    ]"
     :data-orientation="orientation"
     :data-test="dataTest"
     :aria-label="ariaLabel || undefined"
     aria-hidden="false"
   >
-    <div class="page-thumb__regions" :class="`dir-${direction}`">
+    <div v-if="!placeholder" class="page-thumb__regions" :class="`dir-${direction}`">
       <span
         v-for="region in regions"
         :key="region.id"
@@ -35,6 +39,8 @@ const props = defineProps({
   size: { type: String, default: "card" },
   dataTest: { type: String, default: "page-thumbnail" },
   ariaLabel: { type: String, default: "" },
+  // A screen with no page to draw yet (a waiting pairing): an empty dashed box.
+  placeholder: { type: Boolean, default: false },
 });
 
 const regions = computed(() => {
@@ -67,6 +73,11 @@ const direction = computed(() =>
 }
 .page-thumb__regions.dir-column {
   flex-direction: column;
+}
+.page-thumb--placeholder {
+  border-style: dashed;
+  border-color: var(--line);
+  background: transparent;
 }
 .page-thumb__region {
   flex-basis: 0;

@@ -19,13 +19,14 @@
       :placeholder="placeholder || undefined"
       :autocomplete="autocomplete"
       :autocapitalize="autocapitalize"
+      :enterkeyhint="enterkeyhint || undefined"
       :maxlength="maxlength"
       :disabled="disabled"
       :readonly="readonly"
       :required="required"
       autocorrect="off"
       spellcheck="false"
-      :aria-invalid="error ? 'true' : 'false'"
+      :aria-invalid="error || invalid ? 'true' : 'false'"
       :aria-describedby="describedBy"
       @input="$emit('update:modelValue', $event.target.value)"
       @blur="$emit('blur', $event)"
@@ -70,6 +71,8 @@ const props = defineProps({
   placeholder: { type: String, default: "" },
   autocomplete: { type: String, default: "off" },
   autocapitalize: { type: String, default: "off" },
+  // The keyboard's action key on phones ("go" sends the surrounding form).
+  enterkeyhint: { type: String, default: "" },
   maxlength: { type: [String, Number], default: undefined },
   // Attach a test id to the input itself; a plain data-test attribute still
   // lands on the wrapper (the gallery relies on that).
@@ -81,6 +84,9 @@ const props = defineProps({
   // group (e.g. the colour swatch and its hex value share one label).
   hideLabel: { type: Boolean, default: false },
   error: { type: String, default: "" },
+  // A server answer can mark the field without a second copy of its message
+  // (the result line already announces it once).
+  invalid: { type: Boolean, default: false },
   disabled: { type: Boolean, default: false },
   readonly: { type: Boolean, default: false },
   required: { type: Boolean, default: false },

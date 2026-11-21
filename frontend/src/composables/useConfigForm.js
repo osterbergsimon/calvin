@@ -246,6 +246,8 @@ export function useConfigForm(initialConfig = {}) {
         configPollInterval: response.configPollInterval ?? response.config_poll_interval ?? 30,
         calendarRefreshInterval:
           response.calendarRefreshInterval ?? response.calendar_refresh_interval ?? 15,
+        // The household pairing choice (calvin-0xns). Absent reads as optional.
+        kioskPairing: response.kioskPairing ?? "optional",
         gitRepoUrl: response.gitRepoUrl ?? response.git_repo_url ?? null,
         gitBranch: response.gitBranch ?? response.git_branch ?? "develop",
         version: response.version ?? null,
