@@ -63,6 +63,9 @@ const results = computed(() => filterSettingsDestinations(query.value));
 // The mounted live region's line: a change to the result count is announced
 // while the results list itself stays an ordinary list.
 const countLabel = computed(() => {
+  // Nothing to count before the person types: clearing the search must not
+  // announce "No results".
+  if (!query.value.trim()) return "";
   const n = results.value.length;
   if (n === 0) return "No results";
   return n === 1 ? "1 result" : `${n} results`;

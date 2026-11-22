@@ -69,10 +69,22 @@ describe("SettingsSearch", () => {
     // Mounted before any query, so its text changes are announced.
     const count = w.get(".settings-search__count");
     expect(count.attributes("aria-live")).toBe("polite");
-    expect(count.text()).toBe("No results");
+    expect(count.text()).toBe("");
     await w.get("input").setValue("orient");
     expect(w.get(".settings-search__count").text()).toBe("1 result");
     await w.get("input").setValue("all");
     expect(w.get(".settings-search__count").text()).toBe("2 results");
+    await w.get("input").setValue("zzz");
+    expect(w.get(".settings-search__count").text()).toBe("No results");
+  });
+
+  it("says nothing for a blank query, so clearing the search is quiet", async () => {
+    const w = mount(SettingsSearch);
+    await w.get("input").setValue("   ");
+    expect(w.get(".settings-search__count").text()).toBe("");
+    await w.get("input").setValue("orient");
+    expect(w.get(".settings-search__count").text()).toBe("1 result");
+    await w.get("input").setValue("");
+    expect(w.get(".settings-search__count").text()).toBe("");
   });
 });
