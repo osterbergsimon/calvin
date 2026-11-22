@@ -24,8 +24,8 @@ const NEVER = {
   vcpVersion: null,
   limit: null,
 };
-// findings_view always sends limit, and the backend never sets it: a limit
-// saved by a check is only in the overrides.
+// findings_view always sends limit. This screen's findings have none, so the
+// limit in its overrides is a hand-set one.
 const FOUND = { ddc: true, writes: true, checkedAt: "2026-11-04T10:00:00Z", limit: null };
 
 const SIZES = [
@@ -93,7 +93,7 @@ for (const [size, viewport] of SIZES) {
       const group = await openHallway(page, { kiosk: viewport ? "workshop" : null });
       await expect(group).toBeVisible();
       await expect(group.locator('[data-test="check-summary"]')).toContainText(
-        "menu match from 2 readings · checked 4 Nov · highest 26"
+        "menu match from 2 readings · checked 4 Nov · highest 26, set by hand"
       );
 
       await group.getByRole("switch", { name: "Ramp brightness at sleep and wake" }).click();
@@ -158,9 +158,9 @@ for (const [size, viewport] of SIZES) {
       await expect(group.locator('[data-test="levels-summary"]')).toContainText(
         "Highest 78 · Lowest 28"
       );
-      // The date belongs to the check's findings, and the highest level is plain.
+      // The date belongs to the check's findings; this highest is hand-set.
       await expect(group.locator('[data-test="check-summary"]')).toContainText(
-        "checked 4 Nov · highest 26"
+        "checked 4 Nov · highest 26, set by hand"
       );
       await group.locator('[data-test="levels-change"]').click();
       const editor = group.locator('[data-test="levels-editor"]');
@@ -172,7 +172,7 @@ for (const [size, viewport] of SIZES) {
       expect(api.overridesByKiosk.hallway.brightness).toBe(19);
       // The check's date stays with the check, not with the level set here.
       await expect(group.locator('[data-test="check-summary"]')).toContainText(
-        "checked 4 Nov · highest 25"
+        "checked 4 Nov · highest 25, set by hand"
       );
 
       // Raising past the recorded power trouble saves nothing until confirmed.
