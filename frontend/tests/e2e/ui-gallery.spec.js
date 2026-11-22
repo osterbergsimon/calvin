@@ -163,3 +163,103 @@ for (const viewport of VIEWPORTS) {
     });
   }
 }
+
+// Windows High Contrast drops author colours and box-shadows, so state and
+// focus must not depend on them (calvin-kajl M2). These cases run the gallery
+// with forced colours on and check the three blocks whose state is drawn with
+// colour alone.
+test.describe("ui gallery under forced colours", () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  async function openForcedGallery(page) {
+    await page.emulateMedia({ forcedColors: "active" });
+    await page.goto("/ui-gallery.html?theme=light");
+    await expect(page.locator('[data-test="ui-gallery"]')).toBeVisible();
+  }
+
+  // The system colours the browser actually paints with. Comparing against
+  // these tells a real mark apart from a colour that forced colours flattened
+  // to Canvas.
+  async function systemColours(page) {
+    return page.evaluate(() => {
+      const resolve = property => {
+        const probe = document.createElement("div");
+        probe.style.backgroundColor = property;
+        document.body.appendChild(probe);
+        const value = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        return value;
+      };
+      return {
+        highlight: resolve("Highlight"),
+        highlightText: resolve("HighlightText"),
+        buttonText: resolve("ButtonText"),
+      };
+    });
+  }
+
+  test("the switch keeps a visible track, knob and on state", async ({ page }) => {
+    await openForcedGallery(page);
+    const colours = await systemColours(page);
+    const read = locator =>
+      locator.evaluate(el => {
+        const style = getComputedStyle(el);
+        return {
+          borderWidth: style.borderTopWidth,
+          borderStyle: style.borderTopStyle,
+          borderColour: style.borderTopColor,
+          background: style.backgroundColor,
+          knob: getComputedStyle(el, "::after").backgroundColor,
+        };
+      });
+
+    const off = await read(page.getByRole("switch", { name: "Warnings" }));
+    expect(off.borderStyle).toBe("solid");
+    expect(parseFloat(off.borderWidth)).toBeGreaterThanOrEqual(1);
+    expect(off.borderColour).toBe(colours.buttonText);
+    expect(off.knob).toBe(colours.buttonText);
+
+    const on = await read(page.getByRole("switch", { name: "Daily summary" }));
+    expect(on.background).toBe(colours.highlight);
+    expect(on.knob).toBe(colours.highlightText);
+  });
+
+  test("the selected segment is marked", async ({ page }) => {
+    await openForcedGallery(page);
+    const colours = await systemColours(page);
+    const selected = page.getByRole("radiogroup", { name: "Mode" }).locator(".seg__btn.on");
+
+    const marks = await selected.evaluate(el => {
+      const style = getComputedStyle(el);
+      return {
+        style: style.outlineStyle,
+        width: style.outlineWidth,
+        colour: style.outlineColor,
+      };
+    });
+    expect(marks.style).toBe("solid");
+    expect(parseFloat(marks.width)).toBeGreaterThanOrEqual(2);
+    expect(marks.colour).toBe(colours.highlight);
+  });
+
+  test("the active tab keeps its underline", async ({ page }) => {
+    await openForcedGallery(page);
+    const colours = await systemColours(page);
+    const active = page
+      .getByRole("tablist", { name: "Gallery pages" })
+      .locator(".tabs__tab.is-active");
+
+    const marks = await active.evaluate(el => {
+      const style = getComputedStyle(el);
+      const underline = getComputedStyle(el, "::after");
+      return {
+        outline:
+          style.outlineStyle !== "none" && parseFloat(style.outlineWidth) > 0
+            ? style.outlineColor
+            : null,
+        underline: parseFloat(underline.height) > 0 ? underline.backgroundColor : null,
+      };
+    });
+    expect(marks.outline === colours.highlight || marks.underline === colours.highlight).toBe(true);
+  });
+});

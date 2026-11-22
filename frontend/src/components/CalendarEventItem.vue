@@ -344,4 +344,14 @@ const handleFocus = () => {
     margin-right: -0.01rem;
   }
 }
+
+/* High Contrast drops the focus box-shadow; an outline keeps the focused chip
+   visible against its own event colour. */
+@media (forced-colors: active) {
+  .event-item:focus,
+  .event-item.focused {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}
 </style>

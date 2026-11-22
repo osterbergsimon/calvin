@@ -94,4 +94,15 @@ const stateClass = computed(() => {
     transition: none;
   }
 }
+
+/* High Contrast drops both the outline colour and the focus box-shadow; a
+   system-colour outline keeps the focused panel visible in either effects
+   level. */
+@media (forced-colors: active) {
+  .focus-panel.is-focused,
+  [data-effects="full"] .focus-panel.is-focused {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}
 </style>

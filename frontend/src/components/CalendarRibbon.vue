@@ -191,4 +191,14 @@ const handleFocus = () => emit("focus", props.ribbon);
     inset 0 0 0 1px var(--bg-1),
     0 0 0 2px var(--focus-ring);
 }
+
+/* High Contrast drops the focus box-shadow; an outline keeps the focused
+   ribbon visible. */
+@media (forced-colors: active) {
+  .ribbon:focus,
+  .ribbon.focused {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}
 </style>
