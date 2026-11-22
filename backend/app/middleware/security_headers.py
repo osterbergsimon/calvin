@@ -31,10 +31,27 @@ def _is_csp_exempt(path: str) -> bool:
     )
 
 
+_HARDENING_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "same-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+}
+
+
+def _stamp_hardening(response) -> None:
+    """Add the non-CSP hardening headers; a route that set its own value keeps it
+    (the share page sends Referrer-Policy: no-referrer)."""
+    for name, value in _HARDENING_HEADERS.items():
+        if name not in response.headers:
+            response.headers[name] = value
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
-        # Docs UI paths are exempt — they need CDN assets + inline scripts.
+        # Hardening headers go on every response, including the CSP-exempt docs paths.
+        _stamp_hardening(response)
+        # Docs UI paths are exempt from CSP — they need CDN assets + inline scripts.
         if _is_csp_exempt(request.url.path):
             return response
         try:

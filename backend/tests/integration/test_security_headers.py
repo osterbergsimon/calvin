@@ -79,6 +79,10 @@ def security_test_client(temp_image_dir: Path) -> Generator[TestClient, None, No
     async def _spa_root():
         return HTMLResponse("<html><body>kiosk</body></html>")
 
+    @test_app.get("/share-like")
+    async def _share_like():
+        return HTMLResponse("<html></html>", headers={"Referrer-Policy": "no-referrer"})
+
     with TestClient(test_app) as client:
         yield client
 
@@ -326,6 +330,54 @@ class TestSecurityHeaders:
         csp = response.headers.get("content-security-policy", "")
         assert "default-src 'self'" in csp
         assert "frame-src 'self'" in csp
+
+
+_HARDENING = {
+    "x-content-type-options": "nosniff",
+    "referrer-policy": "same-origin",
+    "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=()",
+}
+
+
+@pytest.mark.integration
+class TestHardeningHeaders:
+    def test_normal_response_has_hardening_headers(self, security_test_client: TestClient):
+        headers = security_test_client.get("/api/health").headers
+        for name, value in _HARDENING.items():
+            assert headers.get(name) == value
+
+    def test_html_response_has_hardening_headers(self, security_test_client: TestClient):
+        headers = security_test_client.get("/spa").headers
+        for name, value in _HARDENING.items():
+            assert headers.get(name) == value
+
+    def test_csp_exempt_docs_still_get_nosniff_but_no_csp(self, security_test_client: TestClient):
+        for path in ("/docs", "/redoc", "/openapi.json"):
+            response = security_test_client.get(path)
+            assert response.headers.get("x-content-type-options") == "nosniff", path
+            assert "content-security-policy" not in response.headers, path
+
+    def test_sealed_mode_keeps_hardening_headers(self, security_test_client: TestClient):
+        from app.models.db_models import ConfigDB
+
+        _run(ConfigDB.objects.create(key="sealed_mode", value="true", value_type="bool"))
+        headers = security_test_client.get("/api/health").headers
+        for name, value in _HARDENING.items():
+            assert headers.get(name) == value
+
+    def test_lookup_failure_keeps_hardening_headers(self, security_test_client: TestClient):
+        with patch(
+            "app.middleware.security_headers.get_web_service_origins",
+            new=AsyncMock(side_effect=Exception("boom")),
+        ):
+            headers = security_test_client.get("/api/health").headers
+        for name, value in _HARDENING.items():
+            assert headers.get(name) == value
+
+    def test_route_set_referrer_policy_is_not_overwritten(self, security_test_client: TestClient):
+        headers = security_test_client.get("/share-like").headers
+        assert headers.get("referrer-policy") == "no-referrer"
+        assert headers.get("x-content-type-options") == "nosniff"
 
 
 def _run(coro):
