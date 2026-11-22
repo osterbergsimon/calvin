@@ -92,7 +92,7 @@
             </template>
             <img
               :src="currentImageUrl"
-              :alt="currentImage?.filename || 'Photo'"
+              alt=""
               :class="['photo-image', `photo-image-${displayMode}`]"
               :style="imageStyle"
               decoding="async"

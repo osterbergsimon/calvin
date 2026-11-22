@@ -15,7 +15,9 @@
     >
       <span class="status__line-label calvin-plugin-readout__label">
         <span v-if="isAlert(item)" class="calvin-plugin-lamp" />
-        <span v-if="iconFor(item)" class="status__icon">{{ iconFor(item) }}</span>
+        <span v-if="iconFor(item)" class="status__icon" aria-hidden="true">{{
+          iconFor(item)
+        }}</span>
         {{ labelFor(item) }}
       </span>
       <span class="status__line-value calvin-plugin-readout__value">
@@ -29,7 +31,7 @@
   <span v-else-if="layout === 'row'" ref="rowEl" class="status status--row">
     <span v-for="(item, i) in items" :key="i" class="status__cell" :class="readoutClass(item)">
       <span v-if="isAlert(item)" class="calvin-plugin-lamp" />
-      <span v-if="iconFor(item)" class="status__icon">{{ iconFor(item) }}</span>
+      <span v-if="iconFor(item)" class="status__icon" aria-hidden="true">{{ iconFor(item) }}</span>
       <span v-if="labelFor(item)" class="status__cell-label calvin-plugin-readout__label">
         <span class="status__cell-text">{{ labelFor(item) }}</span>
       </span>
@@ -50,7 +52,9 @@
     >
       <span class="calvin-plugin-readout__label">
         <span v-if="isAlert(item)" class="calvin-plugin-lamp" />
-        <span v-if="iconFor(item)" class="status__icon">{{ iconFor(item) }}</span>
+        <span v-if="iconFor(item)" class="status__icon" aria-hidden="true">{{
+          iconFor(item)
+        }}</span>
         {{ labelFor(item) }}
       </span>
       <span v-if="hasValue(item)" class="calvin-plugin-readout__value">
