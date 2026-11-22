@@ -164,7 +164,7 @@ describe("WebServiceViewer", () => {
     const view = { cardSize: "large", linkAction: "off" };
     const wrapper = mountViewer({ isFullscreen: false, serviceId: "meals", focused: true, view });
 
-    await wrapper.get('[title="Enter Fullscreen"]').trigger("click");
+    await wrapper.get('[aria-label="Full screen"]').trigger("click");
 
     // The region's view rides along so its options still apply fullscreen.
     expect(enterSpy).toHaveBeenCalledWith(modeStore.MODES.WEB_SERVICES, {
@@ -215,9 +215,9 @@ describe("WebServiceViewer control consolidation", () => {
     expect(w.find(".region-controls").exists()).toBe(false);
   });
 
-  it("still shows the Enter Fullscreen control with a pointer present", () => {
+  it("still shows the Full screen control with a pointer present", () => {
     const w = mount2({ isFullscreen: false, serviceId: "b", focused: true });
-    expect(w.find('[title="Enter Fullscreen"]').exists()).toBe(true);
+    expect(w.find('[aria-label="Full screen"]').exists()).toBe(true);
   });
 
   it("follows Dashboard size for the header controls", () => {
@@ -243,6 +243,22 @@ describe("WebServiceViewer control consolidation", () => {
     const w = mount2({ isFullscreen: false, serviceId: "b", focused: true });
     expect(w.find(".region-header-controls .icon-btn path").attributes("d")).toBe(mdiFullscreen);
   });
+
+  it("names each control in plain words, with no duplicate tooltip", () => {
+    const full = mount2({ isFullscreen: true, focused: true });
+
+    for (const name of ["Previous web page", "Next web page", "Exit fullscreen"]) {
+      const control = full.find(`[aria-label="${name}"]`);
+      expect(control.exists(), name).toBe(true);
+      expect(control.attributes("title"), name).toBeUndefined();
+    }
+
+    const enter = mount2({ isFullscreen: false, serviceId: "b", focused: true }).find(
+      '[aria-label="Full screen"]'
+    );
+    expect(enter.exists()).toBe(true);
+    expect(enter.attributes("title")).toBeUndefined();
+  });
 });
 
 describe("WebServiceViewer empty state (F4)", () => {
@@ -260,6 +276,7 @@ describe("WebServiceViewer empty state (F4)", () => {
     const empty = w.findComponent({ name: "EmptyState" });
     expect(empty.exists()).toBe(true);
     expect(empty.props("settingId")).toBe("content-services");
+    expect(w.findComponent({ name: "DashboardPanel" }).props("title")).toBe("Web pages");
     expect(w.text()).toContain("Settings › Content › Web pages & services");
     expect(w.find('[data-test="empty-state-action"]').text()).toBe("Add a web page");
     w.unmount();

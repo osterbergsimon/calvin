@@ -18,18 +18,23 @@
           style="display: none"
           @change="handleFileSelect"
         />
-        <button class="btn-upload" :disabled="uploading" @click="triggerFileInput(section.id)">
-          {{ uploading ? "Uploading..." : "Choose Files" }}
-        </button>
+        <Button
+          :loading="uploading"
+          loading-label="Uploading…"
+          @click="triggerFileInput(section.id)"
+        >
+          Choose photos
+        </Button>
         <span v-if="section.help_text" class="help-text">
           {{ section.help_text }}
         </span>
-        <div v-if="uploadError" class="error-message">
-          {{ uploadError }}
-        </div>
-        <div v-if="uploadSuccess" class="success-message">
-          {{ uploadSuccess }}
-        </div>
+        <InlineNote
+          :tone="uploadError ? 'err' : uploadSuccess ? 'ok' : 'neutral'"
+          role="status"
+          data-test="upload-error"
+        >
+          {{ uploadError || uploadSuccess }}
+        </InlineNote>
       </div>
     </div>
   </div>
@@ -37,6 +42,8 @@
 
 <script setup>
 import { ref } from "vue";
+import Button from "./ui/Button.vue";
+import InlineNote from "./ui/InlineNote.vue";
 
 // Upload is the only ui_section the host still renders: the retired
 // manage_images list lived here but was unreachable (the plugin card no longer
@@ -93,47 +100,6 @@ const handleFileSelect = event => {
 
 .upload-section {
   margin-top: 1rem;
-}
-
-.btn-upload {
-  background: var(--focus);
-  color: var(--focus-ink);
-  border: none;
-  border-radius: var(--radius-xs);
-  padding: 0.75rem 1.5rem;
-  font-size: var(--fs-md);
-  cursor: pointer;
-  transition: all var(--dur) ease;
-  font-weight: var(--weight-strong);
-}
-
-.btn-upload:hover:not(:disabled) {
-  background: var(--focus);
-  opacity: 0.9;
-}
-
-.btn-upload:disabled {
-  background: var(--ink-3);
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.success-message {
-  background: var(--accent-success, var(--ok));
-  color: var(--ok-ink);
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius-xs);
-  margin-top: 0.5rem;
-  font-size: var(--fs-control);
-}
-
-.error-message {
-  background: var(--err);
-  color: var(--err-ink);
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius-xs);
-  margin-top: 0.5rem;
-  font-size: var(--fs-control);
 }
 
 .help-text {

@@ -243,7 +243,7 @@ test.describe("the region's options follow the widget into fullscreen", () => {
     page,
   }) => {
     await openWidget(page, "mealie", "medium", { view: { cardSize: "xlarge", linkAction: "off" } });
-    await page.getByRole("button", { name: "Enter Fullscreen" }).click();
+    await page.getByRole("button", { name: "Full screen" }).click();
     await expect(page.locator(".web-service-viewer.fullscreen")).toBeVisible();
     const card = page.locator(".web-service-viewer.fullscreen .card-grid__card").first();
     await expect(card).toBeVisible();

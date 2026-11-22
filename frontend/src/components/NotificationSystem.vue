@@ -111,8 +111,8 @@ const actionLabels = {
   // Web service actions
   web_service_1: "Web Service 1",
   web_service_2: "Web Service 2",
-  web_service_next: "Next Service",
-  web_service_prev: "Previous Service",
+  web_service_next: "Next web page",
+  web_service_prev: "Previous web page",
 
   // Other
   none: "No Action",

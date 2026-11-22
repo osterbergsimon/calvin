@@ -84,7 +84,7 @@ describe("PhotoSlideshow", () => {
       const wrapper = createWrapper();
 
       expect(wrapper.find(".loading").exists()).toBe(true);
-      expect(wrapper.find(".loading").text()).toContain("Loading images...");
+      expect(wrapper.find(".loading").text()).toContain("Loading photos…");
     });
 
     it("should show placeholder when no images available", () => {

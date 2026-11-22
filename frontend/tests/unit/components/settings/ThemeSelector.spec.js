@@ -31,6 +31,11 @@ const THEMES = [
 const mountSelector = (props = {}) => mount(ThemeSelector, { props: { themes: THEMES, ...props } });
 
 describe("ThemeSelector", () => {
+  it("says it is loading themes with an ellipsis", () => {
+    const w = mountSelector({ loading: true });
+    expect(w.find(".loading-state").text()).toBe("Loading themes…");
+  });
+
   it("lists Calvin plus every installed theme, with a Light and dark caption", () => {
     const w = mountSelector();
     const names = w.findAll(".theme-selection-info strong").map(node => node.text());

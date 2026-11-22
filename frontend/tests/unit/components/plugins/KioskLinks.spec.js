@@ -293,6 +293,9 @@ describe("ExternalLink: the one way to leave Calvin (S6)", () => {
     });
     expect(w.find("a").attributes("target")).toBe("_blank");
     expect(w.find("a").attributes("rel")).toContain("noopener");
+    // The one link style is a zero-specificity hook, so a caller's own class
+    // still wins while every link sits on the same button baseline.
+    expect(w.find("a").classes()).toContain("external-link");
   });
 
   it("shows the QR handoff and never navigates on a kiosk", async () => {

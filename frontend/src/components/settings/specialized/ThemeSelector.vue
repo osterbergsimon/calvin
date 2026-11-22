@@ -1,7 +1,7 @@
 <template>
   <div class="theme-selector">
     <div v-if="loading" class="loading-state">
-      <p>Loading themes...</p>
+      <p>Loading themes…</p>
     </div>
     <div v-else class="theme-selection-grid" role="radiogroup" aria-label="Theme" @keydown="onKey">
       <div

@@ -6,6 +6,7 @@ import Card from "@/components/ui/Card.vue";
 import EmptyState from "@/components/ui/EmptyState.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import Button from "@/components/ui/Button.vue";
+import ExternalLink from "@/components/ui/ExternalLink.vue";
 import CardGrid from "@/components/plugins/renderers/CardGrid.vue";
 import ItemList from "@/components/plugins/renderers/ItemList.vue";
 import MetricDashboard from "@/components/plugins/renderers/MetricDashboard.vue";
@@ -95,19 +96,21 @@ describe("metric-dashboard uses Card", () => {
   });
 });
 
-describe("weather-forecast uses InlineNote for its error", () => {
-  it("reports the error and the detail as notes, in the error tone", () => {
+describe("weather-forecast uses EmptyState for its error", () => {
+  it("says plainly that the weather failed, and never prints the raw error", () => {
     const wrapper = mount(WeatherForecast, {
       props: {
         schema: { kind: "weather-forecast" },
         data: { error: "Weather unavailable", message: "Try again later." },
       },
     });
-    const notes = wrapper.findAllComponents(InlineNote);
-    expect(notes).toHaveLength(2);
-    expect(notes[0].props("tone")).toBe("err");
-    expect(notes[0].text()).toContain("Weather unavailable");
-    expect(notes[1].text()).toContain("Try again later.");
+    const empty = wrapper.findComponent(EmptyState);
+    expect(empty.exists()).toBe(true);
+    expect(empty.props("message")).toBe("Couldn't get the weather.");
+    expect(empty.props("help")).toBe("It will try again soon.");
+    expect(wrapper.text()).not.toContain("Weather unavailable");
+    expect(wrapper.text()).not.toContain("Try again later.");
+    expect(wrapper.findAllComponents(InlineNote)).toHaveLength(0);
   });
 });
 
@@ -120,23 +123,24 @@ describe("iframe uses Card, InlineNote and Button for the embed fallback", () =>
     return wrapper;
   };
 
-  it("draws the fallback as a card with the explanation and the URL", async () => {
+  it("draws the fallback as a card with plain words, the URL and the two ways out", async () => {
     const wrapper = await mountFailing();
     const card = wrapper.findComponent(Card);
     expect(card.exists()).toBe(true);
-    expect(card.text()).toContain("This site won't embed");
-    expect(wrapper.findComponent(InlineNote).exists()).toBe(true);
-    expect(wrapper.find(".iframe-renderer__url").text()).toBe("https://example.test/page");
-    // The escape hatch stays a real link (new window), the retry is a Button.
-    expect(wrapper.find("a.iframe-renderer__open").attributes("href")).toBe(
-      "https://example.test/page"
+    expect(card.text()).toContain("This site won't open here");
+    expect(wrapper.findComponent(InlineNote).text()).toBe(
+      "This site doesn't allow being shown inside Calvin."
     );
+    expect(wrapper.find(".iframe-renderer__url").text()).toBe("https://example.test/page");
+    const link = wrapper.findComponent(ExternalLink);
+    expect(link.find("a").attributes("href")).toBe("https://example.test/page");
+    expect(link.text()).toBe("Open in a new window");
     const buttons = wrapper.findAllComponents(Button);
     expect(buttons).toHaveLength(1);
-    expect(buttons[0].text()).toBe("Retry");
+    expect(buttons[0].text()).toBe("Try again");
   });
 
-  it("Retry closes the fallback", async () => {
+  it("Try again closes the fallback", async () => {
     const wrapper = await mountFailing();
     expect(wrapper.find(".iframe-renderer__fallback").exists()).toBe(true);
     await wrapper.findComponent(Button).trigger("click");

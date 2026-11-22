@@ -137,7 +137,8 @@ import PluginManager from "../specialized/PluginManager.vue";
 import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import { pluginKindKey } from "@/utils/pluginKind";
 import { isOfficialCatalogRepo } from "@/utils/pluginCatalog";
-import { errorDetailMessage } from "@/utils/apiErrors";
+import { friendlyError } from "@/utils/friendlyError";
+import { logError } from "@/utils/logger";
 import { isNewerVersion } from "@/utils/pluginVersions";
 import { scrollBehavior } from "@/utils/scrollIntoViewMotion";
 
@@ -596,16 +597,15 @@ const handleUpload = async event => {
       await imagesStore.uploadImage(file);
     }
 
-    uploadSuccess.value = `Successfully uploaded ${filesArray.length} image${filesArray.length > 1 ? "s" : ""}`;
+    uploadSuccess.value =
+      filesArray.length === 1 ? "Uploaded 1 photo." : `Uploaded ${filesArray.length} photos.`;
     setTimeout(() => {
       uploadSuccess.value = "";
     }, 5000);
   } catch (error) {
-    console.error("Upload error:", error);
-    uploadError.value = errorDetailMessage(error, "Failed to upload image");
-    setTimeout(() => {
-      uploadError.value = "";
-    }, 10000);
+    logError("[PluginsCategory]", "upload failed", error);
+    // The line stays until the next try: a failure should not vanish unread.
+    uploadError.value = friendlyError(error, "upload these photos");
   } finally {
     uploading.value = false;
   }

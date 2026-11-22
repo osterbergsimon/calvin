@@ -22,7 +22,7 @@ const UPDATE_LIFECYCLE = "src/utils/updateLifecycle.js";
 // "Say screen, page, source, plugin, Calvin (for the server)" — never these.
 // `api` stays legal for "API keys", and `configuration` is not `config`.
 const BANNED =
-  /\b(backend|frontend|api(?! key)|instance|schema|payload|endpoint|branch|repository|healthy|config(?!m))\b/i;
+  /\b(backend|frontend|api(?! key)|instance|schema|payload|endpoint|branch|repository|healthy|config(?!m)|x-frame|csp|cors|iframe|embed)\b/i;
 
 const COPY_ATTRS = ["label", "description", "title", "placeholder", "aria-label", "message"];
 
@@ -30,11 +30,6 @@ const COPY_ATTRS = ["label", "description", "title", "placeholder", "aria-label"
 // the dev-mode-only Local path copy are for the person running the server.
 const SKIP_DIRS = ["src/components/dev/"];
 const ALLOWED_COPY = [/docker compose/i, /\/absolute\/path\//i];
-
-// The weather renderer prints the plugin's own `data.error` payload — the
-// plugin's copy, not Calvin's error object. Everything else must not interpolate
-// an error, so a raw message can never land on the wall (CLV-63 §1).
-const RAW_ERROR_ALLOWLIST = new Set(["src/components/plugins/renderers/WeatherForecast.vue"]);
 
 const toPosix = path => path.split("\\").join("/");
 
@@ -146,7 +141,7 @@ describe("copy: no developer words in the UI (CLV-63)", () => {
   it("never interpolates an error on the dashboard", () => {
     const failures = [];
     for (const file of files) {
-      if (file.startsWith("src/components/settings/") || RAW_ERROR_ALLOWLIST.has(file)) continue;
+      if (file.startsWith("src/components/settings/")) continue;
       const source = readFileSync(file, "utf8");
       const { descriptor } = parseSfc(source, { filename: file });
       if (!descriptor.template) continue;

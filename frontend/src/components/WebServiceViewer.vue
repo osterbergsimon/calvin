@@ -9,7 +9,6 @@
         :icon="mdiClose"
         data-action="exit-fullscreen"
         label="Exit fullscreen"
-        title="Close Fullscreen (ESC)"
         @click.stop="handleCloseFullscreen"
       />
     </div>
@@ -18,7 +17,7 @@
     <div class="viewer-content">
       <DashboardPanel
         v-if="emptyState"
-        title="Web Services"
+        title="Web pages"
         :show-title="false"
         :header-visible="!isFullscreen"
         :focused="focused"
@@ -69,8 +68,7 @@
                 "
                 size="custom"
                 :icon="mdiChevronLeft"
-                label="Previous Service"
-                title="Previous Service"
+                label="Previous web page"
                 @click="previousService"
               />
               <IconButton
@@ -82,16 +80,14 @@
                 "
                 size="custom"
                 :icon="mdiChevronRight"
-                label="Next Service"
-                title="Next Service"
+                label="Next web page"
                 @click="nextService"
               />
               <IconButton
                 v-if="showControls && hasPointer && !isFullscreen"
                 size="custom"
                 :icon="mdiFullscreen"
-                label="Enter Fullscreen"
-                title="Enter Fullscreen"
+                label="Full screen"
                 @click.stop="handleToggleFullscreen"
               />
             </RegionHeaderControls>
