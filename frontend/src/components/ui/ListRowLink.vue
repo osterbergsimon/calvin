@@ -43,7 +43,7 @@ const toneClass = computed(() => (props.tone ? `list-row-link__row--${props.tone
 }
 
 .list-row-link:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 

@@ -182,13 +182,13 @@ const handleFocus = () => emit("focus", props.ribbon);
 .ribbon.focused {
   box-shadow:
     inset 0 0 0 1px var(--bg-1),
-    0 0 0 2px var(--focus);
+    0 0 0 2px var(--focus-ring);
   z-index: var(--z-raised);
 }
 
 .ribbon.selected {
   box-shadow:
     inset 0 0 0 1px var(--bg-1),
-    0 0 0 2px var(--focus);
+    0 0 0 2px var(--focus-ring);
 }
 </style>

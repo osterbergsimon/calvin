@@ -13,6 +13,9 @@
      useTheme sets --focus from the selected theme's accent; the edge/glow are
      derived from it so a theme only needs to change --focus. */
   --focus: #e08a1e;
+  /* The focus ring is darker than the accent in the light theme so it clears
+     3:1 on every surface; --focus stays for fills, selection and the bar. */
+  --focus-ring: color-mix(in srgb, var(--focus) 75%, var(--ink));
   /* Text and glyphs that sit ON a solid tone fill. `--*-ink` is the readable
      ink for each filled tone (button, badge, toggle knob, active tab) and
      `--*-text` is the readable ink when the tone itself is used as TEXT on a
@@ -285,6 +288,7 @@
   --ink-2: #9aa7b0;
   --ink-3: #818d96;
   --focus: #f3b052;
+  --focus-ring: var(--focus);
   --focus-ink: #151c21;
   --focus-text: #efcd9a;
   --focus-glow: color-mix(in srgb, var(--focus) 32%, transparent);

@@ -143,7 +143,7 @@ onUnmounted(() => {
 }
 
 .settings-search__bar:focus-within {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-color: var(--focus);
 }
@@ -204,7 +204,7 @@ onUnmounted(() => {
 }
 
 .settings-search__result:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: -2px;
 }
 

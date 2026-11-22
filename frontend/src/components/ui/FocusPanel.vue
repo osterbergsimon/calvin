@@ -51,7 +51,7 @@ const stateClass = computed(() => {
     linear-gradient(180deg, color-mix(in srgb, var(--focus) 16%, transparent), transparent 44%),
     var(--bg-2);
   border-color: var(--focus);
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: -1px;
   box-shadow: 0 0 8px 0 var(--focus-edge);
 }
@@ -80,7 +80,7 @@ const stateClass = computed(() => {
   /* Soft neon, even on all sides: a crisp saturated edge, a tight bright halo,
      then centered colored blooms. */
   box-shadow:
-    0 0 0 2px var(--focus),
+    0 0 0 2px var(--focus-ring),
     0 0 10px 0 var(--focus),
     0 0 30px 1px var(--focus-edge),
     0 0 68px 3px var(--focus-glow);

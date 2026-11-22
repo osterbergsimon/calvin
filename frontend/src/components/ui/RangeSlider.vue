@@ -78,7 +78,7 @@ const onInput = event => {
   box-shadow: 0 2px 4px var(--shadow);
 }
 .range-slider__input:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 .range-slider__value {

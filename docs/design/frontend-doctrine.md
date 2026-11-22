@@ -64,6 +64,7 @@ Components stop referencing these (§7 migration).
 | | `--radius-round` | 999px | toggles, dots, pill indicators (status pill, connection pill) |
 | Colour | `--bg-0/1/2`, `--line`, `--line-soft`, `--ink`, `--ink-2`, `--ink-3` | existing | surfaces, borders, text |
 | | `--focus`, `--focus-ink`, `--focus-text`, `--focus-glow`, `--focus-edge` | existing | action and selection only (§5) |
+| | `--focus-ring` | existing | focus ring only (§5) |
 | | `--ok`, `--warn`, `--err` (+ the `--tag-*` mix rule) | existing | status only |
 | Elevation | `--elev-1` (raised: menus, popovers), `--elev-2` (dialogs, sheets) | `0 6px 18px -8px var(--shadow-hover)` / `0 18px 50px -16px var(--shadow-hover)` | nothing else casts shadows |
 | Motion | `--dur-fast` 120ms, `--dur` 200ms, `--ease` `cubic-bezier(.2,.7,.2,1)`; `--dur-loading-fade` 450ms (`calc(var(--dur) * 2.25)`) | | all transitions; zero under `prefers-reduced-motion`. `--dur-loading-fade` is the loading light's fade only ([loading light](2026-11-01-loading-light.md) §2), the one slow transition |
@@ -189,7 +190,7 @@ makes any visual change to a block show up as a diff, so drift becomes visible i
 | State | Treatment (all controls, via `ui/`) |
 |---|---|
 | Hover | surface `--bg-2` → `color-mix(--ink 4%, --bg-2)`; text unchanged |
-| Focus-visible | `outline: 2px solid var(--focus); outline-offset: 2px`. Never removed, never colour-only |
+| Focus-visible | `outline: 2px solid var(--focus-ring); outline-offset: 2px`. Never removed, never colour-only |
 | Selected / on | `color-mix(in srgb, var(--focus) 16%, var(--bg-2))` fill + `--focus` border, or a filled `--focus` with `--focus-ink` text for segmented/toggle |
 | Primary action | `--focus` fill, `--focus-ink` text |
 | Disabled | `opacity: .5`, `cursor: not-allowed`, no hover change |

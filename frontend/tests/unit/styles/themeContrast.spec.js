@@ -224,3 +224,52 @@ describe("theme contrast: text/background token pairs used in components", () =>
     });
   }
 });
+
+/**
+ * Focus ring contrast (calvin-kajl M3).
+ *
+ * The ring has its own token so it can be darker than the accent in the light
+ * theme: `--focus` stays the fill/selection colour. A focus indicator is a
+ * non-text element, so it must clear 3:1 against every surface it can sit on.
+ */
+const FOCUS_RING_MIN = 3;
+
+/** The `--focus-ring` declaration that applies in one mode. */
+const focusRingValue = mode => {
+  const selector = mode === "dark" ? ".dark" : ":root";
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const block = THEME_CSS.match(new RegExp(`(?:^|\\n)${escaped}\\s*\\{([\\s\\S]*?)\\n\\}`));
+  const value = block?.[1]?.match(/--focus-ring:\s*([^;]+);/)?.[1];
+  expect(value, `--focus-ring must be declared in ${selector}`).toBeTruthy();
+  return value.trim();
+};
+
+/** Resolve the declared value to the same spec shape the text pairs use. */
+const focusRingSpec = value => {
+  const mixMatch = value.match(
+    /color-mix\(\s*in srgb,\s*var\(--([a-z0-9-]+)\)(?:\s+([0-9.]+)%)?\s*,\s*var\(--([a-z0-9-]+)\)(?:\s+([0-9.]+)%)?\s*\)/
+  );
+  if (mixMatch) {
+    const [, a, aPercent, b, bPercent] = mixMatch;
+    const share = aPercent !== undefined ? Number(aPercent) / 100 : 1 - Number(bPercent) / 100;
+    return { kind: "mix", a, b, share };
+  }
+  const token = value.match(/^var\(--([a-z0-9-]+)\)$/);
+  expect(token, `--focus-ring value "${value}" is neither a token nor a mix`).toBeTruthy();
+  return { kind: "token", token: token[1] };
+};
+
+describe("theme contrast: focus ring", () => {
+  for (const palette of palettes()) {
+    it(`${palette.id}${palette.mode === "dark" ? " dark" : ""} clears 3:1 on every surface`, () => {
+      const ring = rgbOfSpec(palette, focusRingSpec(focusRingValue(palette.mode)));
+      const failures = SURFACES.map(surface => {
+        const ratio = contrast(ring, rgbOf(palette, surface));
+        return ratio < FOCUS_RING_MIN
+          ? `${surface}: ${ratio.toFixed(2)} < ${FOCUS_RING_MIN}`
+          : null;
+      }).filter(Boolean);
+      expect(failures, "focus ring contrast failures").toEqual([]);
+    });
+  }
+});

@@ -64,7 +64,7 @@ const bump = delta => {
   background: var(--bg-1);
 }
 .stepper__btn:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: -2px;
 }
 .stepper__value {

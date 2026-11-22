@@ -171,7 +171,7 @@ onUnmounted(() => window.removeEventListener("resize", refreshPhone));
 }
 
 .section-index__link:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
