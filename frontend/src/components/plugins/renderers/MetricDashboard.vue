@@ -8,7 +8,9 @@
     >
       <span class="calvin-plugin-readout__label">
         <span v-if="isAlert(metric)" class="calvin-plugin-lamp" />
-        <span v-if="iconFor(metric)" class="metric-dashboard__icon">{{ iconFor(metric) }}</span>
+        <span v-if="iconFor(metric)" class="metric-dashboard__icon" aria-hidden="true">{{
+          iconFor(metric)
+        }}</span>
         {{ labelFor(metric) }}
       </span>
       <span class="calvin-plugin-readout__value metric-dashboard__value">
