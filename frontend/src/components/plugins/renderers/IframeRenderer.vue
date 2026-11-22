@@ -70,7 +70,7 @@ import ExternalLink from "../../ui/ExternalLink.vue";
 import HandoffOverlay from "../overlays/HandoffOverlay.vue";
 import { isKioskDisplay } from "../../../utils/kioskId";
 import { isHttpUrl } from "../../../utils/safeUrl";
-import { kioskSandboxFor } from "../../../utils/kioskSandbox";
+import { frameSandboxFor } from "../../../utils/kioskSandbox";
 import { FRAME_BLOCKED_TITLE, frameBlockedBody } from "../../../utils/frameBlockedCopy";
 import { useFrameBlockDetection } from "../../../composables/useFrameBlockDetection";
 
@@ -90,12 +90,9 @@ const url = computed(() => {
   return safe(props.schema.url);
 });
 
-// A kiosk has no way back from a popup or a top-level navigation, so its frame
-// gets neither allow-popups nor allow-top-navigation, and a frame from Calvin's
-// own origin loses allow-same-origin too (see utils/kioskSandbox.js).
-const sandbox = computed(() =>
-  onKiosk ? kioskSandboxFor(url.value) : "allow-scripts allow-same-origin allow-forms allow-popups"
-);
+// No client lets a frame navigate Calvin; a kiosk also gets no popups, and a frame
+// from Calvin's own origin loses allow-same-origin everywhere (see utils/kioskSandbox.js).
+const sandbox = computed(() => frameSandboxFor(url.value, { kiosk: onKiosk }));
 
 // The QR action must not cover a permanent display. On a kiosk it shows for a few
 // seconds after the page loads (a site that refuses framing is only a blank

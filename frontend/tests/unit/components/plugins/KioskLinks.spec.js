@@ -101,10 +101,14 @@ describe("kiosk embed is sandboxed and always offers the QR (B1, B2, S2)", () =>
     expect(sandbox).not.toContain("allow-top-navigation");
   });
 
-  it("IframeViewer has no sandbox off a kiosk (unchanged behaviour)", () => {
+  it("IframeViewer is sandboxed off a kiosk too: popups only, never top navigation", () => {
     sessionStorage.removeItem("calvin_kiosk_id");
     const w = mount(IframeViewer, { props: { url: URL_ }, global });
-    expect(w.find("iframe").attributes("sandbox")).toBeUndefined();
+    const frame = w.find("iframe");
+    expect(frame.attributes("sandbox")).toBe(frameSandboxFor(URL_, { kiosk: false }));
+    expect(frame.attributes("sandbox")).toContain("allow-popups-to-escape-sandbox");
+    expect(frame.attributes("sandbox")).not.toContain("allow-top-navigation");
+    expect(frame.attributes("referrerpolicy")).toBe("no-referrer");
   });
 
   it("IframeRenderer drops allow-popups on a kiosk and keeps it elsewhere", () => {
@@ -114,6 +118,16 @@ describe("kiosk embed is sandboxed and always offers the QR (B1, B2, S2)", () =>
     sessionStorage.removeItem("calvin_kiosk_id");
     const desk = mount(IframeRenderer, { props: { schema: { url: URL_ } }, global });
     expect(desk.find("iframe").attributes("sandbox")).toContain("allow-popups");
+    expect(desk.find("iframe").attributes("sandbox")).toBe(frameSandboxFor(URL_, { kiosk: false }));
+  });
+
+  it("IframeRenderer drops allow-same-origin for an own-origin URL off a kiosk", () => {
+    sessionStorage.removeItem("calvin_kiosk_id");
+    const own = mount(IframeRenderer, {
+      props: { schema: { url: `${window.location.origin}/api/x` } },
+      global,
+    });
+    expect(own.find("iframe").attributes("sandbox")).not.toContain("allow-same-origin");
   });
 
   it("IframeRenderer shows the QR action without any error", async () => {
@@ -338,9 +352,38 @@ describe("ExternalLink: the one way to leave Calvin (S6)", () => {
 
 // ---- re-check of #340 --------------------------------------------------
 
-import { KIOSK_SANDBOX, kioskSandboxFor } from "@/utils/kioskSandbox";
+import { KIOSK_SANDBOX, kioskSandboxFor, frameSandboxFor } from "@/utils/kioskSandbox";
 import { captureKioskIdentity } from "@/utils/kioskId";
 import { KIOSK_ROOT_CLASS } from "@/styles/breakpoints.js";
+
+describe("frameSandboxFor: one helper for every client", () => {
+  const O = "https://calvin.local";
+  const has = (s, t) => s.split(" ").includes(t);
+
+  it("kiosk: identical to kioskSandboxFor (own and foreign origin)", () => {
+    for (const u of [`${O}/x`, "https://svc.home/x"]) {
+      expect(frameSandboxFor(u, { kiosk: true, origin: O })).toBe(kioskSandboxFor(u, O));
+    }
+  });
+
+  it("phone/desktop, foreign origin: keeps same-origin, adds popups only", () => {
+    const s = frameSandboxFor("https://svc.home/x", { kiosk: false, origin: O });
+    expect(has(s, "allow-same-origin")).toBe(true);
+    expect(has(s, "allow-popups")).toBe(true);
+    expect(has(s, "allow-popups-to-escape-sandbox")).toBe(true);
+    expect(s).not.toContain("allow-top-navigation");
+  });
+
+  it("phone/desktop, own origin: loses allow-same-origin, still popups only", () => {
+    for (const u of [`${O}/api/x`, "/relative"]) {
+      const s = frameSandboxFor(u, { kiosk: false, origin: O });
+      expect(has(s, "allow-same-origin")).toBe(false);
+      expect(has(s, "allow-scripts")).toBe(true);
+      expect(has(s, "allow-popups")).toBe(true);
+      expect(s).not.toContain("allow-top-navigation");
+    }
+  });
+});
 
 describe("a Calvin-origin frame loses allow-same-origin (re-check 2)", () => {
   beforeEach(() => sessionStorage.setItem("calvin_kiosk_id", "calvin-test"));
