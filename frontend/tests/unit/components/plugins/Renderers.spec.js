@@ -573,4 +573,19 @@ describe("IframeRenderer", () => {
     });
     expect(wrapper.find("iframe").attributes("src")).toBe("https://example.test/literal");
   });
+
+  it("titles the frame with the plugin's title, else Web page", () => {
+    const titled = mount(IframeRenderer, {
+      props: {
+        schema: { kind: "iframe", url: "https://example.test/x", title: "Family calendar" },
+        data: null,
+      },
+    });
+    expect(titled.find("iframe").attributes("title")).toBe("Family calendar");
+
+    const untitled = mount(IframeRenderer, {
+      props: { schema: { kind: "iframe", url: "https://example.test/x" }, data: null },
+    });
+    expect(untitled.find("iframe").attributes("title")).toBe("Web page");
+  });
 });

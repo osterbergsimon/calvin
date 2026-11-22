@@ -49,7 +49,7 @@
 
       <div class="slideshow-content">
         <div v-if="imagesStore.loading" class="loading">
-          <p>Loading images...</p>
+          <p>Loading photos…</p>
         </div>
         <div v-else-if="!currentImage" class="photo-placeholder">
           <EmptyState
@@ -102,7 +102,7 @@
             />
           </template>
           <div v-else class="loading">
-            <p>Loading images...</p>
+            <p>Loading photos…</p>
           </div>
         </div>
       </div>

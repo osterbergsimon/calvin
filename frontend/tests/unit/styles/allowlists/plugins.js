@@ -38,11 +38,7 @@ export const roleLint = {
 };
 
 export const controlLint = {
-  allowlist: [
-    "components/PluginActions.vue",
-    "components/PluginFieldRenderer.vue",
-    "components/PluginSections.vue",
-  ],
+  allowlist: ["components/PluginActions.vue", "components/PluginFieldRenderer.vue"],
   baseline: [
     "components/PluginActions.vue",
     "components/PluginFieldRenderer.vue",

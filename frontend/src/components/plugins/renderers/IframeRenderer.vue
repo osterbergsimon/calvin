@@ -4,6 +4,7 @@
       v-if="url"
       ref="iframe"
       :src="url"
+      :title="schema.title || 'Web page'"
       class="iframe-renderer__frame"
       :class="{ 'iframe-renderer__frame--error': error }"
       frameborder="0"
@@ -37,9 +38,7 @@
         <InlineNote v-if="frameBlock.blocked.value" data-test="frame-blocked-body">
           {{ frameBlockedBody(frameBlock.sealed.value) }}
         </InlineNote>
-        <InlineNote v-else>
-          It blocks being shown inside another page (X-Frame-Options/CSP).
-        </InlineNote>
+        <InlineNote v-else>This site doesn't allow being shown inside Calvin.</InlineNote>
         <p v-if="url" class="iframe-renderer__url">{{ url }}</p>
         <div class="iframe-renderer__actions">
           <Button
@@ -50,17 +49,9 @@
           >
             Show QR code
           </Button>
-          <a
-            v-else-if="url"
-            :href="url"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="iframe-renderer__open"
-          >
-            Open in new window
-          </a>
+          <ExternalLink v-else-if="url" :href="url">Open in a new window</ExternalLink>
           <Button v-if="!frameBlock.blocked.value" variant="secondary" @click="retry">
-            Retry
+            Try again
           </Button>
         </div>
       </Card>
@@ -75,6 +66,7 @@ import { resolvePath } from "../../../utils/jsonPath";
 import Button from "../../ui/Button.vue";
 import Card from "../../ui/Card.vue";
 import InlineNote from "../../ui/InlineNote.vue";
+import ExternalLink from "../../ui/ExternalLink.vue";
 import HandoffOverlay from "../overlays/HandoffOverlay.vue";
 import { isKioskDisplay } from "../../../utils/kioskId";
 import { isHttpUrl } from "../../../utils/safeUrl";
@@ -263,27 +255,5 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   gap: var(--gap-inline);
-}
-
-/* A real link to the site (it leaves the page), so it stays an anchor; it is
-   styled as the doctrine's text link, never as a button. */
-.iframe-renderer__open {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--touch-target);
-  font-family: var(--font-ui);
-  font-size: var(--text-body);
-  color: var(--ink);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.iframe-renderer__open:hover {
-  color: var(--focus-text);
-}
-
-.iframe-renderer__open:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
 }
 </style>

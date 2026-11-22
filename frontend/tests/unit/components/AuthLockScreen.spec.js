@@ -153,6 +153,9 @@ describe("AuthLockScreen", () => {
 
     expect(wrapper.text()).toContain("Can't reach Calvin");
     expect(wrapper.find("[data-test='auth-unreachable']").exists()).toBe(true);
+    expect(wrapper.text().replace(/\s+/g, " ")).toContain(
+      "Settings can't check whether you're signed in. Check that Calvin is running and this device is on the same network."
+    );
   });
 
   it("validates the setup fields on submit before sending a request", async () => {

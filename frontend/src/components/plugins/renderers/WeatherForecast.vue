@@ -79,23 +79,38 @@
     </div>
   </section>
   <div v-else-if="data?.error" class="weather-forecast-renderer weather-forecast-renderer--error">
-    <InlineNote tone="err">{{ data.error }}</InlineNote>
-    <InlineNote v-if="data.message">{{ data.message }}</InlineNote>
+    <EmptyState
+      compact
+      :inset="false"
+      message="Couldn't get the weather."
+      help="It will try again soon."
+    />
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useResizeObserver } from "@vueuse/core";
 import { resolvePath } from "../../../utils/jsonPath";
 import { weatherIconPath } from "../../../utils/weatherIcons";
 import { useFitScroll } from "../../../composables/useFitScroll.js";
-import InlineNote from "../../ui/InlineNote.vue";
+import { logError } from "../../../utils/logger";
+import EmptyState from "../../ui/EmptyState.vue";
 
 const props = defineProps({
   schema: { type: Object, required: true },
   data: { type: [Object, Array], default: null },
 });
+
+// The plugin's own error text stays in the log: a failed fetch gets one plain
+// sentence on the wall, never the raw message.
+watch(
+  () => props.data?.error,
+  error => {
+    if (error) logError("[WeatherForecast]", error);
+  },
+  { immediate: true }
+);
 
 const currentSpec = computed(() => props.schema.current || {});
 const forecastSpec = computed(() => props.schema.forecast || {});

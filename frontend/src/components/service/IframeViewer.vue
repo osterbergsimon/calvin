@@ -3,6 +3,7 @@
     <iframe
       ref="iframe"
       :src="frameSrc"
+      :title="title"
       :sandbox="onKiosk ? kioskSandboxFor(frameSrc) : undefined"
       class="service-iframe"
       :class="{ 'iframe-error': iframeError }"
@@ -19,28 +20,23 @@
           <svg class="error-content__icon" viewBox="0 0 24 24" aria-hidden="true">
             <path :d="mdiAlert" />
           </svg>
-          {{ frameBlock.blocked.value ? FRAME_BLOCKED_TITLE : "Cannot Display Service" }}
+          {{ frameBlock.blocked.value ? FRAME_BLOCKED_TITLE : "This site won't open here" }}
         </h3>
         <p v-if="frameBlock.blocked.value" data-test="frame-blocked-body">
           {{ frameBlockedBody(frameBlock.sealed.value) }}
         </p>
-        <p v-else>
-          This service cannot be embedded in an iframe due to security restrictions
-          (CORS/X-Frame-Options).
-        </p>
+        <p v-else>This site doesn't allow being shown inside Calvin.</p>
         <p class="service-url">
           {{ url }}
         </p>
         <div class="error-actions">
-          <button v-if="onKiosk" class="btn-open-new" data-test="show-qr" @click="showQr = true">
-            Show QR Code
-          </button>
-          <a v-else :href="url" target="_blank" rel="noopener noreferrer" class="btn-open-new">
-            Open in New Window
-          </a>
-          <button v-if="!frameBlock.blocked.value" class="btn-retry" @click="retryLoad">
-            Retry
-          </button>
+          <Button v-if="onKiosk" variant="secondary" data-test="show-qr" @click="showQr = true">
+            Show QR code
+          </Button>
+          <ExternalLink v-else :href="url">Open in a new window</ExternalLink>
+          <Button v-if="!frameBlock.blocked.value" variant="secondary" @click="retryLoad">
+            Try again
+          </Button>
         </div>
       </div>
     </div>
@@ -51,6 +47,8 @@
 <script setup>
 import { computed, ref, watch, onUnmounted } from "vue";
 import { mdiAlert } from "@mdi/js";
+import Button from "../ui/Button.vue";
+import ExternalLink from "../ui/ExternalLink.vue";
 import HandoffOverlay from "../plugins/overlays/HandoffOverlay.vue";
 import { isKioskDisplay } from "../../utils/kioskId";
 import { isHttpUrl } from "../../utils/safeUrl";
@@ -62,6 +60,11 @@ const props = defineProps({
   url: {
     type: String,
     required: true,
+  },
+  // The embed's accessible name: "Page from example.com", else "Web page".
+  title: {
+    type: String,
+    default: "Web page",
   },
 });
 
@@ -217,39 +220,10 @@ onUnmounted(() => {
 
 .error-actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 1rem;
   justify-content: center;
   margin-top: 1.5rem;
-}
-
-.btn-open-new,
-.btn-retry {
-  padding: 0.75rem 1.5rem;
-  border-radius: var(--radius-sm);
-  font-size: var(--fs-base);
-  cursor: pointer;
-  /* Hover feedback is a colour swap, not an animated filter (kiosk GPU). */
-  transition: background var(--dur);
-}
-
-.btn-open-new {
-  background: var(--focus);
-  color: var(--focus-ink);
-  text-decoration: none;
-  border: none;
-}
-
-.btn-open-new:hover {
-  background: color-mix(in srgb, var(--focus) 92%, var(--ink));
-}
-
-.btn-retry {
-  background: var(--bg-2);
-  color: var(--ink);
-  border: 1px solid var(--line);
-}
-
-.btn-retry:hover {
-  background: var(--bg-0);
 }
 </style>

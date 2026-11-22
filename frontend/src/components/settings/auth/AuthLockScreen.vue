@@ -27,7 +27,7 @@
         <Card>
           <h1 class="auth-card__title heading-title">Can't reach Calvin</h1>
           <p class="auth-card__lead">
-            Settings can't check whether you're signed in. Check that the server is running and this
+            Settings can't check whether you're signed in. Check that Calvin is running and this
             device is on the same network.
           </p>
           <Button

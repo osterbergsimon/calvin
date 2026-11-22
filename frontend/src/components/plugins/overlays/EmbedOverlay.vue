@@ -8,7 +8,7 @@
       @close="$emit('close')"
     >
       <div class="embed-overlay__frame">
-        <IframeViewer :url="url" @error="onFrameError" />
+        <IframeViewer :url="url" :title="frameTitle" @error="onFrameError" />
       </div>
       <!-- A frame blocked by Calvin's CSP is detected (securitypolicyviolation) and
            falls back via IframeViewer's error. A site that refuses framing with
@@ -35,7 +35,7 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import Button from "@/components/ui/Button.vue";
 import Dialog from "@/components/ui/Dialog.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
@@ -45,8 +45,17 @@ import { isKioskDisplay } from "@/utils/kioskId";
 // A plugin link that asks for an embed opens the one Dialog shell in its full
 // size: scrim, focus trap, Escape, close button and the OSK layer all come from
 // Dialog. The frame fills the body; IframeViewer keeps its own error fallback.
-defineProps({ url: { type: String, required: true } });
+const props = defineProps({ url: { type: String, required: true } });
 const emit = defineEmits(["close", "fallback"]);
+
+// Name the frame by the site it shows, so a screen reader knows what it is.
+const frameTitle = computed(() => {
+  try {
+    return `Page from ${new URL(props.url).host}`;
+  } catch {
+    return "Web page";
+  }
+});
 
 const onKiosk = isKioskDisplay();
 

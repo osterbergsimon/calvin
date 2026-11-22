@@ -35,7 +35,7 @@ export const roleLint = {
 };
 
 export const controlLint = {
-  allowlist: ["components/service/IframeViewer.vue"],
+  allowlist: [],
   baseline: [
     "components/service/IframeViewer.vue",
     "components/settings/specialized/SourceList.vue",

@@ -22,6 +22,17 @@ describe("EmbedOverlay", () => {
     );
   });
 
+  it("titles the frame after the site it shows", () => {
+    const w = mountIt();
+    expect(w.findComponent(IframeViewer).props("title")).toBe("Page from svc.home");
+
+    const plain = mount(EmbedOverlay, {
+      props: { url: "not a url" },
+      global: { stubs: { teleport: true } },
+    });
+    expect(plain.findComponent(IframeViewer).props("title")).toBe("Web page");
+  });
+
   it("emits close on the Dialog's close button and on the scrim", async () => {
     const w = mountIt();
     await w.find("[aria-label='Close']").trigger("click");

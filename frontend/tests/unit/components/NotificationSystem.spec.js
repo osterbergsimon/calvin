@@ -126,6 +126,18 @@ describe("NotificationSystem (input-echo HUD)", () => {
       expect(wrapper.find(".hud__label").text()).toBe("Next Image");
     });
 
+    it("calls the web service actions web pages", async () => {
+      const wrapper = mount(NotificationSystem);
+
+      wrapper.vm.showKeyboardFeedback("KEY_2", "web_service_next");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(".hud__label").text()).toBe("Next web page");
+
+      wrapper.vm.showKeyboardFeedback("KEY_3", "web_service_prev");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(".hud__label").text()).toBe("Previous web page");
+    });
+
     it("should say Button pressed when the action has no label", async () => {
       const wrapper = mount(NotificationSystem);
 
