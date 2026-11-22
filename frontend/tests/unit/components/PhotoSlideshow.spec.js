@@ -295,9 +295,22 @@ describe("PhotoSlideshow", () => {
 
       const backdrop = wrapper.find("img.photo-backdrop--full");
       expect(backdrop.exists()).toBe(true);
-      // The display source, not the small Standard thumbnail.
-      expect(backdrop.attributes("src")).toBe("/api/images/1?w=1920");
+      // The 640 px bucket: a 28 px blur of a 2560 px source shows no extra detail.
+      expect(backdrop.attributes("src")).toBe("/api/images/1?w=640");
       expect(wrapper.find(".photo-backdrop--soft").exists()).toBe(false);
+    });
+
+    it.each(["full", "standard"])("loads the photo first and its backdrop last (%s effects)", async (effects) => {
+      document.documentElement.setAttribute("data-effects", effects);
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 1920 });
+      imagesStore.currentImage = createImage({ width: 1000, height: 1500 });
+      const wrapper = createWrapper({ fit: "smart" });
+      await setContainer(wrapper, 1600, 900);
+
+      expect(wrapper.find("img.photo-image").attributes("fetchpriority")).toBe("high");
+      const backdrop = wrapper.find(effects === "full" ? "img.photo-backdrop--full" : "img.photo-backdrop__image");
+      expect(backdrop.exists()).toBe(true);
+      expect(backdrop.attributes("fetchpriority")).toBe("low");
     });
 
     it("keeps the tiny thumbnail backdrop under standard effects", async () => {

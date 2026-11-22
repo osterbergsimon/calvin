@@ -67,15 +67,16 @@
                can measure it; no src is set until that measurement exists. -->
           <template v-if="currentImageUrl">
             <template v-if="fitDecision.backdrop">
-              <!-- Full: the original blurred copy of the photo itself (source
-                   image, filter and scale from before calvin-e70v). -->
+              <!-- Full: the blurred copy of the photo itself, from the 640 px bucket
+                   (a 28 px blur shows no extra detail), loaded at low priority. -->
               <img
                 v-if="fullEffects"
-                :src="currentImageUrl"
+                :src="backdropImageUrl"
                 class="photo-backdrop photo-backdrop--full"
                 alt=""
                 aria-hidden="true"
                 decoding="async"
+                fetchpriority="low"
                 loading="eager"
               />
               <!-- Standard: a tiny upscaled copy of the same photo, so a whole
@@ -86,6 +87,7 @@
                   class="photo-backdrop__image"
                   alt=""
                   decoding="async"
+                  fetchpriority="low"
                   loading="eager"
                 />
               </div>
@@ -96,6 +98,7 @@
               :class="['photo-image', `photo-image-${displayMode}`]"
               :style="imageStyle"
               decoding="async"
+              fetchpriority="high"
               loading="eager"
               @load="onImageLoad"
               @error="onImageError"
