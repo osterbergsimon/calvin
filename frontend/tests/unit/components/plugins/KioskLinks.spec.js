@@ -374,6 +374,13 @@ describe("frameSandboxFor: one helper for every client", () => {
     expect(s).not.toContain("allow-top-navigation");
   });
 
+  it("an unparseable URL and a protocol-relative URL resolve against the origin", () => {
+    const o = { kiosk: false, origin: O };
+    expect(has(frameSandboxFor("http://[", o), "allow-same-origin")).toBe(false);
+    expect(has(frameSandboxFor("//calvin.local/x", o), "allow-same-origin")).toBe(false);
+    expect(has(frameSandboxFor("//evil.example/x", o), "allow-same-origin")).toBe(true);
+  });
+
   it("phone/desktop, own origin: loses allow-same-origin, still popups only", () => {
     for (const u of [`${O}/api/x`, "/relative"]) {
       const s = frameSandboxFor(u, { kiosk: false, origin: O });
