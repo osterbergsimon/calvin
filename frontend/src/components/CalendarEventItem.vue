@@ -11,7 +11,8 @@
       'event-multi-day': event._isMultiDay,
     }"
     :style="{ backgroundColor: eventColor, '--on-event': eventInk }"
-    :title="eventTitle"
+    role="button"
+    :aria-label="showFullText ? undefined : eventTitle"
     tabindex="0"
     @click="handleClick"
     @keydown.enter="handleClick"

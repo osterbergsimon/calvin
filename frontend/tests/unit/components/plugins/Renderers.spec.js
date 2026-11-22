@@ -10,6 +10,7 @@ import IframeRenderer from "@/components/plugins/renderers/IframeRenderer.vue";
 import ImageWithCaption from "@/components/plugins/renderers/ImageWithCaption.vue";
 import MetricDashboard from "@/components/plugins/renderers/MetricDashboard.vue";
 import WeatherForecast from "@/components/plugins/renderers/WeatherForecast.vue";
+import { styleRules } from "../../styles/lint-helpers.js";
 
 describe("SchemaRenderer dispatcher", () => {
   it("renders the registered renderer for a known kind", () => {
@@ -252,6 +253,19 @@ describe("StatusRenderer", () => {
     });
     expect(wrapper.findAll(".status__cell")).toHaveLength(0);
   });
+
+  it("hides the decorative status icon from screen readers (L22)", () => {
+    const wrapper = mount(StatusRenderer, {
+      props: {
+        schema: { kind: "status", item: { icon: "⚡", label: "Power", value: "120", unit: "W" } },
+        data: {},
+      },
+    });
+
+    const icon = wrapper.get(".status__icon");
+    expect(icon.text()).toBe("⚡");
+    expect(icon.attributes("aria-hidden")).toBe("true");
+  });
 });
 
 describe("CardGrid", () => {
@@ -380,8 +394,18 @@ describe("ImageWithCaption", () => {
       },
     });
     expect(wrapper.find("img").attributes("src")).toBe("https://example.test/pic.jpg");
+    // The title is in the figcaption; the image is decorative (L12).
+    expect(wrapper.find("img").attributes("alt")).toBe("");
     expect(wrapper.text()).toContain("Sunrise");
     expect(wrapper.text()).toContain("Photo from yesterday.");
+  });
+
+  it("reserves the image box before it loads (L12)", () => {
+    const rule = styleRules("components/plugins/renderers/ImageWithCaption.vue").find(
+      candidate => candidate.selector === ".image-caption__img"
+    );
+
+    expect(rule.declarations).toContainEqual({ prop: "aspect-ratio", value: "16 / 9" });
   });
 
   it("omits figcaption when no text fields resolve", () => {
@@ -426,6 +450,23 @@ describe("MetricDashboard", () => {
     expect(tiles[0].text()).toContain("21.5");
     expect(tiles[0].classes()).not.toContain("calvin-plugin-readout--warn");
     expect(tiles[1].classes()).toContain("calvin-plugin-readout--warn");
+  });
+
+  it("hides the decorative metric icon from screen readers (L22)", () => {
+    const wrapper = mount(MetricDashboard, {
+      props: {
+        schema: {
+          kind: "metric-dashboard",
+          data_path: "$.metrics",
+          tile: { icon: "🌡", label_path: "$.name", value_path: "$.value" },
+        },
+        data: { metrics: [{ name: "Temp", value: 21 }] },
+      },
+    });
+
+    const icon = wrapper.get(".metric-dashboard__icon");
+    expect(icon.text()).toBe("🌡");
+    expect(icon.attributes("aria-hidden")).toBe("true");
   });
 });
 

@@ -53,6 +53,28 @@ describe("ClockBarHorizontal", () => {
     expect(wrapper.find(".clock-bar-horizontal").exists()).toBe(true);
   });
 
+  it("is a labelled region, not a live region (M4)", () => {
+    const store = useConfigStore();
+    store.showUI = true;
+
+    const wrapper = mount(ClockBarHorizontal, {
+      props: {
+        position: "top",
+        showInNonKiosk: true,
+        showInKiosk: false,
+        enabled: true,
+      },
+      global: {
+        ...globalMountOptions,
+      },
+    });
+
+    const bar = wrapper.get(".clock-bar-horizontal");
+    expect(bar.attributes("role")).toBe("region");
+    expect(bar.attributes("aria-label")).toBe("Clock bar");
+    expect(bar.attributes("aria-live")).toBeUndefined();
+  });
+
   it("should not render when enabled but showInNonKiosk is false and UI is visible", () => {
     const store = useConfigStore();
     store.showUI = true;

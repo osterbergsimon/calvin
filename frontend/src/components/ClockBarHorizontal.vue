@@ -4,9 +4,8 @@
     class="clock-bar-horizontal"
     :class="[`position-${position}`, { 'is-live': !editable }]"
     :style="{ padding: barPaddingStyle }"
-    role="status"
-    aria-label="Status bar"
-    aria-live="polite"
+    role="region"
+    aria-label="Clock bar"
   >
     <div class="clock-bar-outer">
       <div

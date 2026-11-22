@@ -3,6 +3,7 @@
     class="bar-logo"
     :class="{ 'bar-logo--vertical': vertical }"
     :style="sizeStyle"
+    role="img"
     aria-label="Calvin"
   >
     CAL<span class="bar-logo__dot">·</span>VIN
