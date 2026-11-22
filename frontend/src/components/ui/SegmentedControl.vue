@@ -89,12 +89,12 @@ const onKey = e => {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
-/* High Contrast flattens the selected fill; an inset system-colour outline
-   keeps the chosen segment readable. */
+/* High Contrast flattens the selected fill; system colours keep the chosen
+   segment readable without shadowing the focus outline. */
 @media (forced-colors: active) {
   .seg__btn.on {
-    outline: 2px solid Highlight;
-    outline-offset: -2px;
+    background: Highlight;
+    color: HighlightText;
   }
 }
 </style>

@@ -191,6 +191,8 @@ test.describe("ui gallery under forced colours", () => {
         return value;
       };
       return {
+        canvas: resolve("Canvas"),
+        canvasText: resolve("CanvasText"),
         highlight: resolve("Highlight"),
         highlightText: resolve("HighlightText"),
         buttonText: resolve("ButtonText"),
@@ -224,22 +226,25 @@ test.describe("ui gallery under forced colours", () => {
     expect(on.knob).toBe(colours.highlightText);
   });
 
-  test("the selected segment is marked", async ({ page }) => {
+  test("the selected segment is filled and keeps its focus ring", async ({ page }) => {
     await openForcedGallery(page);
     const colours = await systemColours(page);
     const selected = page.getByRole("radiogroup", { name: "Mode" }).locator(".seg__btn.on");
 
-    const marks = await selected.evaluate(el => {
+    const fill = await selected.evaluate(el => {
       const style = getComputedStyle(el);
-      return {
-        style: style.outlineStyle,
-        width: style.outlineWidth,
-        colour: style.outlineColor,
-      };
+      return { background: style.backgroundColor, colour: style.color };
     });
-    expect(marks.style).toBe("solid");
-    expect(parseFloat(marks.width)).toBeGreaterThanOrEqual(2);
-    expect(marks.colour).toBe(colours.highlight);
+    expect(fill.background).toBe(colours.highlight);
+    expect(fill.colour).toBe(colours.highlightText);
+
+    await selected.focus();
+    const focus = await selected.evaluate(el => {
+      const style = getComputedStyle(el);
+      return { style: style.outlineStyle, offset: style.outlineOffset };
+    });
+    expect(focus.style).toBe("solid");
+    expect(focus.offset).toBe("2px");
   });
 
   test("the active tab keeps its underline", async ({ page }) => {
@@ -261,5 +266,44 @@ test.describe("ui gallery under forced colours", () => {
       };
     });
     expect(marks.outline === colours.highlight || marks.underline === colours.highlight).toBe(true);
+  });
+
+  test("the progress bar keeps its track and fill", async ({ page }) => {
+    await openForcedGallery(page);
+    const colours = await systemColours(page);
+    const bar = page.locator('[data-test="gallery-progress-bar"] .progress-bar');
+    const read = locator =>
+      locator.evaluate(el => {
+        const style = getComputedStyle(el);
+        return {
+          borderWidth: style.borderTopWidth,
+          borderStyle: style.borderTopStyle,
+          borderColour: style.borderTopColor,
+          background: style.backgroundColor,
+        };
+      });
+
+    const track = await read(bar);
+    expect(track.borderStyle).toBe("solid");
+    expect(parseFloat(track.borderWidth)).toBeGreaterThanOrEqual(1);
+    expect(track.borderColour).toBe(colours.canvasText);
+
+    const fill = await read(bar.locator(".progress-bar__fill"));
+    expect(fill.background).toBe(colours.highlight);
+  });
+
+  test("the colour dots keep their swatch", async ({ page }) => {
+    await openForcedGallery(page);
+    const colours = await systemColours(page);
+    const dot = page
+      .locator('[data-test="gallery-colour-field"] .colour-field__dot--choice')
+      .first();
+
+    const swatch = await dot.evaluate(el => {
+      const style = getComputedStyle(el);
+      return { adjust: style.forcedColorAdjust, background: style.backgroundColor };
+    });
+    expect(swatch.adjust).toBe("none");
+    expect(swatch.background).not.toBe(colours.canvas);
   });
 });
