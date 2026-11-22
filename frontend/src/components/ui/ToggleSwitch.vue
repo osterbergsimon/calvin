@@ -85,4 +85,21 @@ const toggle = () => emit("update:modelValue", !props.modelValue);
     transition: none;
   }
 }
+/* Windows High Contrast drops the track fill and the knob. A system-colour
+   border and knob keep off and on apart, and Highlight/HighlightText carry the
+   on state without relying on the accent. */
+@media (forced-colors: active) {
+  .tog {
+    border: 1px solid ButtonText;
+  }
+  .tog::after {
+    background: ButtonText;
+  }
+  .tog.on {
+    background: Highlight;
+  }
+  .tog.on::after {
+    background: HighlightText;
+  }
+}
 </style>
