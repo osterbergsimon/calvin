@@ -795,6 +795,51 @@ def test_save_limit_from_a_calibration_fault(test_client: TestClient, kiosk):
     assert _config(test_client)["brightnessLimit"] == 10
 
 
+def _save_a_calibration_fault_limit(client: TestClient) -> int:
+    """Save the limit FAULT implies (10) and return it."""
+    run = _start(client, "write").json()
+    _report(client, run["id"], "error", reason="power_trouble", fault=FAULT)
+    saved = client.post(f"{BASE}/save-limit")
+    assert saved.status_code == 200, saved.text
+    return saved.json()["brightnessLimit"]
+
+
+@pytest.mark.integration
+def test_save_limit_also_records_the_findings_limit(test_client: TestClient, kiosk):
+    """calvin-7fkf: the findings say which limit the check itself saved."""
+    assert _findings(test_client)["limit"] is None
+    limit = _save_a_calibration_fault_limit(test_client)
+    assert limit == 10
+    assert _findings(test_client)["limit"] == limit
+    assert test_client.get(BASE).json()["findings"]["limit"] == limit
+
+
+@pytest.mark.integration
+def test_a_hand_set_limit_never_writes_the_findings_limit(test_client: TestClient, kiosk):
+    _set_overrides(test_client, {"brightnessLimit": 26})
+    assert _findings(test_client)["limit"] is None
+
+    saved = _save_a_calibration_fault_limit(test_client)
+    _set_overrides(test_client, {"brightnessLimit": 40})
+    assert _findings(test_client)["limit"] == saved
+
+    patched = test_client.patch(
+        f"/api/kiosks/{KIOSK}/overrides", json={"overrides": {"brightnessLimit": 35}}
+    )
+    assert patched.status_code == 200, patched.text
+    assert _findings(test_client)["limit"] == saved
+
+
+@pytest.mark.integration
+def test_a_later_check_keeps_the_saved_findings_limit(test_client: TestClient, kiosk):
+    limit = _save_a_calibration_fault_limit(test_client)
+    run = _start(test_client, "detect").json()
+    _report(test_client, run["id"], "done", info={"model": "NOMAD TOUCH"})
+    found = _findings(test_client)
+    assert found["limit"] == limit
+    assert found["model"] == "NOMAD TOUCH"
+
+
 @pytest.mark.integration
 def test_findings_power_trouble_from_a_preflight_fault(test_client: TestClient, kiosk):
     assert _findings(test_client)["powerTrouble"] is None
