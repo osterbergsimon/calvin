@@ -45,4 +45,15 @@ const clamped = computed(() => Math.max(0, Math.min(100, Math.round(props.value 
   background: var(--focus);
   transition: width var(--dur-fast) linear;
 }
+
+/* High Contrast flattens the track and fill; a system-colour edge and fill
+   keep the progress readable. */
+@media (forced-colors: active) {
+  .progress-bar {
+    border: 1px solid CanvasText;
+  }
+  .progress-bar__fill {
+    background: Highlight;
+  }
+}
 </style>

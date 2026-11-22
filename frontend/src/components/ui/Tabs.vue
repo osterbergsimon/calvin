@@ -220,4 +220,12 @@ const onKey = event => {
   display: flex;
   align-items: center;
 }
+
+/* High Contrast flattens the accent underline; paint it with the system
+   highlight so the active tab still stands out. */
+@media (forced-colors: active) {
+  .tabs__tab.is-active::after {
+    background: Highlight;
+  }
+}
 </style>

@@ -252,13 +252,32 @@ describe("CalendarEventItem", () => {
   });
 
   describe("Title and Accessibility", () => {
-    it("should set title attribute for tooltip", () => {
+    it("is a button, with no title tooltip (M15)", () => {
       const event = createEvent({ title: "Important Meeting" });
-      mockEventHelpers.getEventTitle.mockReturnValue("Important Meeting");
+      mockEventHelpers.getEventTitle.mockReturnValue("Important Meeting (10:00)");
       const wrapper = createWrapper({ event });
 
-      expect(wrapper.find(".event-item").attributes("title")).toBe("Important Meeting");
-      expect(mockEventHelpers.getEventTitle).toHaveBeenCalledWith(event);
+      const chip = wrapper.find(".event-item");
+      expect(chip.attributes("role")).toBe("button");
+      expect(chip.attributes("title")).toBeUndefined();
+      expect(chip.attributes("aria-label")).toBeUndefined();
+    });
+
+    it("names the clipped continuation chip with the full event title", () => {
+      const event = createEvent({
+        _isMultiDay: true,
+        _isStart: false,
+        _isEnd: false,
+        _isMiddle: true,
+        title: "Long Multi-Day Event Name",
+      });
+      mockEventHelpers.getEventTitle.mockReturnValue("Long Multi-Day Event Name (10:00)");
+      const wrapper = createWrapper({ event });
+
+      expect(wrapper.find(".event-continuation").exists()).toBe(true);
+      expect(wrapper.find(".event-item").attributes("aria-label")).toBe(
+        "Long Multi-Day Event Name (10:00)"
+      );
     });
 
     it("should be keyboard accessible with tabindex", () => {

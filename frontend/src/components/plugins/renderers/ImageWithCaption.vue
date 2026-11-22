@@ -1,6 +1,7 @@
 <template>
   <figure class="image-caption">
-    <img v-if="imageUrl" :src="imageUrl" :alt="title || ''" class="image-caption__img" />
+    <!-- The figcaption carries the title, so the image itself is decorative. -->
+    <img v-if="imageUrl" :src="imageUrl" alt="" class="image-caption__img" />
     <figcaption v-if="title || caption || metadata" class="image-caption__text">
       <h3 v-if="title" class="image-caption__title">{{ title }}</h3>
       <p v-if="caption" class="image-caption__caption">{{ caption }}</p>

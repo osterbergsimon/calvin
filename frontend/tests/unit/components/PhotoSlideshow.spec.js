@@ -120,6 +120,8 @@ describe("PhotoSlideshow", () => {
       expect(wrapper.find(".photo-container").exists()).toBe(true);
       expect(wrapper.find(".photo-image").exists()).toBe(true);
       expect(wrapper.find(".photo-image").attributes("src")).toBe("/api/images/1?w=640");
+      // The frame is ambient: the photo carries no name of its own (L12).
+      expect(wrapper.find(".photo-image").attributes("alt")).toBe("");
     });
 
     it("keeps raw error text off the wall (CLV-63)", () => {
@@ -192,22 +194,22 @@ describe("PhotoSlideshow", () => {
   });
 
   describe("Image Display", () => {
-    it("should display image with correct alt text", () => {
+    it("keeps the photo decorative, whatever its filename (L12)", () => {
       const image = createImage({ filename: "vacation.jpg" });
       imagesStore.currentImage = image;
       const wrapper = createWrapper();
 
       const img = wrapper.find(".photo-image");
-      expect(img.attributes("alt")).toBe("vacation.jpg");
+      expect(img.attributes("alt")).toBe("");
     });
 
-    it("should use default alt text when filename not available", () => {
+    it("stays decorative when the photo has no filename", () => {
       const image = createImage({ filename: null });
       imagesStore.currentImage = image;
       const wrapper = createWrapper();
 
       const img = wrapper.find(".photo-image");
-      expect(img.attributes("alt")).toBe("Photo");
+      expect(img.attributes("alt")).toBe("");
     });
   });
 

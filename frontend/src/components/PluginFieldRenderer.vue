@@ -508,4 +508,13 @@ input.form-input {
   font-size: var(--fs-xs);
   color: var(--color-error, var(--err-text));
 }
+
+/* High Contrast drops the border tint and the box-shadow ring; a system-colour
+   outline keeps the focused field visible. */
+@media (forced-colors: active) {
+  .form-input:focus {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}
 </style>

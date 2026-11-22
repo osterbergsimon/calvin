@@ -459,4 +459,12 @@ onBeforeUnmount(() => observer?.disconnect());
   line-height: 1.4;
   color: var(--ink-2);
 }
+
+/* High Contrast would flatten every swatch to one colour; the dots keep their
+   own colour so the choice stays recognisable. */
+@media (forced-colors: active) {
+  .colour-field__dot {
+    forced-color-adjust: none;
+  }
+}
 </style>

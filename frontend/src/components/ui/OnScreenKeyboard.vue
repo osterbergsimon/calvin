@@ -646,6 +646,14 @@ defineExpose({
   color: var(--ink);
 }
 
+/* High Contrast drops the tinted shift fill; an outline keeps Shift's on
+   state visible. */
+@media (forced-colors: active) {
+  :deep(.hg-button.hg-button-shift.k--on) {
+    outline: 2px solid Highlight;
+  }
+}
+
 :deep(.hg-button.hg-activeButton) {
   background: color-mix(in srgb, var(--focus) 22%, var(--bg-2));
   box-shadow: none;
