@@ -5,7 +5,7 @@
   <component :is="keyboard" v-if="keyboard" />
   <!-- A failed chunk load (flaky Wi-Fi on a kiosk) must not leave the keyboard
        dead until the page is reloaded (calvin-o8c1): offer a retry. -->
-  <div v-else-if="failed" class="osk-load-error" role="alert">
+  <div v-else-if="failed" class="osk-load-error" role="alert" data-dialog-live>
     <span>The on-screen keyboard did not load.</span>
     <button type="button" class="osk-load-error__retry" data-test="osk-retry" @click="load">
       Retry
