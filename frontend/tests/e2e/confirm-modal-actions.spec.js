@@ -110,6 +110,28 @@ const CASES = [
   { name: "desktop", viewport: { width: 1280, height: 720 }, stacked: false },
 ];
 
+test.describe("delete-page confirm over the pages editor", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("Escape closes the confirm and leaves the editor open", async ({ page, consoleErrors }) => {
+    const { api, dialog } = await openDeleteConfirm(page);
+    const editor = page.locator(".sre-root");
+    await expect(editor).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(editor).toBeVisible();
+
+    // A second Escape reaches the editor underneath.
+    await page.keyboard.press("Escape");
+    await expect(editor).toBeHidden();
+
+    expect(api.hostActions).toEqual([]);
+    expect(api.unmatched).toEqual([]);
+    expect(consoleErrors).toEqual([]);
+  });
+});
+
 for (const c of CASES) {
   test.describe(`delete-page confirm at ${c.name}`, () => {
     test.use({ viewport: c.viewport });

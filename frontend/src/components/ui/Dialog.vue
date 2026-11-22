@@ -1,6 +1,6 @@
 <template>
   <template v-if="modelValue">
-    <DialogScrim :blur="scrimBlur" @dismiss="onScrim" />
+    <DialogScrim ref="scrimEl" :blur="scrimBlur" @dismiss="onScrim" />
     <div
       ref="overlayEl"
       class="dialog-overlay dialog-above-osk"
@@ -34,13 +34,12 @@
           </div>
           <IconButton
             v-if="dismissible"
+            :icon="mdiClose"
             :label="closeLabel"
             size="md"
             variant="ghost"
             @click="requestClose"
-          >
-            ×
-          </IconButton>
+          />
         </header>
 
         <div ref="bodyEl" class="dialog__body"><slot /></div>
@@ -53,8 +52,21 @@
   </template>
 </template>
 
+<script>
+// Shared by every instance, so set in module scope rather than inside setup.
+let dialogSeq = 0;
+// Every open dialog, oldest first. Only the newest handles keys, so Escape on
+// a confirm over the pages editor closes the confirm (calvin-kajl M1).
+const openStack = [];
+const openRoots = new Map();
+// The elements we made inert, so clearing never removes an inert another part
+// of the app set (the screen stack does).
+const inerted = new Set();
+</script>
+
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, useSlots, watch } from "vue";
+import { mdiClose } from "@mdi/js";
 import DialogScrim from "./DialogScrim.vue";
 import IconButton from "./IconButton.vue";
 
@@ -62,8 +74,6 @@ import IconButton from "./IconButton.vue";
 // scrim, title, body, actions, focus trap, Escape, layered at --z-dialog and
 // kept above the on-screen keyboard like ConfirmModal/AdminSignInDialog. It
 // returns focus to whatever opened it. Feature code supplies content only.
-let dialogSeq = 0;
-
 const props = defineProps({
   // Open state, so `v-model="open"` works.
   modelValue: { type: Boolean, default: false },
@@ -95,6 +105,7 @@ const emit = defineEmits(["update:modelValue", "close"]);
 
 const slots = useSlots();
 const titleId = `dialog-title-${++dialogSeq}`;
+const scrimEl = ref(null);
 const overlayEl = ref(null);
 const panelEl = ref(null);
 const bodyEl = ref(null);
@@ -139,12 +150,82 @@ function restoreFocus() {
   nextTick(() => target?.focus?.());
 }
 
+function topDialog() {
+  // A dialog torn down without unmounting (an HMR swap, a test teardown)
+  // leaves a stale id behind. Drop ids whose root has left the document.
+  for (let i = openStack.length - 1; i >= 0; i -= 1) {
+    const id = openStack[i];
+    const entry = openRoots.get(id);
+    if (entry?.overlay && !entry.overlay.isConnected) {
+      openStack.splice(i, 1);
+      openRoots.delete(id);
+    }
+  }
+  return openStack[openStack.length - 1];
+}
+
+// Make everything outside the open dialogs inert, so the screen reader cursor
+// can't leave the top one. Walk from each dialog's overlay up to the app root
+// and mark the siblings at every level; the dialog's own scrim and any nested
+// dialog stay live. The on-screen keyboard is teleported to <body>, outside
+// #app, so it keeps working while a dialog with fields is open.
+function applyInert() {
+  const entries = [...openRoots.values()].filter(entry => entry.overlay?.isConnected);
+  const roots = entries.flatMap(entry => [entry.overlay, entry.scrim].filter(Boolean));
+  const wanted = new Set();
+
+  for (const { overlay } of entries) {
+    let node = overlay;
+    while (node.parentElement && node.parentElement !== document.body) {
+      for (const sibling of node.parentElement.children) {
+        if (sibling === node) continue;
+        // A sibling that holds an open dialog (a second mount, not a nested
+        // one) is part of the live surface.
+        if (roots.some(root => sibling === root || sibling.contains(root))) continue;
+        wanted.add(sibling);
+      }
+      node = node.parentElement;
+    }
+  }
+
+  for (const node of inerted) {
+    if (!wanted.has(node)) {
+      node.removeAttribute("inert");
+      inerted.delete(node);
+    }
+  }
+  for (const node of wanted) {
+    if (!node.hasAttribute("inert")) {
+      node.setAttribute("inert", "");
+      inerted.add(node);
+    }
+  }
+}
+
+function registerOpen() {
+  if (!openStack.includes(titleId)) openStack.push(titleId);
+  openRoots.set(titleId, { overlay: null, scrim: null });
+  nextTick(() => {
+    if (!props.modelValue) return;
+    openRoots.set(titleId, { overlay: overlayEl.value, scrim: scrimEl.value?.$el ?? null });
+    applyInert();
+  });
+}
+
+function registerClose() {
+  const index = openStack.indexOf(titleId);
+  if (index !== -1) openStack.splice(index, 1);
+  openRoots.delete(titleId);
+  applyInert();
+}
+
 // A SelectPill, Menu or Popover inside the dialog is a floating surface of its
 // own: Escape closes that, not the editor behind it. Their panels teleport to
 // <body>, so detect them from the event target rather than the DOM subtree.
 const NESTED_OVERLAY = '[role="listbox"], [role="menu"], .popover__panel';
 
 function onKeydown(event) {
+  if (topDialog() !== titleId) return;
   if (event.key === "Escape") {
     if (event.target?.closest?.(NESTED_OVERLAY)) return;
     if (!props.dismissible) return;
@@ -195,9 +276,11 @@ watch(
       opener = document.activeElement;
       listen();
       focusInitial();
+      registerOpen();
     } else if (wasOpen) {
       unlisten();
       restoreFocus();
+      registerClose();
     }
   },
   { immediate: true }
@@ -205,6 +288,7 @@ watch(
 
 onBeforeUnmount(() => {
   unlisten();
+  registerClose();
   if (props.modelValue) restoreFocus();
 });
 </script>

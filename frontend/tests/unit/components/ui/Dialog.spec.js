@@ -12,21 +12,31 @@ const SOURCE = readFileSync(
 );
 const STYLE = SOURCE.slice(SOURCE.indexOf("<style"), SOURCE.indexOf("</style>"));
 
+const wrappers = [];
+
+const track = wrapper => {
+  wrappers.push(wrapper);
+  return wrapper;
+};
+
 const mountOpen = (props = {}, slots = {}) =>
-  mount(Dialog, {
-    props: { modelValue: true, title: "Edit source", ...props },
-    slots: {
-      default: "<p>Body text</p>",
-      actions: "<button type='button'>Save</button>",
-      ...slots,
-    },
-    attachTo: document.body,
-  });
+  track(
+    mount(Dialog, {
+      props: { modelValue: true, title: "Edit source", ...props },
+      slots: {
+        default: "<p>Body text</p>",
+        actions: "<button type='button'>Save</button>",
+        ...slots,
+      },
+      attachTo: document.body,
+    })
+  );
 
 const keydown = key =>
   document.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
 
 afterEach(() => {
+  while (wrappers.length) wrappers.pop().unmount();
   document.body.innerHTML = "";
 });
 
@@ -91,6 +101,116 @@ describe("Dialog", () => {
     keydown("Escape");
     await nextTick();
     expect(w.emitted("update:modelValue")).toEqual([[false]]);
+  });
+
+  it("closes only the top of two nested dialogs on Escape", async () => {
+    const app = document.createElement("div");
+    app.id = "app";
+    document.body.appendChild(app);
+    const host = document.createElement("div");
+    app.appendChild(host);
+
+    const outer = track(
+      mount(Dialog, {
+        props: { modelValue: true, title: "Pages & regions" },
+        slots: { default: "<p>Editor</p>" },
+        attachTo: host,
+      })
+    );
+    const innerHost = document.createElement("div");
+    host.appendChild(innerHost);
+    const inner = track(
+      mount(Dialog, {
+        props: { modelValue: true, title: "Delete page?", size: "sm" },
+        slots: { default: "<p>Confirm</p>" },
+        attachTo: innerHost,
+      })
+    );
+    await nextTick();
+    await nextTick();
+
+    keydown("Escape");
+    await nextTick();
+    expect(inner.emitted("update:modelValue")).toEqual([[false]]);
+    expect(outer.emitted("update:modelValue")).toBeUndefined();
+
+    await inner.setProps({ modelValue: false });
+    await nextTick();
+    await nextTick();
+    keydown("Escape");
+    await nextTick();
+    expect(outer.emitted("update:modelValue")).toEqual([[false]]);
+  });
+
+  it("makes the page behind inert while open and clears it after the last closes", async () => {
+    const app = document.createElement("div");
+    app.id = "app";
+    document.body.appendChild(app);
+    const content = document.createElement("main");
+    content.innerHTML = "<button type='button'>Behind</button>";
+    app.appendChild(content);
+    const host = document.createElement("div");
+    app.appendChild(host);
+
+    const outer = track(
+      mount(Dialog, {
+        props: { modelValue: true, title: "Pages & regions" },
+        slots: { default: "<p>Editor</p>" },
+        attachTo: host,
+      })
+    );
+    await nextTick();
+    await nextTick();
+    expect(content.hasAttribute("inert")).toBe(true);
+
+    const innerHost = document.createElement("div");
+    host.appendChild(innerHost);
+    const inner = track(
+      mount(Dialog, {
+        props: { modelValue: true, title: "Delete page?", size: "sm" },
+        slots: { default: "<p>Confirm</p>" },
+        attachTo: innerHost,
+      })
+    );
+    await nextTick();
+    await nextTick();
+    // The outer dialog holds the inner one, so both stay live.
+    expect(content.hasAttribute("inert")).toBe(true);
+    expect(host.hasAttribute("inert")).toBe(false);
+
+    await inner.setProps({ modelValue: false });
+    await nextTick();
+    expect(content.hasAttribute("inert")).toBe(true);
+
+    await outer.setProps({ modelValue: false });
+    await nextTick();
+    expect(content.hasAttribute("inert")).toBe(false);
+  });
+
+  it("clears inert when a dialog unmounts", async () => {
+    const app = document.createElement("div");
+    app.id = "app";
+    document.body.appendChild(app);
+    const content = document.createElement("main");
+    app.appendChild(content);
+    const host = document.createElement("div");
+    app.appendChild(host);
+
+    const w = track(
+      mount(Dialog, {
+        props: { modelValue: true, title: "Edit" },
+        slots: { default: "<p>Body</p>" },
+        attachTo: host,
+      })
+    );
+    await nextTick();
+    await nextTick();
+    expect(content.hasAttribute("inert")).toBe(true);
+
+    w.unmount();
+    wrappers.splice(wrappers.indexOf(w), 1);
+    await nextTick();
+    expect(content.hasAttribute("inert")).toBe(false);
   });
 
   it("does not dismiss a non-dismissible dialog", async () => {
