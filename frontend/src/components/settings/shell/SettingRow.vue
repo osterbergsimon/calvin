@@ -80,6 +80,14 @@ defineProps({
   margin: 0;
 }
 .setting-row__control {
+  /* A row with two controls (Screen now's Turn on/Turn off now, the server
+     display's pair) leaves --gap-inline between them instead of letting them
+     touch (calvin-4txw). A lone control keeps its size and is centred in the
+     row. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap-inline);
   /* Never narrower than its own content: a long description wraps in the left
      column instead of squeezing a segmented control until its card clips it
      (calvin-y14e). A phone still wraps the control below the label via the
@@ -95,6 +103,10 @@ defineProps({
   gap: 0.75rem;
 }
 .setting-row--stacked .setting-row__control {
+  /* A stacked editor keeps the full width and its own block layout: its
+     content is one wide control (a chip group, a table, a preview), not a
+     pair to space. */
+  display: block;
   flex-shrink: 1;
   width: 100%;
   min-width: 0;
