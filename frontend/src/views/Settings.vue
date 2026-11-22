@@ -1,5 +1,6 @@
 <template>
   <div class="settings-page" :class="{ 'settings-page--pinned': pairing.showStrip }">
+    <h1 class="settings-page__title">Settings</h1>
     <SettingsTopBar
       :category-label="auth.authenticated ? topBarTitle : 'Settings'"
       :section-label="auth.authenticated && !phone ? sectionLabel : ''"
@@ -607,6 +608,20 @@ onUnmounted(() => {
   color: var(--ink);
   display: flex;
   flex-direction: column;
+}
+
+/* The page's heading: the top bar shows the category, so the title is for
+   screen readers only (a main needs a heading to be announced by). */
+.settings-page__title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .settings-body {

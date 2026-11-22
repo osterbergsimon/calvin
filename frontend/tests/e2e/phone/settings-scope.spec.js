@@ -245,11 +245,11 @@ test.describe("settings scope — signpost, old links and search", () => {
     ];
     for (const [word, label] of cases) {
       await typeSearch(word);
-      await expect(page.getByRole("option", { name: label }), word).toBeVisible();
+      await expect(page.getByRole("button", { name: label }), word).toBeVisible();
     }
 
     await typeSearch("appearance");
-    await page.getByRole("option", { name: /Look: theme, light or dark and font/ }).click();
+    await page.getByRole("button", { name: /Look: theme, light or dark and font/ }).click();
     await expect(page.locator('[data-test="default-screen-page"]')).toBeVisible();
     await expect(page.locator("#section-screen-look")).toBeVisible();
   });

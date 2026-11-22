@@ -31,18 +31,12 @@
         autocomplete="off"
         @keydown.escape="query = ''"
       />
-      <kbd v-if="!isTouch" class="settings-search__hint" aria-label="Press slash to focus search"
-        >/</kbd
-      >
+      <kbd v-if="!isTouch" class="settings-search__hint" aria-hidden="true">/</kbd>
     </div>
-    <ul
-      v-if="results.length"
-      class="settings-search__results"
-      role="listbox"
-      aria-label="Search results"
-    >
-      <li v-for="result in results" :key="result.id" role="none">
-        <button class="settings-search__result" type="button" role="option" @click="select(result)">
+    <p class="settings-search__count" role="status" aria-live="polite">{{ countLabel }}</p>
+    <ul v-if="results.length" class="settings-search__results" aria-label="Search results">
+      <li v-for="result in results" :key="result.id">
+        <button class="settings-search__result" type="button" @click="select(result)">
           <span class="settings-search__result-label">{{ result.label }}</span>
           <span class="settings-search__result-path">{{ result.path }}</span>
         </button>
@@ -65,6 +59,14 @@ const query = ref("");
 const inputEl = useTemplateRef("inputEl");
 
 const results = computed(() => filterSettingsDestinations(query.value));
+
+// The mounted live region's line: a change to the result count is announced
+// while the results list itself stays an ordinary list.
+const countLabel = computed(() => {
+  const n = results.value.length;
+  if (n === 0) return "No results";
+  return n === 1 ? "1 result" : `${n} results`;
+});
 
 function select(destination) {
   emit("jump", destination);
@@ -161,6 +163,20 @@ onUnmounted(() => {
   border-radius: var(--radius-xs);
   padding: 1px 5px;
   line-height: 1.4;
+}
+
+/* The results count for screen readers only: the list shows the matches, and
+   this line announces how many arrived without moving focus into it. */
+.settings-search__count {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .settings-search__results {

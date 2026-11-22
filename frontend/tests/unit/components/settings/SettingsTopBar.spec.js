@@ -43,6 +43,30 @@ describe("SettingsTopBar", () => {
     expect(w.get('[data-action="done"]').exists()).toBe(true);
   });
 
+  it("draws the phone hand-off and Done with the shared Button", () => {
+    const w = mount(SettingsTopBar, {
+      props: { categoryLabel: "Display", saveState: "idle", showPhone: true },
+    });
+    const phone = w.get('[data-action="phone"]');
+    expect(phone.classes()).toContain("btn");
+    expect(phone.classes()).toContain("btn--sm");
+    expect(phone.text()).toBe("Use your phone");
+    // The label is the text, so no duplicate accessible name.
+    expect(phone.attributes("aria-label")).toBeUndefined();
+    const done = w.get('[data-action="done"]');
+    expect(done.classes()).toContain("btn--primary");
+    expect(done.text()).toBe("Done");
+  });
+
+  it("announces the wordmark as the Calvin image", () => {
+    const w = mount(SettingsTopBar, {
+      props: { categoryLabel: "Display", saveState: "idle" },
+    });
+    const mark = w.get(".settings-topbar__wordmark");
+    expect(mark.attributes("role")).toBe("img");
+    expect(mark.attributes("aria-label")).toBe("Calvin");
+  });
+
   it("exposes the full save wording as the pill's accessible name", () => {
     // On a phone only the dot shows, so the wording must live on the pill.
     const w = mount(SettingsTopBar, {

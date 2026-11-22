@@ -59,6 +59,13 @@ describe("Settings shell", () => {
     expect(w.find(".content-settings-stub").exists()).toBe(true);
   });
 
+  it("gives the page a visually hidden h1", () => {
+    const w = mount(Settings, { global: { stubs } });
+    const heading = w.get("h1");
+    expect(heading.text()).toBe("Settings");
+    expect(heading.classes()).toContain("settings-page__title");
+  });
+
   it("renders DashboardSettings for the dashboard category", async () => {
     const w = mount(Settings, { global: { stubs } });
     await w.find(".rail-stub").trigger("click");

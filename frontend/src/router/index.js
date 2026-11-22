@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { recoverFromChunkLoadError } from "./chunkRecovery";
+import { applyRouteTitle } from "./titles";
 import { createGuestGuard } from "../utils/guestPath";
 import { isPhone } from "../styles/breakpoints";
 
@@ -20,13 +21,14 @@ const router = createRouter({
       path: "/settings",
       name: "settings",
       component: Settings,
+      meta: { title: "Settings" },
     },
     {
       // Trailing slash optional: the installed PWA's scope is /share/<token>/.
       path: "/share/:token/",
       name: "guest-share",
       component: GuestShare,
-      meta: { guest: true },
+      meta: { guest: true, title: "Shared photos" },
     },
   ],
   // Phone Settings is a stack of pages in the query string
@@ -44,6 +46,9 @@ const router = createRouter({
 
 // The guest page and the dashboard never share a page load (calvin-mwqo).
 router.beforeEach(createGuestGuard());
+
+// The tab and history name the page you are on (M9).
+router.afterEach(applyRouteTitle);
 
 // A stale client (a page left open across a deploy) cannot load a route's
 // hashed chunk, and Vue Router would abort the navigation silently — clicking

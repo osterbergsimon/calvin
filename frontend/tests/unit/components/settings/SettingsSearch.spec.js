@@ -12,7 +12,22 @@ vi.mock("@/components/settings/settingsRegistry", () => ({
             category: "dashboard",
           },
         ]
-      : [],
+      : q === "all"
+        ? [
+            {
+              id: "dashboard-layout",
+              label: "Layout",
+              path: "Display / Layout",
+              category: "dashboard",
+            },
+            {
+              id: "dashboard-ui",
+              label: "Look",
+              path: "Display / Look",
+              category: "dashboard",
+            },
+          ]
+        : [],
 }));
 import SettingsSearch from "@/components/settings/shell/SettingsSearch.vue";
 
@@ -34,5 +49,30 @@ describe("SettingsSearch", () => {
   it("shows nothing for an empty query", async () => {
     const w = mount(SettingsSearch);
     expect(w.find(".settings-search__result").exists()).toBe(false);
+  });
+
+  it("lists plain results instead of a listbox", async () => {
+    const w = mount(SettingsSearch);
+    await w.get("input").setValue("orient");
+    expect(w.find('[role="listbox"]').exists()).toBe(false);
+    expect(w.find('[role="option"]').exists()).toBe(false);
+    const list = w.get("ul.settings-search__results");
+    expect(list.attributes("aria-label")).toBe("Search results");
+    expect(list.findAll("li button")).toHaveLength(1);
+    // The "/" hint is decoration, not a control.
+    expect(w.get("kbd").attributes("aria-hidden")).toBe("true");
+    expect(w.get("kbd").attributes("aria-label")).toBeUndefined();
+  });
+
+  it("keeps one polite results line mounted and updates its count", async () => {
+    const w = mount(SettingsSearch);
+    // Mounted before any query, so its text changes are announced.
+    const count = w.get(".settings-search__count");
+    expect(count.attributes("aria-live")).toBe("polite");
+    expect(count.text()).toBe("No results");
+    await w.get("input").setValue("orient");
+    expect(w.get(".settings-search__count").text()).toBe("1 result");
+    await w.get("input").setValue("all");
+    expect(w.get(".settings-search__count").text()).toBe("2 results");
   });
 });
