@@ -46,8 +46,6 @@ const metadata = computed(() => pick("metadata_path", "metadata", "metadata_form
 .image-caption__img {
   width: 100%;
   height: 100%;
-  /* Reserve a box before the image loads, so the caption text does not jump. */
-  aspect-ratio: 16 / 9;
   object-fit: cover;
   display: block;
 }

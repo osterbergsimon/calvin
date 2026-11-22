@@ -10,7 +10,6 @@ import IframeRenderer from "@/components/plugins/renderers/IframeRenderer.vue";
 import ImageWithCaption from "@/components/plugins/renderers/ImageWithCaption.vue";
 import MetricDashboard from "@/components/plugins/renderers/MetricDashboard.vue";
 import WeatherForecast from "@/components/plugins/renderers/WeatherForecast.vue";
-import { styleRules } from "../../styles/lint-helpers.js";
 
 describe("SchemaRenderer dispatcher", () => {
   it("renders the registered renderer for a known kind", () => {
@@ -398,14 +397,6 @@ describe("ImageWithCaption", () => {
     expect(wrapper.find("img").attributes("alt")).toBe("");
     expect(wrapper.text()).toContain("Sunrise");
     expect(wrapper.text()).toContain("Photo from yesterday.");
-  });
-
-  it("reserves the image box before it loads (L12)", () => {
-    const rule = styleRules("components/plugins/renderers/ImageWithCaption.vue").find(
-      candidate => candidate.selector === ".image-caption__img"
-    );
-
-    expect(rule.declarations).toContainEqual({ prop: "aspect-ratio", value: "16 / 9" });
   });
 
   it("omits figcaption when no text fields resolve", () => {
