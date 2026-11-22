@@ -62,12 +62,31 @@ const openRoots = new Map();
 // The elements we made inert, so clearing never removes an inert another part
 // of the app set (the screen stack does).
 const inerted = new Set();
+// Our ownership token on each node we inerted. Another owner that sets inert
+// later wins and we leave theirs alone on close.
+const INERT_TOKEN = "data-dialog-inert";
+const inertTokens = new WeakMap();
+const claimedElsewhere = new WeakSet();
+let inertTokenSeq = 0;
 // App-level layers that stay usable over a dialog: the toast rail, connection
 // pill, pairing strip and the on-screen keyboard's Retry.
 const LIVE_LAYER = "data-dialog-live";
 
 const observer =
   typeof MutationObserver === "undefined" ? null : new MutationObserver(() => applyInert());
+
+// A later write to inert (oldValue is not null: the attribute already existed)
+// comes from another owner. We only ever set it when it was absent.
+const inertObserver =
+  typeof MutationObserver === "undefined"
+    ? null
+    : new MutationObserver(records => {
+        for (const record of records) {
+          if (record.attributeName === "inert" && record.oldValue !== null) {
+            claimedElsewhere.add(record.target);
+          }
+        }
+      });
 
 function topDialog() {
   // A dialog torn down without unmounting (an HMR swap, a test teardown)
@@ -89,6 +108,20 @@ function watchAncestors(ancestors) {
   for (const ancestor of ancestors) observer.observe(ancestor, { childList: true });
 }
 
+// A live layer can sit deep inside an otherwise inert subtree (the connection
+// pill lives in the clock bar, which lives in the dashboard). Keep the path to
+// it live and inert the rest: containers on that path are recursed into and
+// watched, a branch without a live layer is inert as a whole.
+function inertAround(node, wanted, ancestors) {
+  if (node.hasAttribute(LIVE_LAYER)) return;
+  if (!node.querySelector(`[${LIVE_LAYER}]`)) {
+    wanted.add(node);
+    return;
+  }
+  ancestors.add(node);
+  for (const child of node.children) inertAround(child, wanted, ancestors);
+}
+
 // Make everything outside the top dialog inert, so the screen reader cursor
 // can't leave it. Only the top dialog's own scrim stays live: a dialog below
 // it (nested or sibling-mounted, such as the admin sign-in over the pages
@@ -108,29 +141,56 @@ function applyInert() {
       ancestors.add(node.parentElement);
       for (const sibling of node.parentElement.children) {
         if (sibling === node) continue;
-        // The top dialog's own scrim, and app-level live layers, stay live.
+        // The top dialog's own scrim stays live; live layers deeper in a
+        // sibling keep just their own path live.
         if (roots.some(root => sibling === root || sibling.contains(root))) continue;
-        if (sibling.hasAttribute(LIVE_LAYER) || sibling.querySelector(`[${LIVE_LAYER}]`)) continue;
-        wanted.add(sibling);
+        inertAround(sibling, wanted, ancestors);
       }
       node = node.parentElement;
     }
   }
 
   for (const node of inerted) {
-    if (!node.isConnected || !wanted.has(node)) {
+    const ours =
+      !claimedElsewhere.has(node) && inertTokens.get(node) === node.getAttribute(INERT_TOKEN);
+    if (ours && (!node.isConnected || !wanted.has(node))) {
       node.removeAttribute("inert");
-      inerted.delete(node);
+      node.removeAttribute(INERT_TOKEN);
     }
+    if (!ours || !node.isConnected || !wanted.has(node)) forgetInert(node);
   }
   for (const node of wanted) {
     // Never claim an inert another part of the app set (the screen stack).
     if (!node.hasAttribute("inert")) {
+      const token = `dialog-${++inertTokenSeq}`;
+      inertTokens.set(node, token);
+      claimedElsewhere.delete(node);
+      node.setAttribute(INERT_TOKEN, token);
       node.setAttribute("inert", "");
       inerted.add(node);
     }
   }
   watchAncestors(ancestors);
+  watchInertNodes();
+}
+
+// MutationObserver has no per-node unobserve: re-observe the current set.
+function watchInertNodes() {
+  if (!inertObserver) return;
+  inertObserver.disconnect();
+  for (const node of inerted) {
+    inertObserver.observe(node, {
+      attributes: true,
+      attributeFilter: ["inert"],
+      attributeOldValue: true,
+    });
+  }
+}
+
+function forgetInert(node) {
+  inertTokens.delete(node);
+  claimedElsewhere.delete(node);
+  inerted.delete(node);
 }
 </script>
 

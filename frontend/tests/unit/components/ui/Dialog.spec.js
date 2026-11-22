@@ -336,6 +336,63 @@ describe("Dialog", () => {
     expect(nested.hasAttribute("inert")).toBe(false);
   });
 
+  it("keeps only the live path inside a nested container", async () => {
+    const { app, content, host } = appWithHost();
+    const container = document.createElement("section");
+    const other = document.createElement("p");
+    const middle = document.createElement("div");
+    const live = document.createElement("span");
+    live.setAttribute("data-dialog-live", "");
+    middle.appendChild(live);
+    container.appendChild(other);
+    container.appendChild(middle);
+    app.appendChild(container);
+
+    mountAt(host);
+    await nextTick();
+    await nextTick();
+    expect(content.hasAttribute("inert")).toBe(true);
+    expect(container.hasAttribute("inert")).toBe(false);
+    expect(middle.hasAttribute("inert")).toBe(false);
+    expect(live.hasAttribute("inert")).toBe(false);
+    expect(other.hasAttribute("inert")).toBe(true);
+
+    // A child added to the watched container later follows the same split.
+    const late = document.createElement("b");
+    middle.appendChild(late);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(late.hasAttribute("inert")).toBe(true);
+  });
+
+  it("leaves inert that another owner set after the dialog opened", async () => {
+    const { content, host } = appWithHost();
+    const w = mountAt(host);
+    await nextTick();
+    await nextTick();
+    expect(content.hasAttribute("inert")).toBe(true);
+
+    // The screen stack takes ownership of the same node while the dialog is up.
+    content.setAttribute("inert", "");
+    await nextTick();
+    await w.setProps({ modelValue: false });
+    await nextTick();
+    expect(content.hasAttribute("inert")).toBe(true);
+  });
+
+  it("stacks two dialogs opened in the same tick", async () => {
+    const { host } = appWithHost();
+    const wrapper = track(mount(SiblingDialogs, { attachTo: host }));
+    await nextTick();
+    await nextTick();
+    expect(wrapper.findAllComponents(Dialog)).toHaveLength(2);
+
+    keydown("Escape");
+    await nextTick();
+    await nextTick();
+    expect(wrapper.findAll("[role='dialog']")).toHaveLength(1);
+    expect(wrapper.find(".dialog__title").text()).toBe("Pages & regions");
+  });
+
   it("inerts a sibling added while the dialog is open", async () => {
     const { app, host } = appWithHost();
     mountAt(host);
