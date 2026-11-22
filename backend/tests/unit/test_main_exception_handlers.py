@@ -9,7 +9,11 @@ from fastapi import HTTPException
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.requests import Request
 
-from app.main import fastapi_http_exception_handler, http_exception_handler
+from app.main import (
+    fastapi_http_exception_handler,
+    general_exception_handler,
+    http_exception_handler,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -43,3 +47,13 @@ async def test_handler_without_headers_still_works(handler, exc_cls):
     response = await handler(_request(), exc_cls(status_code=404, detail="nope"))
     assert response.status_code == 404
     assert "retry-after" not in response.headers
+
+
+async def test_500_handler_carries_hardening_headers():
+    # ServerErrorMiddleware answers outside every middleware, so the handler
+    # itself must add them.
+    response = await general_exception_handler(_request(), RuntimeError("boom"))
+    assert response.status_code == 500
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["referrer-policy"] == "same-origin"
+    assert "camera=()" in response.headers["permissions-policy"]

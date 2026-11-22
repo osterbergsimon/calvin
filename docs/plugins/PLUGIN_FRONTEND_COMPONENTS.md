@@ -128,6 +128,9 @@ display_schema={
 - `url` (literal) or `url_path`. Pair with `panel_variant: "iframe"`.
 - Sites that refuse embedding (X-Frame-Options/CSP) get a built-in error
   overlay with an "open in new window" action.
+- Calvin sends `Permissions-Policy` denying camera, microphone, geolocation and
+  payment; an embedded frame cannot re-enable them, so a location-aware plugin
+  takes coordinates from its config.
 
 ### `image-with-caption` — full-bleed image + caption overlay
 
@@ -262,6 +265,10 @@ display_schema={
     "stylesheet": "dist.css",        # optional, linked into <head> while mounted
 }
 ```
+
+Calvin sends `Permissions-Policy` denying camera, microphone, geolocation and
+payment to the page the component runs in, so a location-aware plugin takes
+coordinates from its config, not the browser.
 
 Host behavior:
 
