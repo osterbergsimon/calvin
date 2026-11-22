@@ -3,21 +3,25 @@
     <div v-if="loading" class="loading-state">
       <p>Loading themes…</p>
     </div>
-    <div v-else class="theme-selection-grid">
+    <div v-else class="theme-selection-grid" role="radiogroup" aria-label="Theme" @keydown="onKey">
       <div
-        v-for="theme in themes"
+        v-for="(theme, index) in themes"
         :key="theme.id"
+        :ref="el => setCardRef(el, index)"
         class="theme-selection-item"
         :class="{
           active: selectedThemeId === theme.id,
           builtin: theme.is_builtin,
           disabled: theme.selectable === false,
         }"
+        role="radio"
+        :aria-checked="selectedThemeId === theme.id ? 'true' : 'false'"
         :aria-disabled="theme.selectable === false ? 'true' : undefined"
-        :tabindex="theme.selectable === false ? -1 : 0"
+        :tabindex="cardTabIndex(index)"
         :data-theme-id="theme.id"
         @click="handleThemeSelect(theme)"
         @keydown.enter.prevent="handleThemeSelect(theme)"
+        @keydown.space.prevent="handleThemeSelect(theme)"
       >
         <div
           class="theme-selection-preview"
@@ -78,7 +82,7 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, nextTick, ref } from "vue";
 import { mdiCheck } from "@mdi/js";
 import Tag from "@/components/ui/Tag.vue";
 import { themePalette } from "@/utils/themePalettes";
@@ -129,6 +133,51 @@ const handleThemeSelect = theme => {
   // A theme that fails the load check stays visible but cannot be selected.
   if (theme.selectable === false) return;
   emit("select", theme.id);
+};
+
+// The grid is one radiogroup: the checked card holds the tab stop, and the
+// arrows move the selection the way SegmentedControl does. A theme that needs
+// an update is skipped, because it cannot take the selection.
+const cardRefs = ref([]);
+const setCardRef = (el, index) => {
+  if (el) cardRefs.value[index] = el;
+};
+
+const selectedIndex = computed(() =>
+  props.themes.findIndex(theme => theme.id === props.selectedThemeId)
+);
+
+const tabbableIndex = computed(() => {
+  if (selectedIndex.value >= 0 && props.themes[selectedIndex.value].selectable !== false) {
+    return selectedIndex.value;
+  }
+  return props.themes.findIndex(theme => theme.selectable !== false);
+});
+
+const cardTabIndex = index => (index === tabbableIndex.value ? 0 : -1);
+
+const nextSelectable = (from, delta) => {
+  const count = props.themes.length;
+  let index = from;
+  for (let step = 0; step < count; step += 1) {
+    index = (index + delta + count) % count;
+    if (props.themes[index].selectable !== false) return index;
+  }
+  return -1;
+};
+
+const onKey = event => {
+  const horizontal = event.key === "ArrowRight" || event.key === "ArrowLeft";
+  const vertical = event.key === "ArrowDown" || event.key === "ArrowUp";
+  if (!horizontal && !vertical) return;
+  const from = tabbableIndex.value;
+  if (from < 0) return;
+  const delta = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : -1;
+  const next = nextSelectable(from, delta);
+  if (next < 0) return;
+  event.preventDefault();
+  emit("select", props.themes[next].id);
+  nextTick(() => cardRefs.value[next]?.focus());
 };
 
 const paletteFor = (theme, dark) => themePalette(theme, dark);

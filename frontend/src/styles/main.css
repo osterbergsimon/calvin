@@ -195,6 +195,23 @@ body {
   cursor: pointer;
 }
 
+/* A clickable plugin row is a real button, so the keyboard can reach it. Reset
+   the button chrome back to the row it sits in and inherit the row's display,
+   alignment and gap, so wrapping the content does not move the layout. */
+button.calvin-plugin-clickable {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: inherit;
+  width: 100%;
+  min-width: 0;
+  display: inherit;
+  align-items: inherit;
+  gap: inherit;
+}
+
 .calvin-plugin-clickable:hover {
   background: color-mix(in srgb, var(--focus) 7%, transparent);
 }

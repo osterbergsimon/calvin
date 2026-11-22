@@ -110,6 +110,124 @@ const CASES = [
   { name: "desktop", viewport: { width: 1280, height: 720 }, stacked: false },
 ];
 
+test.describe("delete-page confirm over the pages editor", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("Escape closes the confirm and leaves the editor open", async ({ page, consoleErrors }) => {
+    const { api, dialog } = await openDeleteConfirm(page);
+    const editor = page.locator(".sre-root");
+    await expect(editor).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(editor).toBeVisible();
+
+    // A second Escape reaches the editor underneath.
+    await page.keyboard.press("Escape");
+    await expect(editor).toBeHidden();
+
+    expect(api.hostActions).toEqual([]);
+    expect(api.unmatched).toEqual([]);
+    expect(consoleErrors).toEqual([]);
+  });
+});
+
+test.describe("admin sign-in over the dashboard", () => {
+  test.use({ viewport: { width: 1024, height: 600 } });
+
+  test("leaves the dashboard inert but the connection pill live", async ({
+    page,
+    consoleErrors,
+  }) => {
+    // Offline shows the pill without waiting for failed health checks.
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "onLine", { get: () => false, configurable: true });
+    });
+
+    const api = await installApiMock(page, {
+      overrides: [
+        [
+          /^\/api\/config$/,
+          (route, { method }) =>
+            method === "POST"
+              ? route.fulfill({
+                  status: 401,
+                  contentType: "application/json",
+                  body: JSON.stringify({
+                    detail: { code: "admin_required", message: "Admin required." },
+                  }),
+                })
+              : false,
+        ],
+      ],
+    });
+
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+    await expect(page.locator(".clock-bar-horizontal")).toBeVisible();
+
+    const pill = page.locator('[data-test="connection-pill"]').first();
+    await expect(pill).toBeVisible();
+    await expect(pill).toContainText("No network");
+
+    // An admin write answers 401, opening the in-place sign-in dialog.
+    await page.getByRole("button", { name: "More controls" }).click();
+    await page.getByRole("menuitem", { name: /Lock layout|Unlock layout/ }).click();
+    const dialog = page.getByRole("dialog", { name: "Sign in to continue" });
+    await expect(dialog).toBeVisible();
+
+    // The page behind is inert; the pill nested in the clock bar is not.
+    expect(
+      await page.locator(".dashboard-stage").evaluate(el => Boolean(el.closest("[inert]")))
+    ).toBe(true);
+    expect(await pill.evaluate(el => Boolean(el.closest("[inert]")))).toBe(false);
+    expect(await dialog.evaluate(el => Boolean(el.closest("[inert]")))).toBe(false);
+
+    // It stays in the accessibility tree and keeps its state over the dialog.
+    await expect(pill).toBeVisible();
+    await expect(pill).toContainText("No network");
+    await expect(dialog).toBeVisible();
+
+    expect(api.hostActions).toEqual([]);
+    expect(api.unmatched).toEqual([]);
+    // The deliberately refused admin write is the scenario, not an app error.
+    expect(
+      consoleErrors.filter(text => !/401|Unauthorized|Failed to update config/.test(text))
+    ).toEqual([]);
+  });
+});
+
+test.describe("toasts over the pages editor", () => {
+  test.use({ viewport: { width: 1024, height: 600 } });
+
+  test("a toast stays live and can be dismissed", async ({ page, consoleErrors }) => {
+    const { api, dialog } = await openDeleteConfirm(page);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(page.locator(".sre-root")).toBeVisible();
+
+    await page.evaluate(async () => {
+      const { useNotificationsStore } = await import("/src/stores/notifications.js");
+      useNotificationsStore().notify({
+        severity: "error",
+        eyebrow: "Save",
+        message: "Could not save the page.",
+        persistent: true,
+      });
+    });
+
+    const toast = page.locator(".status-rail .annunciator");
+    await expect(toast).toBeVisible();
+    await expect(toast).toContainText("Could not save the page.");
+    await toast.locator(".annunciator__close").click();
+    await expect(toast).toBeHidden();
+
+    expect(api.hostActions).toEqual([]);
+    expect(api.unmatched).toEqual([]);
+    expect(consoleErrors).toEqual([]);
+  });
+});
+
 for (const c of CASES) {
   test.describe(`delete-page confirm at ${c.name}`, () => {
     test.use({ viewport: c.viewport });

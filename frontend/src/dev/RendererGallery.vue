@@ -249,7 +249,7 @@ const panels = [
       card: {
         title_path: "$.day",
         items_path: "$.meals",
-        item: { label_path: "$.type", value_path: "$.name" },
+        item: { label_path: "$.type", value_path: "$.name", click_url_path: "$.url" },
       },
       empty_text: "Nothing planned.",
     },
@@ -258,13 +258,27 @@ const panels = [
         {
           day: "Tuesday",
           meals: [
-            { type: "Lunch", name: "Tomato soup with grilled cheese" },
-            { type: "Dinner", name: "Chicken tikka masala" },
+            {
+              type: "Lunch",
+              name: "Tomato soup with grilled cheese",
+              url: "https://mealie.example/recipes/tomato-soup",
+            },
+            {
+              type: "Dinner",
+              name: "Chicken tikka masala",
+              url: "https://mealie.example/recipes/tikka-masala",
+            },
           ],
         },
         {
           day: "Wednesday",
-          meals: [{ type: "Dinner", name: "Pasta carbonara" }],
+          meals: [
+            {
+              type: "Dinner",
+              name: "Pasta carbonara",
+              url: "https://mealie.example/recipes/carbonara",
+            },
+          ],
         },
         { day: "Thursday", meals: [] },
       ],
@@ -279,13 +293,29 @@ const panels = [
         timestamp_path: "$.time",
         label_path: "$.title",
         value_path: "$.detail",
+        click_url_path: "$.url",
       },
     },
     data: {
       entries: [
-        { time: "08:12", title: "Backup finished", detail: "412 photos synced from Immich" },
-        { time: "07:30", title: "Mail checked", detail: "2 new photo attachments saved" },
-        { time: "06:00", title: "Meal plan updated", detail: "This week from Mealie" },
+        {
+          time: "08:12",
+          title: "Backup finished",
+          detail: "412 photos synced from Immich",
+          url: "https://immich.example/albums",
+        },
+        {
+          time: "07:30",
+          title: "Mail checked",
+          detail: "2 new photo attachments saved",
+          url: "https://mail.example/inbox",
+        },
+        {
+          time: "06:00",
+          title: "Meal plan updated",
+          detail: "This week from Mealie",
+          url: "https://mealie.example/meal-plans",
+        },
       ],
     },
   },

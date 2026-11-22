@@ -312,12 +312,18 @@ describe("CardGrid", () => {
     expect(wrapper.attributes("style") || "").toContain("repeat(3, 1fr)");
   });
 
-  it("marks rows as clickable when click_url_path resolves", () => {
+  it("puts a clickable row's content in a real button, and keeps a plain row plain", () => {
     const wrapper = mount(CardGrid, { props: { schema, data: mealData } });
     const items = wrapper.findAll(".card-grid__item");
     expect(items[0].classes()).toContain("card-grid__item--clickable");
-    expect(items[0].classes()).toContain("calvin-plugin-clickable");
+    expect(items[0].classes()).not.toContain("calvin-plugin-clickable");
+    const button = items[0].find("button");
+    expect(button.exists()).toBe(true);
+    expect(button.attributes("type")).toBe("button");
+    expect(button.classes()).toContain("calvin-plugin-clickable");
+    expect(button.text()).toContain("Pasta");
     expect(items[1].classes()).not.toContain("card-grid__item--clickable");
+    expect(items[1].find("button").exists()).toBe(false);
   });
 
   it("marks the grid as a fit-scroll container", () => {
@@ -349,6 +355,36 @@ describe("ItemList", () => {
     expect(wrapper.text()).toContain("world");
     expect(wrapper.find("ul").classes()).toContain("calvin-plugin-list");
     expect(wrapper.find(".item-list__row").classes()).toContain("calvin-plugin-row");
+  });
+
+  it("wraps only a clickable row's content in a button", () => {
+    const wrapper = mount(ItemList, {
+      props: {
+        schema: {
+          kind: "item-list",
+          data_path: "$.items",
+          item: {
+            timestamp_path: "$.time",
+            label_path: "$.title",
+            value_path: "$.detail",
+            click_url_path: "$.url",
+          },
+        },
+        data: {
+          items: [
+            { time: "08:12", title: "Linked", detail: "opens", url: "https://svc.home/x" },
+            { time: "07:30", title: "Plain", detail: "inert" },
+          ],
+        },
+      },
+    });
+    const rows = wrapper.findAll(".item-list__row");
+    expect(rows[0].classes()).toContain("item-list__row--clickable");
+    const button = rows[0].find("button");
+    expect(button.exists()).toBe(true);
+    expect(button.classes()).toContain("calvin-plugin-clickable");
+    expect(button.text()).toContain("Linked");
+    expect(rows[1].find("button").exists()).toBe(false);
   });
 
   it("shows empty state when items is empty", () => {
