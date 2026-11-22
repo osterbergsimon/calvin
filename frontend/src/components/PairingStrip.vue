@@ -4,6 +4,7 @@
     ref="strip"
     class="pairing-strip"
     aria-labelledby="pairing-strip-title"
+    data-dialog-live
   >
     <svg class="pairing-strip__icon" viewBox="0 0 24 24" aria-hidden="true">
       <path :d="mdiCellphoneLink" fill="currentColor" />

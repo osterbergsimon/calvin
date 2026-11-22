@@ -62,6 +62,76 @@ const openRoots = new Map();
 // The elements we made inert, so clearing never removes an inert another part
 // of the app set (the screen stack does).
 const inerted = new Set();
+// App-level layers that stay usable over a dialog: the toast rail, connection
+// pill, pairing strip and the on-screen keyboard's Retry.
+const LIVE_LAYER = "data-dialog-live";
+
+const observer =
+  typeof MutationObserver === "undefined" ? null : new MutationObserver(() => applyInert());
+
+function topDialog() {
+  // A dialog torn down without unmounting (an HMR swap, a test teardown)
+  // leaves a stale id behind. Drop ids whose root has left the document.
+  for (let i = openStack.length - 1; i >= 0; i -= 1) {
+    const id = openStack[i];
+    const entry = openRoots.get(id);
+    if (entry?.overlay && !entry.overlay.isConnected) {
+      openStack.splice(i, 1);
+      openRoots.delete(id);
+    }
+  }
+  return openStack[openStack.length - 1];
+}
+
+function watchAncestors(ancestors) {
+  if (!observer) return;
+  observer.disconnect();
+  for (const ancestor of ancestors) observer.observe(ancestor, { childList: true });
+}
+
+// Make everything outside the top dialog inert, so the screen reader cursor
+// can't leave it. Only the top dialog's own scrim stays live: a dialog below
+// it (nested or sibling-mounted, such as the admin sign-in over the pages
+// editor) and its scrim are part of the page behind, so they go inert too.
+// The on-screen keyboard is teleported to <body>, and only #app hosts the
+// app, so body-level siblings are out of scope and keep working.
+function applyInert() {
+  const top = openRoots.get(topDialog());
+  const entries = top?.overlay?.isConnected ? [top] : [];
+  const roots = entries.flatMap(entry => [entry.overlay, entry.scrim].filter(Boolean));
+  const wanted = new Set();
+  const ancestors = new Set();
+
+  for (const { overlay } of entries) {
+    let node = overlay;
+    while (node.parentElement && node.parentElement !== document.body) {
+      ancestors.add(node.parentElement);
+      for (const sibling of node.parentElement.children) {
+        if (sibling === node) continue;
+        // The top dialog's own scrim, and app-level live layers, stay live.
+        if (roots.some(root => sibling === root || sibling.contains(root))) continue;
+        if (sibling.hasAttribute(LIVE_LAYER) || sibling.querySelector(`[${LIVE_LAYER}]`)) continue;
+        wanted.add(sibling);
+      }
+      node = node.parentElement;
+    }
+  }
+
+  for (const node of inerted) {
+    if (!node.isConnected || !wanted.has(node)) {
+      node.removeAttribute("inert");
+      inerted.delete(node);
+    }
+  }
+  for (const node of wanted) {
+    // Never claim an inert another part of the app set (the screen stack).
+    if (!node.hasAttribute("inert")) {
+      node.setAttribute("inert", "");
+      inerted.add(node);
+    }
+  }
+  watchAncestors(ancestors);
+}
 </script>
 
 <script setup>
@@ -148,58 +218,6 @@ function restoreFocus() {
   const target = opener;
   opener = null;
   nextTick(() => target?.focus?.());
-}
-
-function topDialog() {
-  // A dialog torn down without unmounting (an HMR swap, a test teardown)
-  // leaves a stale id behind. Drop ids whose root has left the document.
-  for (let i = openStack.length - 1; i >= 0; i -= 1) {
-    const id = openStack[i];
-    const entry = openRoots.get(id);
-    if (entry?.overlay && !entry.overlay.isConnected) {
-      openStack.splice(i, 1);
-      openRoots.delete(id);
-    }
-  }
-  return openStack[openStack.length - 1];
-}
-
-// Make everything outside the open dialogs inert, so the screen reader cursor
-// can't leave the top one. Walk from each dialog's overlay up to the app root
-// and mark the siblings at every level; the dialog's own scrim and any nested
-// dialog stay live. The on-screen keyboard is teleported to <body>, outside
-// #app, so it keeps working while a dialog with fields is open.
-function applyInert() {
-  const entries = [...openRoots.values()].filter(entry => entry.overlay?.isConnected);
-  const roots = entries.flatMap(entry => [entry.overlay, entry.scrim].filter(Boolean));
-  const wanted = new Set();
-
-  for (const { overlay } of entries) {
-    let node = overlay;
-    while (node.parentElement && node.parentElement !== document.body) {
-      for (const sibling of node.parentElement.children) {
-        if (sibling === node) continue;
-        // A sibling that holds an open dialog (a second mount, not a nested
-        // one) is part of the live surface.
-        if (roots.some(root => sibling === root || sibling.contains(root))) continue;
-        wanted.add(sibling);
-      }
-      node = node.parentElement;
-    }
-  }
-
-  for (const node of inerted) {
-    if (!wanted.has(node)) {
-      node.removeAttribute("inert");
-      inerted.delete(node);
-    }
-  }
-  for (const node of wanted) {
-    if (!node.hasAttribute("inert")) {
-      node.setAttribute("inert", "");
-      inerted.add(node);
-    }
-  }
 }
 
 function registerOpen() {

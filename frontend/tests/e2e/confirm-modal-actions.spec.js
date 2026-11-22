@@ -132,6 +132,37 @@ test.describe("delete-page confirm over the pages editor", () => {
   });
 });
 
+test.describe("toasts over the pages editor", () => {
+  test.use({ viewport: { width: 1024, height: 600 } });
+
+  test("a toast stays live and can be dismissed", async ({ page, consoleErrors }) => {
+    const { api, dialog } = await openDeleteConfirm(page);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(page.locator(".sre-root")).toBeVisible();
+
+    await page.evaluate(async () => {
+      const { useNotificationsStore } = await import("/src/stores/notifications.js");
+      useNotificationsStore().notify({
+        severity: "error",
+        eyebrow: "Save",
+        message: "Could not save the page.",
+        persistent: true,
+      });
+    });
+
+    const toast = page.locator(".status-rail .annunciator");
+    await expect(toast).toBeVisible();
+    await expect(toast).toContainText("Could not save the page.");
+    await toast.locator(".annunciator__close").click();
+    await expect(toast).toBeHidden();
+
+    expect(api.hostActions).toEqual([]);
+    expect(api.unmatched).toEqual([]);
+    expect(consoleErrors).toEqual([]);
+  });
+});
+
 for (const c of CASES) {
   test.describe(`delete-page confirm at ${c.name}`, () => {
     test.use({ viewport: c.viewport });

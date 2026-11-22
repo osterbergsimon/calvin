@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { mount } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { defineComponent, h, nextTick, ref } from "vue";
 import Dialog from "@/components/ui/Dialog.vue";
 import DialogScrim from "@/components/ui/DialogScrim.vue";
 
@@ -31,6 +31,60 @@ const mountOpen = (props = {}, slots = {}) =>
       attachTo: document.body,
     })
   );
+
+const appWithHost = () => {
+  const app = document.createElement("div");
+  app.id = "app";
+  document.body.appendChild(app);
+  const content = document.createElement("main");
+  content.innerHTML = "<button type='button'>Behind</button>";
+  app.appendChild(content);
+  const host = document.createElement("div");
+  app.appendChild(host);
+  return { app, content, host };
+};
+
+const mountAt = (host, props = {}, slots = { default: "<p>Body</p>" }) =>
+  track(
+    mount(Dialog, {
+      props: { modelValue: true, title: "Dialog", ...props },
+      slots,
+      attachTo: host,
+    })
+  );
+
+// Two dialogs in one app, mounted side by side: the real shape of the admin
+// sign-in over the pages editor (no DOM nesting).
+const SiblingDialogs = defineComponent({
+  setup(_, { expose }) {
+    const first = ref(true);
+    const second = ref(true);
+    const closeFirst = () => {
+      first.value = false;
+    };
+    const closeSecond = () => {
+      second.value = false;
+    };
+    expose({ closeFirst, closeSecond });
+    const dialog = (model, title, body) =>
+      h(
+        Dialog,
+        {
+          modelValue: model.value,
+          "onUpdate:modelValue": value => {
+            model.value = value;
+          },
+          title,
+        },
+        { default: () => h("p", body) }
+      );
+    return () =>
+      h("div", [
+        dialog(first, "Pages & regions", "Editor"),
+        dialog(second, "Admin sign in", "Confirm"),
+      ]);
+  },
+});
 
 const keydown = key =>
   document.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
@@ -211,6 +265,87 @@ describe("Dialog", () => {
     wrappers.splice(wrappers.indexOf(w), 1);
     await nextTick();
     expect(content.hasAttribute("inert")).toBe(false);
+  });
+
+  it("makes an older sibling dialog inert, and frees it when the newer one closes", async () => {
+    const { content, host } = appWithHost();
+    const wrapper = track(mount(SiblingDialogs, { attachTo: host }));
+    await nextTick();
+    await nextTick();
+
+    const [olderOverlay, newerOverlay] = wrapper.findAll(".dialog-overlay");
+    expect(olderOverlay.element.hasAttribute("inert")).toBe(true);
+    expect(newerOverlay.element.hasAttribute("inert")).toBe(false);
+    expect(content.hasAttribute("inert")).toBe(true);
+
+    wrapper.vm.closeSecond();
+    await nextTick();
+    await nextTick();
+    expect(olderOverlay.element.hasAttribute("inert")).toBe(false);
+    expect(content.hasAttribute("inert")).toBe(true);
+  });
+
+  it("keeps the top dialog live when a dialog below it closes", async () => {
+    const { content, host } = appWithHost();
+    const wrapper = track(mount(SiblingDialogs, { attachTo: host }));
+    await nextTick();
+    await nextTick();
+
+    const [, newerOverlay] = wrapper.findAll(".dialog-overlay");
+    wrapper.vm.closeFirst();
+    await nextTick();
+    await nextTick();
+    expect(newerOverlay.element.hasAttribute("inert")).toBe(false);
+    expect(content.hasAttribute("inert")).toBe(true);
+
+    wrapper.vm.closeSecond();
+    await nextTick();
+    expect(content.hasAttribute("inert")).toBe(false);
+  });
+
+  it("leaves a node that was already inert alone", async () => {
+    const { content, host } = appWithHost();
+    content.setAttribute("inert", "");
+    const w = mountAt(host);
+    await nextTick();
+    await nextTick();
+    expect(content.hasAttribute("inert")).toBe(true);
+
+    await w.setProps({ modelValue: false });
+    await nextTick();
+    expect(content.hasAttribute("inert")).toBe(true);
+  });
+
+  it("keeps data-dialog-live layers out of the inert set", async () => {
+    const { app, content, host } = appWithHost();
+    const live = document.createElement("section");
+    live.setAttribute("data-dialog-live", "");
+    app.appendChild(live);
+    const wrapper = document.createElement("div");
+    const nested = document.createElement("span");
+    nested.setAttribute("data-dialog-live", "");
+    wrapper.appendChild(nested);
+    app.appendChild(wrapper);
+
+    mountAt(host);
+    await nextTick();
+    await nextTick();
+    expect(content.hasAttribute("inert")).toBe(true);
+    expect(live.hasAttribute("inert")).toBe(false);
+    expect(wrapper.hasAttribute("inert")).toBe(false);
+    expect(nested.hasAttribute("inert")).toBe(false);
+  });
+
+  it("inerts a sibling added while the dialog is open", async () => {
+    const { app, host } = appWithHost();
+    mountAt(host);
+    await nextTick();
+    await nextTick();
+
+    const late = document.createElement("aside");
+    app.appendChild(late);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(late.hasAttribute("inert")).toBe(true);
   });
 
   it("does not dismiss a non-dismissible dialog", async () => {
