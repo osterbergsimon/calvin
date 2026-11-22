@@ -12,7 +12,7 @@
         data-action="back"
         @click="$emit('back')"
       />
-      <span v-else class="settings-topbar__wordmark" aria-label="Calvin">
+      <span v-else class="settings-topbar__wordmark" role="img" aria-label="Calvin">
         CAL<span class="settings-topbar__wordmark-dot">·</span>VIN
       </span>
       <span
@@ -35,22 +35,17 @@
         <span class="settings-topbar__dot" :class="dotClass" aria-hidden="true"></span>
         <span class="settings-topbar__pill-label">{{ pillLabel }}</span>
       </div>
-      <button
+      <Button
         v-if="showPhone && !locked"
         class="settings-topbar__phone"
-        type="button"
+        size="sm"
+        :icon="mdiCellphone"
         data-action="phone"
-        aria-label="Continue setup on your phone"
         @click="$emit('phone')"
       >
-        <svg class="settings-topbar__phone-glyph" viewBox="0 0 24 24" aria-hidden="true">
-          <path :d="mdiCellphone" fill="currentColor" />
-        </svg>
         Use your phone
-      </button>
-      <button class="settings-topbar__done" type="button" data-action="done" @click="$emit('done')">
-        Done
-      </button>
+      </Button>
+      <Button variant="primary" size="sm" data-action="done" @click="$emit('done')"> Done </Button>
     </div>
   </header>
 </template>
@@ -206,56 +201,6 @@ const dotClass = computed(() => {
   background: var(--err);
 }
 
-.settings-topbar__done {
-  background: var(--focus);
-  color: var(--focus-ink);
-  border: none;
-  border-radius: var(--radius-xs);
-  padding: 6px 16px;
-  font-family: inherit;
-  font-size: var(--fs-control);
-  font-weight: var(--weight-title);
-  cursor: pointer;
-  transition: opacity var(--dur-fast);
-}
-
-.settings-topbar__phone {
-  padding: 6px 12px;
-  font-family: inherit;
-  font-size: var(--fs-control);
-  font-weight: var(--weight-title);
-  color: var(--ink);
-  background: var(--bg-0);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  cursor: pointer;
-}
-
-.settings-topbar__phone {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--gap-tight);
-}
-
-.settings-topbar__phone-glyph {
-  width: 1.15em;
-  height: 1.15em;
-  flex: 0 0 auto;
-}
-
-.settings-topbar__phone:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
-
-/* 44px touch targets on touch screens (F8); the 48px bar still fits them. */
-@media (any-pointer: coarse) {
-  .settings-topbar__done,
-  .settings-topbar__phone {
-    min-height: var(--touch-target, 2.75rem);
-  }
-}
-
 /* You are already on the phone: the hand-off lives on a touch kiosk, and the
    button only squeezes the bar on a 390px screen. */
 @media (--bp-phone) {
@@ -271,14 +216,5 @@ const dotClass = computed(() => {
   .settings-topbar__pill-label {
     display: none;
   }
-}
-
-.settings-topbar__done:hover {
-  opacity: 0.88;
-}
-
-.settings-topbar__done:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
 }
 </style>

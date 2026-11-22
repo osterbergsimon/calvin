@@ -78,7 +78,7 @@ test("kiosk: every settings category and the phone hand-off at 800x480", async (
 
   // A touch kiosk offers the same settings on a phone.
   await selectCategory(page, "Content");
-  await page.getByRole("button", { name: "Continue setup on your phone" }).click();
+  await page.getByRole("button", { name: "Use your phone" }).click();
   const handoff = page.getByRole("dialog", { name: "Set up from your phone" });
   await expect(handoff).toBeVisible();
   await expectPhoneLayout(page, "phone hand-off card", {

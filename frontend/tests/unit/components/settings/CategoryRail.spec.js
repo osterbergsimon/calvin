@@ -20,6 +20,20 @@ describe("CategoryRail", () => {
     await w.findAll(".category-rail__item")[1].trigger("click");
     expect(w.emitted("select")[0]).toEqual(["clock-bar"]);
   });
+  it("is a nav labelled for the categories, holding one button per category in a list", () => {
+    const w = mount(CategoryRail, { props: { categories: cats, activeId: "dashboard" } });
+    const nav = w.get("nav");
+    expect(nav.attributes("aria-label")).toBe("Settings categories");
+    // The nav is a landmark, not a list: the list lives inside it.
+    expect(nav.attributes("role")).toBeUndefined();
+    const list = nav.get("ul");
+    expect(list.attributes("role")).toBe("list");
+    const items = list.findAll("li");
+    expect(items).toHaveLength(2);
+    expect(items[0].get("button").text()).toContain("Display");
+    // The button itself carries no list role any more.
+    expect(w.findAll('[role="listitem"]')).toHaveLength(0);
+  });
   it("roving tabindex: exactly one item has tabindex=0 after ArrowDown", async () => {
     const w = mount(CategoryRail, {
       props: { categories: cats, activeId: "dashboard" },

@@ -3,7 +3,9 @@
   <RouterView v-if="guest" />
   <div v-else class="app-shell">
     <KeyboardHandler />
-    <RouterView />
+    <main class="app-main">
+      <RouterView />
+    </main>
     <ConnectionStatus v-if="!clockBarVisible" floating />
     <StatusRail />
     <ReloadLight />
@@ -87,5 +89,13 @@ if (!guest) {
   height: calc(100vh - var(--pairing-strip-h, 0px));
   margin: 0;
   padding: 0;
+}
+
+/* The page's one main landmark. Views size themselves against the viewport,
+   so this only has to pass the shell's height through. */
+.app-main {
+  display: block;
+  height: 100%;
+  min-height: 0;
 }
 </style>

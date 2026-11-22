@@ -1,23 +1,29 @@
 <template>
-  <nav ref="railEl" class="category-rail" :class="{ 'is-scrollable': scrollable }" role="list">
-    <FocusPanel
-      v-for="(cat, index) in categories"
-      :key="cat.id"
-      as="button"
-      :focused="cat.id === activeId"
-      :dim="false"
-      class="category-rail__item"
-      :class="{ 'is-active': cat.id === activeId }"
-      type="button"
-      :aria-current="cat.id === activeId ? 'page' : null"
-      :tabindex="cat.id === activeId ? 0 : -1"
-      role="listitem"
-      @click="$emit('select', cat.id)"
-      @keydown="onKeydown($event, index)"
-    >
-      <span class="category-rail__label">{{ cat.label }}</span>
-      <span class="category-rail__subtitle">{{ cat.subtitle }}</span>
-    </FocusPanel>
+  <nav
+    ref="railEl"
+    class="category-rail"
+    :class="{ 'is-scrollable': scrollable }"
+    aria-label="Settings categories"
+  >
+    <ul class="category-rail__list" role="list">
+      <li v-for="(cat, index) in categories" :key="cat.id">
+        <FocusPanel
+          as="button"
+          :focused="cat.id === activeId"
+          :dim="false"
+          class="category-rail__item"
+          :class="{ 'is-active': cat.id === activeId }"
+          type="button"
+          :aria-current="cat.id === activeId ? 'page' : null"
+          :tabindex="cat.id === activeId ? 0 : -1"
+          @click="$emit('select', cat.id)"
+          @keydown="onKeydown($event, index)"
+        >
+          <span class="category-rail__label">{{ cat.label }}</span>
+          <span class="category-rail__subtitle">{{ cat.subtitle }}</span>
+        </FocusPanel>
+      </li>
+    </ul>
   </nav>
 </template>
 
@@ -51,7 +57,11 @@ onMounted(() => {
   if (typeof ResizeObserver === "undefined" || !railEl.value) return;
   resizeObserver = new ResizeObserver(measure);
   resizeObserver.observe(railEl.value);
-  for (const item of railEl.value.children) resizeObserver.observe(item);
+  const list = railEl.value.querySelector(".category-rail__list");
+  if (list) resizeObserver.observe(list);
+  for (const item of railEl.value.querySelectorAll(".category-rail__item")) {
+    resizeObserver.observe(item);
+  }
 });
 onBeforeUnmount(() => resizeObserver?.disconnect());
 
@@ -91,6 +101,17 @@ function focusItem(index) {
      ugly box (calvin-7ux). `is-scrollable` is set from a measurement in the
      script when the items overflow, at any viewport size. */
   overflow: visible;
+}
+
+/* The nav is the landmark; the list inside it carries the semantics, so the
+   browser's list box is reset away. */
+.category-rail__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .category-rail.is-scrollable {

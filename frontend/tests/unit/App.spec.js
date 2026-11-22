@@ -133,6 +133,12 @@ describe("App shell", () => {
     syncWithConfig.mockClear();
   });
 
+  it("wraps the page in exactly one main landmark", async () => {
+    const wrapper = await mountApp();
+    expect(wrapper.findAll("main")).toHaveLength(1);
+    wrapper.unmount();
+  });
+
   it("does not load the on-screen keyboard until an editable field is focused", async () => {
     keyboard.throws = false;
     const wrapper = await mountApp();
