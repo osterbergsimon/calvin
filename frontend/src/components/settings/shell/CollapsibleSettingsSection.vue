@@ -75,7 +75,7 @@ const toggle = () => {
   margin: 1.25rem 0.25rem 0.5rem;
 }
 .collapsible-settings-section__header:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 .collapsible-settings-section__chevron {

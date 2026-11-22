@@ -62,7 +62,7 @@ defineEmits(["select-screen"]);
   box-shadow: 0 0 9px var(--focus);
 }
 .screen-dot:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: var(--radius-lg);
 }

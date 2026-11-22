@@ -86,7 +86,7 @@ const onKey = e => {
   color: var(--focus-ink);
 }
 .seg__btn:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 </style>

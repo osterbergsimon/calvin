@@ -380,7 +380,7 @@ defineExpose({
   fill: var(--ink-2);
 }
 .osk-open:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 @keyframes osk-open-in {
@@ -563,7 +563,7 @@ defineExpose({
   -webkit-tap-highlight-color: transparent;
 }
 .osk-picker__option:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 .osk-picker__option--on {
@@ -600,7 +600,7 @@ defineExpose({
   cursor: pointer;
 }
 .osk-picker__abc:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 

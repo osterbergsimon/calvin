@@ -98,7 +98,7 @@ describe("Button", () => {
 describe("Button doctrine contract", () => {
   it("uses the focus ring the doctrine defines", () => {
     expect(STYLE).toMatch(
-      /\.btn:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--focus\)[^}]*outline-offset:\s*2px/s
+      /\.btn:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--focus-ring\)[^}]*outline-offset:\s*2px/s
     );
   });
 

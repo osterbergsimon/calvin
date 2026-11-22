@@ -141,7 +141,7 @@ defineExpose({ focus, select });
   cursor: pointer;
 }
 .password-field__toggle:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 .password-field__hint {

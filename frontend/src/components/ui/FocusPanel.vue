@@ -51,7 +51,7 @@ const stateClass = computed(() => {
     linear-gradient(180deg, color-mix(in srgb, var(--focus) 16%, transparent), transparent 44%),
     var(--bg-2);
   border-color: var(--focus);
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: -1px;
   box-shadow: 0 0 8px 0 var(--focus-edge);
 }

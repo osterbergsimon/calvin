@@ -179,7 +179,7 @@ const visibleGroups = computed(() => {
   color: var(--ink);
 }
 .ap-group-toggle:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 .ap-chevron {
@@ -217,11 +217,11 @@ const visibleGroups = computed(() => {
   border-color: var(--focus);
 }
 .ap-opt:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 .ap-opt--current {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
 }
 .ap-opt-desc {

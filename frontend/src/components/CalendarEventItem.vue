@@ -219,7 +219,7 @@ const handleFocus = () => {
   outline: 2px solid var(--on-event, var(--on-event-ink));
   outline-offset: -2px;
   border-color: var(--on-event, var(--on-event-ink));
-  box-shadow: 0 0 0 2px var(--focus);
+  box-shadow: 0 0 0 2px var(--focus-ring);
   z-index: var(--z-sticky);
   position: relative;
 }
@@ -228,7 +228,7 @@ const handleFocus = () => {
   outline: 2px solid var(--on-event, var(--on-event-ink));
   outline-offset: -2px;
   border-color: var(--on-event, var(--on-event-ink));
-  box-shadow: 0 0 0 2px var(--focus);
+  box-shadow: 0 0 0 2px var(--focus-ring);
   z-index: var(--z-sticky);
   position: relative;
 }

@@ -121,7 +121,7 @@ const conflictHint = computed(() => {
   cursor: help;
 }
 .kbt-conflict-badge:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 

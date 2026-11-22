@@ -362,12 +362,12 @@ onBeforeUnmount(() => observer?.disconnect());
 }
 
 .colour-field__swatch--selected .colour-field__dot--choice {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
 .colour-field__radio:focus-visible + .colour-field__dot {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -430,7 +430,7 @@ onBeforeUnmount(() => observer?.disconnect());
 }
 
 .colour-field__trigger:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
