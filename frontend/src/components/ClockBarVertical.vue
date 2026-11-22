@@ -4,9 +4,8 @@
     class="clock-bar-vertical"
     :class="[`position-${position}`]"
     :style="{ padding: barPaddingStyle }"
-    role="status"
-    aria-label="Status bar"
-    aria-live="polite"
+    role="region"
+    aria-label="Clock bar"
   >
     <div
       v-for="zoneKey in zoneKeys"

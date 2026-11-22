@@ -1,5 +1,11 @@
 <template>
-  <div class="status-rail" role="status" aria-live="polite" aria-label="System status">
+  <div
+    class="status-rail"
+    role="status"
+    aria-live="polite"
+    aria-label="System status"
+    data-dialog-live
+  >
     <div v-if="overflow > 0" class="status-rail__more">{{ overflow }} more</div>
     <TransitionGroup name="tile" tag="div" class="status-rail__stack">
       <div
@@ -7,11 +13,7 @@
         :key="n.id"
         class="annunciator"
         :class="[`annunciator--${n.severity}`, { 'annunciator--sticky': n.persistent }]"
-        role="status"
-        tabindex="0"
         @click="dismiss(n.id)"
-        @keydown.enter.prevent="dismiss(n.id)"
-        @keydown.space.prevent="dismiss(n.id)"
       >
         <span class="annunciator__strip" aria-hidden="true" />
         <span class="annunciator__lamp" aria-hidden="true" />
@@ -145,11 +147,6 @@ onUnmounted(() => {
 
 .annunciator:hover {
   border-color: var(--focus-edge);
-}
-
-.annunciator:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
 }
 
 /* Severity edge-strip — the region-strip motif, recolored per severity. */

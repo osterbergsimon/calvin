@@ -10,6 +10,7 @@
       floating ? `connection-status--${floatingCorner}` : null,
     ]"
     data-test="connection-status"
+    data-dialog-live
   >
     <Popover
       v-if="hasPill"
