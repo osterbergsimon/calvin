@@ -12,15 +12,27 @@
       :class="{
         'calvin-plugin-row': true,
         'item-list__row--clickable': isClickable(urlFor(item), itemLinkAction),
-        'calvin-plugin-clickable': isClickable(urlFor(item), itemLinkAction),
       }"
-      @click="openLink(urlFor(item), itemLinkAction)"
     >
-      <span v-if="timestampFor(item)" class="item-list__timestamp">{{ timestampFor(item) }}</span>
-      <div class="item-list__body">
-        <span v-if="labelFor(item)" class="item-list__label">{{ labelFor(item) }}</span>
-        <span v-if="valueFor(item)" class="item-list__value">{{ valueFor(item) }}</span>
-      </div>
+      <button
+        v-if="isClickable(urlFor(item), itemLinkAction)"
+        type="button"
+        class="calvin-plugin-clickable"
+        @click="openLink(urlFor(item), itemLinkAction)"
+      >
+        <span v-if="timestampFor(item)" class="item-list__timestamp">{{ timestampFor(item) }}</span>
+        <div class="item-list__body">
+          <span v-if="labelFor(item)" class="item-list__label">{{ labelFor(item) }}</span>
+          <span v-if="valueFor(item)" class="item-list__value">{{ valueFor(item) }}</span>
+        </div>
+      </button>
+      <template v-else>
+        <span v-if="timestampFor(item)" class="item-list__timestamp">{{ timestampFor(item) }}</span>
+        <div class="item-list__body">
+          <span v-if="labelFor(item)" class="item-list__label">{{ labelFor(item) }}</span>
+          <span v-if="valueFor(item)" class="item-list__value">{{ valueFor(item) }}</span>
+        </div>
+      </template>
     </li>
     <li v-if="items.length === 0" class="item-list__empty">
       <EmptyState compact :inset="false" :message="schema.empty_text || 'Nothing to show yet.'" />

@@ -2,12 +2,16 @@
   <Button
     variant="primary"
     data-test="add-web-page"
-    :disabled="candidates.length === 0"
-    :title="candidates.length === 0 ? 'Enable a web-service plugin first' : ''"
+    :aria-disabled="candidates.length === 0 ? 'true' : undefined"
+    :aria-describedby="candidates.length === 0 ? 'add-web-page-hint' : undefined"
     @click="open"
   >
     Add a web page
   </Button>
+
+  <InlineNote v-if="candidates.length === 0" id="add-web-page-hint">
+    Turn on a plugin that shows web pages first, in Settings › Plugins.
+  </InlineNote>
 
   <ProviderPicker
     :show="showPicker"
@@ -32,6 +36,7 @@ import { usePlugins } from "@/composables";
 import InstanceModal from "./InstanceModal.vue";
 import ProviderPicker from "./ProviderPicker.vue";
 import Button from "@/components/ui/Button.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
 
 // The "Add a web page" flow shared with Content › Web pages & services. A web
 // page is one service plugin among several, so the user always picks one:
@@ -64,6 +69,7 @@ onMounted(async () => {
 });
 
 const open = () => {
+  if (candidates.value.length === 0) return;
   if (candidates.value.length === 1) {
     openProvider(candidates.value[0]);
     return;

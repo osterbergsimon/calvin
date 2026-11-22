@@ -54,10 +54,27 @@ describe("AddWebPageButton", () => {
     mockLoadPlugins.mockClear();
   });
 
-  it("disables the button when no web-service plugin is enabled", async () => {
+  it("stays focusable but disabled, with the note saying how to add one", async () => {
     const w = await mountButton();
-    expect(w.find('[data-test="add-web-page"]').attributes("disabled")).toBeDefined();
+    const button = w.find('[data-test="add-web-page"]');
+    expect(button.attributes("disabled")).toBeUndefined();
+    expect(button.attributes("aria-disabled")).toBe("true");
+    expect(button.attributes("title")).toBeUndefined();
+    expect(button.attributes("aria-describedby")).toBe("add-web-page-hint");
+    expect(w.find("#add-web-page-hint").text()).toBe(
+      "Turn on a plugin that shows web pages first, in Settings › Plugins."
+    );
+    await clickAdd(w);
     expect(w.findComponent({ name: "InstanceModal" }).props("show")).toBe(false);
+  });
+
+  it("has no disabled state or note once a web page plugin exists", async () => {
+    pluginsRef.value = [iframePlugin];
+    const w = await mountButton();
+    const button = w.find('[data-test="add-web-page"]');
+    expect(button.attributes("aria-disabled")).toBeUndefined();
+    expect(button.attributes("aria-describedby")).toBeUndefined();
+    expect(w.find("#add-web-page-hint").exists()).toBe(false);
   });
 
   it("opens the shared instance modal directly when the iframe plugin is the only candidate", async () => {

@@ -135,6 +135,23 @@ describe("ClockBarEditor", () => {
     expect(design.horizontal.zones.right).toContain("time");
   });
 
+  it("keeps focus on Move later when the part is already at the end", async () => {
+    const wrapper = mountEditor(baseConfig(), { attachTo: document.body });
+    await flushPromises();
+
+    await select(wrapper, "status");
+    const later = wrapper.find('[aria-label="Move Status & menu later"]');
+    expect(later.attributes("aria-disabled")).toBe("true");
+    expect(later.attributes("disabled")).toBeUndefined();
+
+    later.element.focus();
+    await later.trigger("click");
+    await flushPromises();
+
+    expect(document.activeElement).toBe(later.element);
+    wrapper.unmount();
+  });
+
   it("writes Time › Show seconds live", async () => {
     const wrapper = mountEditor();
     await flushPromises();

@@ -19,12 +19,21 @@
           class="card-grid__item calvin-plugin-row"
           :class="{
             'card-grid__item--clickable': isClickable(itemUrl(item), itemLinkAction),
-            'calvin-plugin-clickable': isClickable(itemUrl(item), itemLinkAction),
           }"
-          @click="openLink(itemUrl(item), itemLinkAction)"
         >
-          <span v-if="itemLabel(item)" class="card-grid__item-label">{{ itemLabel(item) }}</span>
-          <span v-if="itemValue(item)" class="card-grid__item-value">{{ itemValue(item) }}</span>
+          <button
+            v-if="isClickable(itemUrl(item), itemLinkAction)"
+            type="button"
+            class="calvin-plugin-clickable"
+            @click="openLink(itemUrl(item), itemLinkAction)"
+          >
+            <span v-if="itemLabel(item)" class="card-grid__item-label">{{ itemLabel(item) }}</span>
+            <span v-if="itemValue(item)" class="card-grid__item-value">{{ itemValue(item) }}</span>
+          </button>
+          <template v-else>
+            <span v-if="itemLabel(item)" class="card-grid__item-label">{{ itemLabel(item) }}</span>
+            <span v-if="itemValue(item)" class="card-grid__item-value">{{ itemValue(item) }}</span>
+          </template>
         </li>
       </ul>
       <EmptyState

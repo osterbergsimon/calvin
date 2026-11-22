@@ -101,4 +101,47 @@ describe("ThemeSelector", () => {
     const w = mountSelector({ selectedThemeId: "ocean" });
     expect(w.findAll(".theme-selection-item")[1].classes()).toContain("active");
   });
+
+  it("is a radiogroup with one checked theme and a roving tabindex", () => {
+    const w = mountSelector({ selectedThemeId: "ocean" });
+    const group = w.find('[role="radiogroup"]');
+    expect(group.attributes("aria-label")).toBe("Theme");
+
+    const cards = w.findAll('[role="radio"]');
+    expect(cards).toHaveLength(4);
+    expect(cards.map(card => card.attributes("aria-checked"))).toEqual([
+      "false",
+      "true",
+      "false",
+      "false",
+    ]);
+    expect(cards.map(card => card.attributes("tabindex"))).toEqual(["-1", "0", "-1", "-1"]);
+    expect(cards[2].attributes("aria-disabled")).toBe("true");
+    expect(cards[0].attributes("aria-disabled")).toBeUndefined();
+  });
+
+  it("moves the selection with the arrow keys, skipping a theme that needs an update", async () => {
+    const w = mount(ThemeSelector, {
+      props: { themes: THEMES, selectedThemeId: "calvin" },
+      attachTo: document.body,
+    });
+    const group = w.find('[role="radiogroup"]');
+
+    await group.trigger("keydown", { key: "ArrowRight" });
+    const cards = w.findAll('[role="radio"]');
+    expect(w.emitted("select")[0]).toEqual(["ocean"]);
+    expect(document.activeElement).toBe(cards[1].element);
+
+    await group.trigger("keydown", { key: "ArrowLeft" });
+    expect(w.emitted("select")[1]).toEqual(["huey"]);
+    w.unmount();
+  });
+
+  it("selects the focused theme with Space", async () => {
+    const w = mountSelector({ selectedThemeId: "calvin" });
+    const ocean = w.findAll('[role="radio"]')[1];
+
+    await ocean.trigger("keydown", { key: " " });
+    expect(w.emitted("select")[0]).toEqual(["ocean"]);
+  });
 });

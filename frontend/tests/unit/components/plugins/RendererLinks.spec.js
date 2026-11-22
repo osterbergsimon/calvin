@@ -24,7 +24,7 @@ describe("CardGrid link behavior", () => {
       props: { schema: cardSchema, data: cardData },
       attachTo: document.body,
     });
-    await w.find(".card-grid__item").trigger("click");
+    await w.find(".card-grid__item button").trigger("click");
     expect(w.findComponent(HandoffOverlay).exists()).toBe(true);
     w.unmount();
   });
@@ -34,7 +34,7 @@ describe("CardGrid link behavior", () => {
       props: { schema: cardSchema, data: cardData, linkAction: "embed" },
       attachTo: document.body,
     });
-    await w.find(".card-grid__item").trigger("click");
+    await w.find(".card-grid__item button").trigger("click");
     expect(w.findComponent(EmbedOverlay).exists()).toBe(true);
     w.unmount();
   });
@@ -45,6 +45,7 @@ describe("CardGrid link behavior", () => {
       attachTo: document.body,
     });
     expect(w.find(".card-grid__item").classes()).not.toContain("calvin-plugin-clickable");
+    expect(w.find(".card-grid__item button").exists()).toBe(false);
     await w.find(".card-grid__item").trigger("click");
     expect(w.findComponent(HandoffOverlay).exists()).toBe(false);
     w.unmount();
@@ -64,7 +65,7 @@ describe("ItemList link behavior", () => {
       props: { schema: listSchema, data: listData },
       attachTo: document.body,
     });
-    await w.find(".item-list__row").trigger("click");
+    await w.find(".item-list__row button").trigger("click");
     expect(w.findComponent(EmbedOverlay).exists()).toBe(true);
     w.unmount();
   });
@@ -74,7 +75,7 @@ describe("ItemList link behavior", () => {
       props: { schema: listSchema, data: listData, linkAction: "handoff" },
       attachTo: document.body,
     });
-    await w.find(".item-list__row").trigger("click");
+    await w.find(".item-list__row button").trigger("click");
     expect(w.findComponent(HandoffOverlay).exists()).toBe(true);
     w.unmount();
   });

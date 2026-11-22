@@ -204,17 +204,17 @@
                 <div class="cbe-order">
                   <Button
                     size="sm"
-                    :disabled="!canMoveEarlier"
+                    :aria-disabled="!canMoveEarlier ? 'true' : undefined"
                     :aria-label="`Move ${selectedLabel} earlier`"
-                    @click="moveSelected(-1)"
+                    @click="moveEarlier"
                   >
                     Move earlier
                   </Button>
                   <Button
                     size="sm"
-                    :disabled="!canMoveLater"
+                    :aria-disabled="!canMoveLater ? 'true' : undefined"
                     :aria-label="`Move ${selectedLabel} later`"
-                    @click="moveSelected(1)"
+                    @click="moveLater"
                   >
                     Move later
                   </Button>
@@ -731,6 +731,19 @@ const moveSelected = delta => {
   const nextZone = zoneKeys.value[zoneIndex + delta];
   if (!nextZone) return;
   movePart(selectedPart.value, nextZone, delta < 0 ? 0 : null);
+};
+
+// A move the bar cannot make stays focusable (aria-disabled, not disabled), so
+// a keyboard user is not thrown off the Order row; the early return makes the
+// click a no-op at the end of the bar.
+const moveEarlier = () => {
+  if (!canMoveEarlier.value) return;
+  moveSelected(-1);
+};
+
+const moveLater = () => {
+  if (!canMoveLater.value) return;
+  moveSelected(1);
 };
 
 // A keyboard move re-renders the bar; keep the keyboard on the chip it moved
