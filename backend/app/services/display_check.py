@@ -752,6 +752,23 @@ async def get_findings(kiosk_id: str) -> dict[str, Any]:
 
 
 @_serialised
+async def set_saved_limit(kiosk_id: str, limit: int) -> dict[str, Any]:
+    """Record the limit the save-limit route stored as the check's finding.
+
+    Only that route writes this: a hand-set ``brightnessLimit`` through the
+    override layer proves nothing about the screen, so ``findings.limit`` keeps
+    saying what the check itself established (calvin-7fkf).
+    """
+    row = await _row(kiosk_id)
+    if row is None:
+        raise UnknownKioskError(kiosk_id)
+    findings = findings_view(row.display_check_findings)
+    findings["limit"] = limit
+    await _save_findings(row, findings)
+    return findings
+
+
+@_serialised
 async def set_writes_verdict(kiosk_id: str, writes: bool) -> dict[str, Any]:
     """Record the owner's answer to "did the screen change?" (it wins over the agent's)."""
     row = await _row(kiosk_id)

@@ -85,16 +85,15 @@ describe("BrightnessGroup rows", () => {
     const wrapper = mountGroup({
       overrides: { brightnessLimit: 26, brightnessConversion: READINGS },
     });
-    // The date describes the check's findings; the highest level is plain,
-    // because the backend never records which limit the check saved.
+    // The saved findings have no limit here, so this highest was set by hand.
     expect(find(wrapper, "check-summary").text()).toBe(
-      "Answers brightness commands · changes take effect · menu match from 2 readings · checked 4 Nov · highest 26"
+      "Answers brightness commands · changes take effect · menu match from 2 readings · checked 4 Nov · highest 26, set by hand"
     );
     await find(wrapper, "check-open").trigger("click");
     expect(wrapper.emitted("open-check")[0][0]).toEqual({ step: "detect" });
   });
 
-  it("shows a plain highest level when the findings have no date", () => {
+  it("shows a hand-set highest level when the findings have no date", () => {
     const wrapper = mountGroup({
       kiosk: {
         id: "kitchen",
@@ -104,7 +103,7 @@ describe("BrightnessGroup rows", () => {
       overrides: { brightnessLimit: 26, brightnessConversion: READINGS },
     });
     expect(find(wrapper, "check-summary").text()).toBe(
-      "Answers brightness commands · changes take effect · menu match from 2 readings · highest 26"
+      "Answers brightness commands · changes take effect · menu match from 2 readings · highest 26, set by hand"
     );
   });
 

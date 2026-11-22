@@ -627,6 +627,12 @@ async def save_display_check_limit(kiosk_id: str):
     overrides = await merge_into_overrides(kiosk_id, update)
     if overrides is None:
         raise HTTPException(status_code=404, detail="Unknown kiosk")
+    try:
+        # The findings remember the limit the check saved, so the summary can
+        # tell it apart from a limit the owner typed by hand (calvin-7fkf).
+        await display_check.set_saved_limit(kiosk_id, limit)
+    except display_check.UnknownKioskError:
+        raise HTTPException(status_code=404, detail="Unknown kiosk")
     logger.info(f"Saved brightness limit {limit} for kiosk {kiosk_id!r}")
     return {"id": kiosk_id, "brightnessLimit": limit, "overrides": public_overrides(overrides)}
 

@@ -158,8 +158,8 @@ describe("checkSummary", () => {
     { ddc: 12, menu: 44 },
     { ddc: 19, menu: 61 },
   ];
-  // The shape findings_view returns: every field present, and limit is never
-  // set (the backend does not record which limit the check saved).
+  // The shape findings_view returns: every field present. limit is null until
+  // the check's own save-limit route records it (calvin-7fkf).
   const foundCheck = {
     checkedAt: "2026-11-04T10:00:00Z",
     ddc: true,
@@ -169,23 +169,39 @@ describe("checkSummary", () => {
     vcpVersion: null,
     limit: null,
   };
+  const savedCheck = { ...foundCheck, limit: 26 };
   it("says Not checked yet", () => {
     expect(checkSummary(null, [], null)).toBe("Not checked yet");
   });
-  it("lists what was found, then the check's date, then a plain highest level", () => {
+  it("lists what was found, then the check's date, then a highest the check saved", () => {
+    expect(checkSummary(savedCheck, threeReadings, 26)).toBe(
+      "Answers brightness commands · changes take effect · menu match from 3 readings · checked 4 Nov · highest 26, from the check"
+    );
+  });
+  it("calls a highest the check did not save hand-set", () => {
     expect(checkSummary(foundCheck, threeReadings, 26)).toBe(
-      "Answers brightness commands · changes take effect · menu match from 3 readings · checked 4 Nov · highest 26"
+      "Answers brightness commands · changes take effect · menu match from 3 readings · checked 4 Nov · highest 26, set by hand"
+    );
+  });
+  it("calls a highest changed by hand after a check hand-set", () => {
+    expect(checkSummary({ ...foundCheck, limit: 10 }, threeReadings, 26)).toBe(
+      "Answers brightness commands · changes take effect · menu match from 3 readings · checked 4 Nov · highest 26, set by hand"
     );
   });
   it("omits the date part when the findings carry none", () => {
-    expect(checkSummary({ ...foundCheck, checkedAt: null }, threeReadings, 26)).toBe(
-      "Answers brightness commands · changes take effect · menu match from 3 readings · highest 26"
+    expect(checkSummary({ ...savedCheck, checkedAt: null }, threeReadings, 26)).toBe(
+      "Answers brightness commands · changes take effect · menu match from 3 readings · highest 26, from the check"
     );
   });
   it("omits the highest part before a limit is saved", () => {
     expect(checkSummary(foundCheck, threeReadings, null)).toBe(
       "Answers brightness commands · changes take effect · menu match from 3 readings · checked 4 Nov"
     );
+  });
+  it("says a hand-set highest when nothing has been checked", () => {
+    expect(checkSummary(null, [], 26)).toBe("Not checked yet · highest 26, set by hand");
+    const empty = { checkedAt: null, ddc: null, writes: null, limit: null };
+    expect(checkSummary(empty, [], 26)).toBe("Not checked yet · highest 26, set by hand");
   });
 });
 
