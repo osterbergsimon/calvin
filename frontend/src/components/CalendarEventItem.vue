@@ -11,7 +11,8 @@
       'event-multi-day': event._isMultiDay,
     }"
     :style="{ backgroundColor: eventColor, '--on-event': eventInk }"
-    :title="eventTitle"
+    role="button"
+    :aria-label="showFullText ? undefined : eventTitle"
     tabindex="0"
     @click="handleClick"
     @keydown.enter="handleClick"
@@ -219,7 +220,7 @@ const handleFocus = () => {
   outline: 2px solid var(--on-event, var(--on-event-ink));
   outline-offset: -2px;
   border-color: var(--on-event, var(--on-event-ink));
-  box-shadow: 0 0 0 2px var(--focus);
+  box-shadow: 0 0 0 2px var(--focus-ring);
   z-index: var(--z-sticky);
   position: relative;
 }
@@ -228,7 +229,7 @@ const handleFocus = () => {
   outline: 2px solid var(--on-event, var(--on-event-ink));
   outline-offset: -2px;
   border-color: var(--on-event, var(--on-event-ink));
-  box-shadow: 0 0 0 2px var(--focus);
+  box-shadow: 0 0 0 2px var(--focus-ring);
   z-index: var(--z-sticky);
   position: relative;
 }
@@ -342,6 +343,16 @@ const handleFocus = () => {
   .event-item.event-middle {
     margin-left: -0.01rem;
     margin-right: -0.01rem;
+  }
+}
+
+/* High Contrast drops the focus box-shadow; an outline keeps the focused chip
+   visible against its own event colour. */
+@media (forced-colors: active) {
+  .event-item:focus,
+  .event-item.focused {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
   }
 }
 </style>

@@ -467,7 +467,7 @@ watch(
 
 .event-detail__also-item:focus-visible {
   background: var(--bg-2);
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 

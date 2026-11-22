@@ -168,7 +168,7 @@ const onKey = event => {
 }
 
 .tabs__tab:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: -2px;
 }
 
@@ -219,5 +219,13 @@ const onKey = event => {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
+}
+
+/* High Contrast flattens the accent underline; paint it with the system
+   highlight so the active tab still stands out. */
+@media (forced-colors: active) {
+  .tabs__tab.is-active::after {
+    background: Highlight;
+  }
 }
 </style>

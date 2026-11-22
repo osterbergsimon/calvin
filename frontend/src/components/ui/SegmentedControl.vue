@@ -86,7 +86,15 @@ const onKey = e => {
   color: var(--focus-ink);
 }
 .seg__btn:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
+}
+/* High Contrast flattens the selected fill; system colours keep the chosen
+   segment readable without shadowing the focus outline. */
+@media (forced-colors: active) {
+  .seg__btn.on {
+    background: Highlight;
+    color: HighlightText;
+  }
 }
 </style>

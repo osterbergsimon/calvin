@@ -83,7 +83,7 @@ const sentence = computed(() => {
 }
 .default-note__action:focus-visible,
 .default-note__dismiss:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 </style>

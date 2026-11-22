@@ -13,11 +13,7 @@
         :key="n.id"
         class="annunciator"
         :class="[`annunciator--${n.severity}`, { 'annunciator--sticky': n.persistent }]"
-        role="status"
-        tabindex="0"
         @click="dismiss(n.id)"
-        @keydown.enter.prevent="dismiss(n.id)"
-        @keydown.space.prevent="dismiss(n.id)"
       >
         <span class="annunciator__strip" aria-hidden="true" />
         <span class="annunciator__lamp" aria-hidden="true" />
@@ -153,11 +149,6 @@ onUnmounted(() => {
   border-color: var(--focus-edge);
 }
 
-.annunciator:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
 /* Severity edge-strip — the region-strip motif, recolored per severity. */
 .annunciator__strip {
   position: absolute;
@@ -233,7 +224,7 @@ onUnmounted(() => {
 }
 
 .annunciator__close:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: -2px;
 }
 

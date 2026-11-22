@@ -207,18 +207,24 @@ export function availability(kiosk, findings, screenName = "This screen") {
 
 /** One line for the Display check row. */
 export function checkSummary(findings, readings, limit) {
-  if (!findings || findings.ddc === undefined || findings.ddc === null) return "Not checked yet";
+  const hasLimit = limit !== null && limit !== undefined;
+  if (!findings || findings.ddc === undefined || findings.ddc === null) {
+    return hasLimit ? `Not checked yet · highest ${limit}, set by hand` : "Not checked yet";
+  }
   const parts = [];
   parts.push(findings.ddc ? "Answers brightness commands" : "Doesn't answer brightness commands");
   if (findings.ddc && findings.writes === true) parts.push("changes take effect");
   if (findings.ddc && findings.writes === false) parts.push("changes don't take effect");
   const count = validPoints(readings).length;
   if (count >= 2) parts.push(`menu match from ${count} readings`);
-  // The date belongs to the check's findings, not to the limit: the backend
-  // never records which limit the check saved (only the run's per-step record
-  // carries it), so the highest level is stated plainly and never dated.
   const when = checkedDate(findings.checkedAt);
   if (when) parts.push(`checked ${when}`);
-  if (limit !== null && limit !== undefined) parts.push(`highest ${limit}`);
+  if (hasLimit) {
+    // The check's saved limit counts only while the setting still equals it;
+    // a later hand change is then set by hand.
+    const fromCheck =
+      findings.limit !== null && findings.limit !== undefined && findings.limit === limit;
+    parts.push(`highest ${limit}, ${fromCheck ? "from the check" : "set by hand"}`);
+  }
   return parts.join(" · ");
 }

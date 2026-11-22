@@ -73,7 +73,7 @@ defineEmits(["select", "move"]);
 }
 
 .clock-bar-chip:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 </style>

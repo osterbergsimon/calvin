@@ -305,7 +305,7 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 .pill:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 .pill__swatch {
@@ -348,7 +348,7 @@ onUnmounted(() => {
   color: var(--ink-3);
 }
 .pill__search-input:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: -2px;
 }
 .pill__menu {
@@ -381,7 +381,7 @@ onUnmounted(() => {
   background: var(--bg-2);
 }
 .pill__opt:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: -2px;
 }
 </style>

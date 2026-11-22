@@ -380,7 +380,7 @@ defineExpose({
   fill: var(--ink-2);
 }
 .osk-open:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 @keyframes osk-open-in {
@@ -563,7 +563,7 @@ defineExpose({
   -webkit-tap-highlight-color: transparent;
 }
 .osk-picker__option:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 .osk-picker__option--on {
@@ -600,7 +600,7 @@ defineExpose({
   cursor: pointer;
 }
 .osk-picker__abc:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -644,6 +644,14 @@ defineExpose({
   background: color-mix(in srgb, var(--focus) 16%, var(--bg-2));
   border-color: var(--focus);
   color: var(--ink);
+}
+
+/* High Contrast drops the tinted shift fill; an outline keeps Shift's on
+   state visible. */
+@media (forced-colors: active) {
+  :deep(.hg-button.hg-button-shift.k--on) {
+    outline: 2px solid Highlight;
+  }
 }
 
 :deep(.hg-button.hg-activeButton) {

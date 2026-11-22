@@ -1342,6 +1342,63 @@ def test_existing_row_is_updated_with_hostname_and_overrides_only(test_client, m
     assert ("kitchen", ["hostname", "overrides"]) in calls
 
 
+def _save_a_findings_limit(client, kiosk_id: str = "kitchen") -> int:
+    """Run a display check to a calibration fault and save its limit (10)."""
+    base = f"/api/kiosks/{kiosk_id}/display-check"
+    assert client.get(f"/api/kiosks/{kiosk_id}/config?khost=pi").status_code == 200
+    run = client.post(f"{base}/start", json={"step": "write"}).json()
+    reported = client.post(
+        base,
+        json={
+            "id": run["id"],
+            "status": "error",
+            "reason": "power_trouble",
+            "fault": {
+                "step": "write",
+                "level": 12,
+                "kind": "under-voltage",
+                "lastGood": 14,
+            },
+        },
+    )
+    assert reported.status_code == 200, reported.text
+    saved = client.post(f"{base}/save-limit")
+    assert saved.status_code == 200, saved.text
+    return saved.json()["brightnessLimit"]
+
+
+def _listed_screen(client, kiosk_id: str) -> dict:
+    rows = client.get("/api/kiosks").json()["kiosks"]
+    return next(k for k in rows if k["id"] == kiosk_id)
+
+
+def test_restore_keeps_an_existing_rows_display_check_findings(test_client):
+    """A backup carries no findings; an existing row keeps its own (calvin-7fkf)."""
+    limit = _save_a_findings_limit(test_client)
+    assert limit == 10
+
+    restored = _restore_seed(
+        test_client,
+        _seed([{"id": "kitchen", "hostname": "new", "overrides": {}}]),
+    )
+    assert restored.status_code == 200, restored.text
+    findings = _listed_screen(test_client, "kitchen")["displayCheck"]
+    assert findings["limit"] == limit
+    assert findings["powerTrouble"]["kind"] == "under-voltage"
+
+
+def test_restore_creates_a_new_screen_without_display_check_findings(test_client):
+    """A screen the backup creates starts with no findings, limit included."""
+    from tests.integration.test_api_display_check import EMPTY_FINDINGS
+
+    restored = _restore_seed(
+        test_client,
+        _seed([{"id": "office", "hostname": "office", "overrides": {}}]),
+    )
+    assert restored.status_code == 200, restored.text
+    assert _listed_screen(test_client, "office")["displayCheck"] == EMPTY_FINDINGS
+
+
 @pytest.mark.parametrize("mode", ["merge", "replace"])
 def test_a_restore_without_kiosk_pairing_keeps_the_current_mode(test_client, mode):
     from app.services.config_service import config_service

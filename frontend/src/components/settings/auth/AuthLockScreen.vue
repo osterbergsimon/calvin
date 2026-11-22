@@ -607,7 +607,7 @@ async function submitLogin() {
   text-underline-offset: 3px;
 }
 .auth-card__hint-link:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 /* Kept for password managers: one consistent account across the forms. */

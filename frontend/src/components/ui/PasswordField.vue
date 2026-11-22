@@ -141,7 +141,7 @@ defineExpose({ focus, select });
   cursor: pointer;
 }
 .password-field__toggle:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 .password-field__hint {
@@ -153,5 +153,14 @@ defineExpose({ focus, select });
   margin: 6px 0 0;
   font-size: var(--fs-sm);
   color: var(--err-text);
+}
+
+/* High Contrast drops the border tint and the box-shadow ring; a system-colour
+   outline keeps the focused field visible. */
+@media (forced-colors: active) {
+  .password-field__input:focus {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
 }
 </style>

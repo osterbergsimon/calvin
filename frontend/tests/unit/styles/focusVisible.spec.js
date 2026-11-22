@@ -3,7 +3,7 @@
  *
  * Every interactive element must show where focus is. Calvin's baseline is one
  * global `:focus-visible` rule in base.css plus component-level rings that use
- * the existing `--focus` token. A rule that removes the outline on focus must
+ * the existing `--focus-ring` token. A rule that removes the outline on focus must
  * therefore provide a replacement (outline, box-shadow or border colour), or
  * carry an explicit `a11y-allow-no-outline` note when focus is programmatic or
  * drawn by an ancestor's `:focus-within`.
@@ -45,8 +45,8 @@ const hasReplacement = body =>
 describe("keyboard focus visibility", () => {
   const baseCss = readFileSync(join(SRC, "styles/base.css"), "utf-8");
 
-  it("provides one global focus-visible ring using the --focus token", () => {
-    expect(baseCss).toMatch(/:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--focus\)/);
+  it("provides one global focus-visible ring using the --focus-ring token", () => {
+    expect(baseCss).toMatch(/:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--focus-ring\)/);
   });
 
   it("never removes the focus outline without a replacement or a stated reason", () => {

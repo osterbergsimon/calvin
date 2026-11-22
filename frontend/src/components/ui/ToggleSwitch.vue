@@ -76,13 +76,30 @@ const toggle = () => emit("update:modelValue", !props.modelValue);
   cursor: not-allowed;
 }
 .tog:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 @media (prefers-reduced-motion: reduce) {
   .tog,
   .tog::after {
     transition: none;
+  }
+}
+/* Windows High Contrast drops the track fill and the knob. A system-colour
+   border and knob keep off and on apart, and Highlight/HighlightText carry the
+   on state without relying on the accent. */
+@media (forced-colors: active) {
+  .tog {
+    border: 1px solid ButtonText;
+  }
+  .tog::after {
+    background: ButtonText;
+  }
+  .tog.on {
+    background: Highlight;
+  }
+  .tog.on::after {
+    background: HighlightText;
   }
 }
 </style>

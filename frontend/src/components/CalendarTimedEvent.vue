@@ -105,7 +105,17 @@ const handleFocus = () => emit("focus", props.event, props.date);
 .timed-event:focus,
 .timed-event.focused,
 .timed-event.selected {
-  box-shadow: 0 0 0 2px var(--focus);
+  box-shadow: 0 0 0 2px var(--focus-ring);
   z-index: var(--z-raised);
+}
+
+/* High Contrast drops the focus box-shadow; an outline keeps the focused
+   event visible. */
+@media (forced-colors: active) {
+  .timed-event:focus,
+  .timed-event.focused {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
 }
 </style>

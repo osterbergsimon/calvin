@@ -244,7 +244,7 @@ const dotClass = computed(() => {
 }
 
 .settings-topbar__phone:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -278,7 +278,7 @@ const dotClass = computed(() => {
 }
 
 .settings-topbar__done:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 </style>
