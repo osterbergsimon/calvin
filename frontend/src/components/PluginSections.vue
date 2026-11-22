@@ -28,12 +28,13 @@
         <span v-if="section.help_text" class="help-text">
           {{ section.help_text }}
         </span>
-        <InlineNote :tone="uploadError ? 'err' : 'neutral'" role="status" data-test="upload-error">
-          {{ uploadError }}
+        <InlineNote
+          :tone="uploadError ? 'err' : uploadSuccess ? 'ok' : 'neutral'"
+          role="status"
+          data-test="upload-error"
+        >
+          {{ uploadError || uploadSuccess }}
         </InlineNote>
-        <div v-if="uploadSuccess" class="success-message">
-          {{ uploadSuccess }}
-        </div>
       </div>
     </div>
   </div>
@@ -99,15 +100,6 @@ const handleFileSelect = event => {
 
 .upload-section {
   margin-top: 1rem;
-}
-
-.success-message {
-  background: var(--accent-success, var(--ok));
-  color: var(--ok-ink);
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius-xs);
-  margin-top: 0.5rem;
-  font-size: var(--fs-control);
 }
 
 .help-text {

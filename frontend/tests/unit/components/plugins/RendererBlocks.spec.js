@@ -127,7 +127,7 @@ describe("iframe uses Card, InlineNote and Button for the embed fallback", () =>
     const wrapper = await mountFailing();
     const card = wrapper.findComponent(Card);
     expect(card.exists()).toBe(true);
-    expect(card.text()).toContain("This site won't embed");
+    expect(card.text()).toContain("This site won't open here");
     expect(wrapper.findComponent(InlineNote).text()).toBe(
       "This site doesn't allow being shown inside Calvin."
     );

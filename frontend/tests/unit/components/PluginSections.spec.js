@@ -39,8 +39,11 @@ describe("PluginSections upload", () => {
     expect(note.find(".inline-note__icon").exists()).toBe(true);
   });
 
-  it("shows the success line it is given", () => {
+  it("shows the success line in the same polite note, and has no green box", () => {
     const w = mountUpload({ uploadSuccess: "Uploaded 3 photos." });
-    expect(w.find(".success-message").text()).toBe("Uploaded 3 photos.");
+    const note = w.findComponent(InlineNote);
+    expect(note.text()).toBe("Uploaded 3 photos.");
+    expect(note.props("tone")).toBe("ok");
+    expect(w.find(".success-message").exists()).toBe(false);
   });
 });

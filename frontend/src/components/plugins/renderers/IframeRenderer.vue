@@ -33,7 +33,7 @@
     <div v-if="error" class="iframe-renderer__fallback">
       <Card
         class="iframe-renderer__fallback-card"
-        :title="frameBlock.blocked.value ? FRAME_BLOCKED_TITLE : `This site won't embed`"
+        :title="frameBlock.blocked.value ? FRAME_BLOCKED_TITLE : `This site won't open here`"
       >
         <InlineNote v-if="frameBlock.blocked.value" data-test="frame-blocked-body">
           {{ frameBlockedBody(frameBlock.sealed.value) }}

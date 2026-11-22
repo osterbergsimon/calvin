@@ -22,7 +22,7 @@ const UPDATE_LIFECYCLE = "src/utils/updateLifecycle.js";
 // "Say screen, page, source, plugin, Calvin (for the server)" — never these.
 // `api` stays legal for "API keys", and `configuration` is not `config`.
 const BANNED =
-  /\b(backend|frontend|api(?! key)|instance|schema|payload|endpoint|branch|repository|healthy|config(?!m)|x-frame|csp|cors|iframe)\b/i;
+  /\b(backend|frontend|api(?! key)|instance|schema|payload|endpoint|branch|repository|healthy|config(?!m)|x-frame|csp|cors|iframe|embed)\b/i;
 
 const COPY_ATTRS = ["label", "description", "title", "placeholder", "aria-label", "message"];
 
