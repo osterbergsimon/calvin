@@ -120,6 +120,12 @@ cmp -s "$REPO/deploy/systemd/calvin-cog.service.d/calvin-full.conf" \
 cmp -s "$REPO/deploy/kiosk-agent/calvin-cog-panel.sh" "$CALVIN_BIN_DIR/calvin-cog-panel.sh" \
     || fail "the cog panel helper is not installed"
 assert_mode "$CALVIN_BIN_DIR/calvin-cog-panel.sh" 755
+cmp -s "$REPO/deploy/kiosk-agent/calvin-drm-hold.py" "$CALVIN_BIN_DIR/calvin-drm-hold.py" \
+    || fail "the screen-off DRM holder is not installed"
+assert_mode "$CALVIN_BIN_DIR/calvin-drm-hold.py" 755
+cmp -s "$REPO/deploy/systemd/calvin-drm-hold.service" "$CALVIN_SYSTEMD_DIR/calvin-drm-hold.service" \
+    || fail "calvin-drm-hold.service not installed from the checkout"
+assert_not_contains "$SYSTEMCTL_LOG" '^enable calvin-drm-hold' "the DRM holder must never be enabled"
 assert_contains "$CALVIN_SUDOERS_DIR/calvin-kiosk-cog" \
     'NOPASSWD: /usr/local/bin/calvin-cog-panel.sh on, /usr/local/bin/calvin-cog-panel.sh off, /usr/local/bin/calvin-cog-panel.sh rotate \*$' \
     "the cog panel sudoers fragment is not installed"

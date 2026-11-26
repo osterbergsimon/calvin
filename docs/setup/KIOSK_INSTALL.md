@@ -460,10 +460,21 @@ cog --platform=drm \
   agent's root helper stops `calvin-cog.service`, waits up to 5 s for its
   `MainPID` to disappear (the kernel restores the console mode when the last DRM
   client closes, which would otherwise turn DPMS back on), clears tty1, then
-  writes `0` and `4` to `/sys/class/graphics/fb0/blank` (DPMS off), verifies the
-  connected connectors report `dpms=Off` and retries the `0`/`4` pair once
-  before failing, so the agent retries on its next poll. On wake it clears tty1,
-  writes `0` and starts the unit again (the dashboard is back in ~5 s).
+  starts `calvin-drm-hold.service`. That small helper
+  (`/usr/local/bin/calvin-drm-hold.py`, runs as `calvin`) holds DRM master with
+  every CRTC disabled until the screen is turned on. Without a DRM master, a
+  monitor that pulses hotplug when it enters standby makes the kernel's fbdev
+  client light the panel again a few seconds after the off. The agent's helper
+  then checks that the connected connectors report `dpms=Off`, restarts the
+  holder once if they do not, and fails if they still do not. If the holder is
+  not installed or cannot start, the helper instead writes `0` and `4` to
+  `/sys/class/graphics/fb0/blank` (retrying that pair once); a monitor that
+  pulses hotplug can relight after this fallback, and `journalctl -u
+  calvin-drm-hold` says why the holder failed. A failed screen-off is retried on
+  the agent's next poll. On wake the helper stops the holder (the kernel
+  restores the console mode cog needs), clears tty1, writes `0` and starts the
+  unit again (the dashboard is back in ~5 s). The holder unit is never enabled,
+  and systemd stops it whenever a display unit starts.
   Starting is idempotent, and a
   kiosk that boots inside its off window recovers at the next on boundary: the
   agent retries a panel command that failed (for example while the unit was

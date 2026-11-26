@@ -222,8 +222,8 @@ path_allowed() {  # $1 = absolute target path
 # newer update-kiosk.sh, which is then re-run to install the rest.
 pinned_entry() {  # $1 = name -> "<dir> <mode>"
   case "$1" in
-    calvin_display_agent.py|update-kiosk.sh|calvin-cog-panel.sh) echo "$BIN_DIR 0755" ;;
-    calvin-display-agent.service|calvin-kiosk-remote.service|calvin-x.service|calvin-kiosk-update.service|calvin-wayland.service|calvin-cog.service) echo "$SYSTEMD_DIR 0644" ;;
+    calvin_display_agent.py|update-kiosk.sh|calvin-drm-hold.py|calvin-cog-panel.sh) echo "$BIN_DIR 0755" ;;
+    calvin-display-agent.service|calvin-kiosk-remote.service|calvin-x.service|calvin-kiosk-update.service|calvin-wayland.service|calvin-cog.service|calvin-drm-hold.service) echo "$SYSTEMD_DIR 0644" ;;
     autostart) echo "$LABWC_DIR 0755" ;;
     rc.xml) echo "$LABWC_DIR 0644" ;;
     *) return 1 ;;
@@ -510,7 +510,7 @@ while IFS=$'\t' read -r name sha mode target unit enable; do
     write_state error fetch "download failed: $name" "$version"; exit 1; }
   got="$(sha256sum "$STAGE/$name" | cut -d' ' -f1)"
   [ "$got" = "$sha" ] || { write_state error verify "checksum mismatch: $name" "$version"; exit 1; }
-  if [ "$name" = "calvin_display_agent.py" ]; then
+  if [ "$name" = "calvin_display_agent.py" ] || [ "$name" = "calvin-drm-hold.py" ]; then
     "$PYTHON" -m py_compile "$STAGE/$name" || { write_state error verify "py_compile failed" "$version"; exit 1; }
   fi
   case "$name" in

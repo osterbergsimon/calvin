@@ -93,6 +93,23 @@ def test_cog_bundle_files_never_switch_the_stack(tmp_path):
     assert by_name["calvin-cog-panel.sh"]["mode"] == "0755"
 
 
+def test_bundle_carries_the_screen_off_drm_holder(tmp_path):
+    # The panel helper starts the holder on screen-off (calvin-e8ze), so a bundle
+    # update must deliver both files, and never enable or restart the unit.
+    _seed(tmp_path)
+    by_name = {f["name"]: f for f in kiosk_bundle.build_manifest(tmp_path)["files"]}
+    expected = {
+        "calvin-drm-hold.py": ("/usr/local/bin/calvin-drm-hold.py", "0755"),
+        "calvin-drm-hold.service": ("/etc/systemd/system/calvin-drm-hold.service", "0644"),
+    }
+    for name, (target, mode) in expected.items():
+        assert name in by_name, name
+        assert by_name[name]["target_path"] == target
+        assert by_name[name]["mode"] == mode
+        assert by_name[name]["enable"] is False, name
+        assert by_name[name]["restart_unit"] is None, name
+
+
 def test_bundle_carries_both_kiosk_browser_units(tmp_path):
     """The start URL with #pair= arrives with the units, not a separate install.
 

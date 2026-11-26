@@ -84,6 +84,22 @@ BUNDLE_FILES: list[BundleFile] = [
         "0755",
         None,
     ),
+    # Started by the panel helper on screen-off: holds DRM master with the output
+    # off. Never enabled; the next screen-off picks up a changed copy.
+    BundleFile(
+        "calvin-drm-hold.py",
+        "deploy/kiosk-agent/calvin-drm-hold.py",
+        "/usr/local/bin/calvin-drm-hold.py",
+        "0755",
+        None,
+    ),
+    BundleFile(
+        "calvin-drm-hold.service",
+        "deploy/systemd/calvin-drm-hold.service",
+        "/etc/systemd/system/calvin-drm-hold.service",
+        "0644",
+        None,
+    ),
     # labwc session config. setup-kiosk.sh writes the same bytes, so a kiosk that
     # switches stacks later gets the bundle's copy; backend tests pin them equal.
     BundleFile(

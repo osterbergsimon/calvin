@@ -1,0 +1,26 @@
+[Unit]
+Description=Calvin kiosk: hold the display off (DRM master) while the screen is off
+# Started and stopped only by calvin-cog-panel.sh, never enabled. Without a DRM
+# master, a monitor that pulses hotplug in standby makes fbdev relight the panel.
+# Conflicts= keeps it from outliving screen-off however a display owner is
+# started, and After= orders the stop of one before the start of the other.
+Conflicts=calvin-cog.service calvin-x.service calvin-wayland.service
+After=calvin-cog.service calvin-x.service calvin-wayland.service
+
+[Service]
+# READY=1 arrives once master is held and the CRTCs are off, so a failed hold
+# fails `systemctl start`.
+Type=notify
+User=calvin
+Group=calvin
+# /dev/dri/card*. The first client of a card becomes its master without root.
+SupplementaryGroups=video
+ExecStart=/usr/bin/python3 /usr/local/bin/calvin-drm-hold.py
+# The display agent runs the panel helper with a 30 s timeout; a hung holder
+# start or stop must not eat most of it. Both fail fast instead.
+TimeoutStartSec=3
+TimeoutStopSec=3
+# A holder that dies while the screen is off would leave the panel to fbdev.
+Restart=on-failure
+RestartSec=2
+SyslogIdentifier=calvin-drm-hold

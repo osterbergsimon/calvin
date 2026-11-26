@@ -435,6 +435,7 @@ configure_kiosk_display_session() {
 install_cog_panel_helper() {
     mkdir -p "${CALVIN_BIN_DIR}"
     install -m 0755 "${CALVIN_SOURCE_DIR}/deploy/kiosk-agent/calvin-cog-panel.sh" "${CALVIN_BIN_DIR}/calvin-cog-panel.sh"
+    install -m 0755 "${CALVIN_SOURCE_DIR}/deploy/kiosk-agent/calvin-drm-hold.py" "${CALVIN_BIN_DIR}/calvin-drm-hold.py"
     install_cog_panel_sudoers "${CALVIN_USER}"
 }
 
@@ -476,6 +477,8 @@ install_runtime_services() {
     for unit in calvin-app calvin-x calvin-wayland calvin-cog calvin-kiosk; do
         install_systemd_service "${CALVIN_SOURCE_DIR}/deploy/systemd/${unit}.service" "${CALVIN_DIR}"
     done
+    # Started by the cog panel helper on screen-off; never enabled.
+    install_systemd_service "${CALVIN_SOURCE_DIR}/deploy/systemd/calvin-drm-hold.service" "${CALVIN_DIR}"
     mkdir -p "${CALVIN_SYSTEMD_DIR}/calvin-cog.service.d"
     install -m 0644 "${CALVIN_SOURCE_DIR}/deploy/systemd/calvin-cog.service.d/calvin-full.conf" \
         "${CALVIN_SYSTEMD_DIR}/calvin-cog.service.d/calvin-full.conf"
