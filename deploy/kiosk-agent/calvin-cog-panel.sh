@@ -85,10 +85,10 @@ blank_cycle() {
     blank 4
 }
 
-# Succeed only when every connected connector's DPMS node reads Off. Connectors
-# without a dpms node (or with no connected connector at all) are skipped: there
-# is nothing to verify then, not a failure.
-dpms_is_off() {
+# 0: at least one connected connector was read and every one reads Off.
+# 1: a checked connector reads something other than Off.
+# 2: no connected connector with a dpms node, so DPMS cannot be verified.
+dpms_status() {
     local dir state connected=0 failures=0
     for dir in "$DRM_DIR"/*/; do
         [ -r "${dir}status" ] || continue
@@ -101,10 +101,14 @@ dpms_is_off() {
     done
     if [ "$connected" -eq 0 ]; then
         log "no connected DRM connector under ${DRM_DIR}; cannot verify DPMS"
-        return 0
+        return 2
     fi
     [ "$failures" -eq 0 ]
 }
+
+# For the screen-off success checks "cannot verify" counts as Off: there is
+# nothing to light.
+dpms_is_off() { dpms_status || [ "$?" -eq 2 ]; }
 
 holder_installed() { "$SYSTEMCTL" cat "$HOLD_UNIT" >/dev/null 2>&1; }
 
@@ -133,9 +137,9 @@ off_with_holder() {
         exit 0
     fi
     log "screen off: panel still reports DPMS on after the retry; it may stay lit"
-    # Return, not exit: the caller stops the holder and falls back to the blank.
-    # A holder left running with DPMS On would be restarted again on every
-    # agent retry, and each restart drops DRM master for fbdev to relight.
+    # Return, not exit: the caller stops the holder so the fallback blank can
+    # take effect instead of leaving a DPMS-On holder running. A later retry
+    # still starts the holder again; this only fixes the state left behind.
     return 1
 }
 
@@ -183,11 +187,11 @@ case "${1:-}" in
         else
             log "${HOLD_UNIT} is not installed; blanking only"
         fi
-        # A holder that keeps failing makes the agent retry on every poll. If
-        # the panel is already DPMS off (the previous retry's blank held), a
-        # blank_cycle would write 0 - a brief unblank - on every poll. Leave a
-        # dark panel alone and still exit 1 so the holder is retried.
-        if [ "$fallback_status" -ne 0 ] && dpms_is_off; then
+        # A holder that keeps failing makes the agent retry on every poll. Skip
+        # the blank only when DPMS is positively verified Off (a connected
+        # connector was read and all read Off): an unverifiable tree must still
+        # get the fallback. Skipping avoids a 0/4 unblank flash per poll.
+        if [ "$fallback_status" -ne 0 ] && dpms_status; then
             log "screen off: panel already DPMS off; not re-blanking"
             exit "$fallback_status"
         fi

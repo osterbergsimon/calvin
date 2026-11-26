@@ -333,10 +333,32 @@ assert_before 'start calvin-drm-hold.service' 'stop calvin-drm-hold.service' "$o
     "the failed holder was not stopped on re-entry"
 pass "a still-failing holder leaves an already dark panel alone"
 
-# --- 15. Holder restarted but DPMS stays On: stop it, blank instead ----------
-# Leaving the holder running would make every retry restart it, dropping DRM
-# master and letting fbdev relight the panel. Stop it, fall back to the blank,
-# and report failure so the agent retries on its next poll.
+# --- 15. DPMS cannot be verified: a failed holder still blanks ---------------
+# No connected connector reads dpms (a monitor can report disconnected in
+# standby). "Cannot verify" is not a positive Off, so the already-dark early
+# exit must not fire: the fallback has to blank, on the first off and on each
+# retry, or a failed holder would leave the panel lit for ever.
+reset_mock
+printf 'disconnected\n' > "$HDMI_DIR/status"
+printf 'On\n' > "$HDMI_DIR/dpms"
+printf '0\n' > "$CALVIN_FB_BLANK"
+if out="$(MOCK_HOLDER_START=1 run off)"; then
+    fail "screen off claimed success although the holder failed"
+fi
+if grep -q 'already DPMS off' <<< "$out"; then
+    fail "unverifiable DPMS was treated as a verified off"
+fi
+assert_eq "1" "$(grep -c 'blank 0' <<< "$out")" \
+    "a failed holder did not blank when DPMS could not be verified"
+assert_eq "4" "$(cat "$CALVIN_FB_BLANK")" \
+    "an unverifiable panel stayed unblanked after the holder failed"
+printf 'connected\n' > "$HDMI_DIR/status"
+printf 'Off\n' > "$HDMI_DIR/dpms"
+pass "a failed holder still blanks when DPMS cannot be verified"
+
+# --- 16. Holder restarted but DPMS stays On: stop it, blank instead ----------
+# A DPMS-On holder still holds DRM master, so the fallback blank is ignored
+# while it runs. Stop it, blank instead, and report failure so the agent retries.
 reset_mock
 printf 'On\n' > "$HDMI_DIR/dpms"
 printf '0\n' > "$CALVIN_FB_BLANK"
@@ -350,7 +372,7 @@ assert_before 'stop calvin-drm-hold.service' 'blank 0' "$out" \
 assert_eq "4" "$(cat "$CALVIN_FB_BLANK")" "the fallback did not leave the framebuffer blanked"
 pass "a holder that cannot go dark is stopped and blanked instead"
 
-# --- 16. Rotation never touches the holder -----------------------------------
+# --- 17. Rotation never touches the holder -----------------------------------
 reset_mock
 MOCK_IS_ACTIVE=3 run rotate 2 >/dev/null
 if grep -q 'calvin-drm-hold' "$SYSTEMCTL_LOG"; then fail "rotate touched the DRM holder"; fi
