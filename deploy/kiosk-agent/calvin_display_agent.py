@@ -3421,6 +3421,11 @@ def apply_on_wayland(on, env=None):
 # and the reverse on wake. Privileged work lives in a root-owned helper; the agent
 # may run only that helper through sudo (installed with the kiosk bundle).
 COG_PANEL_HELPER = "/usr/local/bin/calvin-cog-panel.sh"
+# Screen-off can stop cog, wait for DRM master release, start the holder and
+# retry it once; 10 s (the _run default) is too tight on a slow Pi 3B+, and a
+# timeout kills only sudo, leaving the helper to overlap the next poll. The
+# holder unit's own 3 s start/stop timeouts bound a hung hold.
+COG_PANEL_TIMEOUT = 30
 
 # Calvin's rotation names are xrandr semantics: `left` is 90 degrees
 # counter-clockwise, `right` 90 degrees clockwise. cog's `rotation` parameter is
@@ -3445,7 +3450,7 @@ def _cog_panel(*args, env=None):
     e = dict(os.environ)
     if env is not None:
         e.update(env)
-    return _run(["sudo", "-n", COG_PANEL_HELPER, *args], e)
+    return _run(["sudo", "-n", COG_PANEL_HELPER, *args], e, timeout=COG_PANEL_TIMEOUT)
 
 
 def apply_on_cog(on, env=None):

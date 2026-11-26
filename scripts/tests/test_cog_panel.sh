@@ -298,8 +298,10 @@ pass "screen off restarts the holder once and fails loudly when DPMS stays On"
 # --- 13. Holder installed but fails: blank anyway, report failure ------------
 # The blank still darkens a monitor that sends no hotplug (3B+); the failure
 # makes the agent retry. The failed unit is stopped so systemd's automatic
-# restarts cannot fight the blank.
+# restarts cannot fight the blank. DPMS is On here: the holder failed, so the
+# panel is still lit and the fallback blank is what has to darken it.
 reset_mock
+printf 'On\n' > "$HDMI_DIR/dpms"
 printf '0\n' > "$CALVIN_FB_BLANK"
 if out="$(MOCK_HOLDER_START=1 run off)"; then
     fail "screen off claimed success although the holder failed to start"
@@ -309,9 +311,46 @@ assert_before 'start calvin-drm-hold.service' 'stop calvin-drm-hold.service' "$o
     "a failed holder was not stopped"
 assert_before 'stop calvin-drm-hold.service' 'blank 0' "$out" \
     "screen off blanked before stopping the failed holder"
+printf 'Off\n' > "$HDMI_DIR/dpms"
 pass "a failing holder falls back to the blank and reports failure"
 
-# --- 14. Rotation never touches the holder -----------------------------------
+# --- 14. A still-failing holder must not unblank an already dark panel --------
+# The agent retries every poll while the holder keeps failing. On re-entry DPMS
+# is already Off (the previous fallback blanked it), so a blank_cycle would
+# write 0 (unblank) before 4 - a visible flash on every poll. Exit 1 without
+# touching the panel.
+reset_mock
+printf 'Off\n' > "$HDMI_DIR/dpms"
+printf '4\n' > "$CALVIN_FB_BLANK"
+if out="$(MOCK_HOLDER_START=1 run off)"; then
+    fail "screen off claimed success although the holder failed again"
+fi
+if grep -q 'blank [04]' <<< "$out"; then
+    fail "a failed holder unblanked a panel that was already DPMS off"
+fi
+assert_eq "4" "$(cat "$CALVIN_FB_BLANK")" "a failed holder changed an already blank panel"
+assert_before 'start calvin-drm-hold.service' 'stop calvin-drm-hold.service' "$out" \
+    "the failed holder was not stopped on re-entry"
+pass "a still-failing holder leaves an already dark panel alone"
+
+# --- 15. Holder restarted but DPMS stays On: stop it, blank instead ----------
+# Leaving the holder running would make every retry restart it, dropping DRM
+# master and letting fbdev relight the panel. Stop it, fall back to the blank,
+# and report failure so the agent retries on its next poll.
+reset_mock
+printf 'On\n' > "$HDMI_DIR/dpms"
+printf '0\n' > "$CALVIN_FB_BLANK"
+if out="$(run off)"; then fail "screen off claimed success with DPMS On under the holder"; fi
+assert_eq "1" "$(grep -cx 'restart calvin-drm-hold.service' "$SYSTEMCTL_LOG")" \
+    "screen off did not restart the holder exactly once"
+assert_before 'restart calvin-drm-hold.service' 'stop calvin-drm-hold.service' "$out" \
+    "the holder was left running with DPMS On"
+assert_before 'stop calvin-drm-hold.service' 'blank 0' "$out" \
+    "screen off blanked while the holder still held DRM master"
+assert_eq "4" "$(cat "$CALVIN_FB_BLANK")" "the fallback did not leave the framebuffer blanked"
+pass "a holder that cannot go dark is stopped and blanked instead"
+
+# --- 16. Rotation never touches the holder -----------------------------------
 reset_mock
 MOCK_IS_ACTIVE=3 run rotate 2 >/dev/null
 if grep -q 'calvin-drm-hold' "$SYSTEMCTL_LOG"; then fail "rotate touched the DRM holder"; fi

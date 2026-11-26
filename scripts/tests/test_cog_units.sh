@@ -95,7 +95,8 @@ for owner in calvin-cog calvin-x calvin-wayland; do
     assert_contains "$hold" "^Conflicts=.*$owner\\.service" "the holder can run next to $owner"
     assert_contains "$hold" "^After=.*$owner\\.service" "the holder is not ordered after $owner"
 done
-assert_contains "$hold" '^TimeoutStartSec=5$' "a hung holder would outlast the agent's 10 s timeout"
+assert_contains "$hold" '^TimeoutStartSec=3$' "a hung holder start could outlast the agent's panel timeout"
+assert_contains "$hold" '^TimeoutStopSec=3$' "a hung holder stop could outlast the agent's panel timeout"
 assert_contains "$hold" '^Restart=on-failure$' "a crashed holder would leave the panel to fbdev"
 assert_not_contains "$hold" '^WantedBy=' "the holder must never be enabled at boot"
 pass "calvin-drm-hold.service cannot outlive screen-off"

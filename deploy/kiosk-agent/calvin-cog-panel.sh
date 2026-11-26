@@ -133,7 +133,10 @@ off_with_holder() {
         exit 0
     fi
     log "screen off: panel still reports DPMS on after the retry; it may stay lit"
-    exit 1
+    # Return, not exit: the caller stops the holder and falls back to the blank.
+    # A holder left running with DPMS On would be restarted again on every
+    # agent retry, and each restart drops DRM master for fbdev to relight.
+    return 1
 }
 
 current_rotation() {
@@ -167,9 +170,9 @@ case "${1:-}" in
             log "continuing without a confirmed stop; the panel may stay on"
         fi
         clear_console
-        # off_with_holder exits unless the holder itself fails. The blank below
-        # still darkens a monitor that sends no standby hotplug, but a failed
-        # holder exits 1 so the agent retries on its next poll.
+        # off_with_holder exits on success and returns 1 when the holder fails
+        # or leaves DPMS on. The blank below still darkens a monitor that sends
+        # no standby hotplug, but a failed holder exits 1 so the agent retries.
         fallback_status=0
         if holder_installed; then
             if ! off_with_holder; then
@@ -179,6 +182,14 @@ case "${1:-}" in
             fi
         else
             log "${HOLD_UNIT} is not installed; blanking only"
+        fi
+        # A holder that keeps failing makes the agent retry on every poll. If
+        # the panel is already DPMS off (the previous retry's blank held), a
+        # blank_cycle would write 0 - a brief unblank - on every poll. Leave a
+        # dark panel alone and still exit 1 so the holder is retried.
+        if [ "$fallback_status" -ne 0 ] && dpms_is_off; then
+            log "screen off: panel already DPMS off; not re-blanking"
+            exit "$fallback_status"
         fi
         blank_cycle
         if dpms_is_off; then

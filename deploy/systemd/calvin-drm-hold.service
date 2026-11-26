@@ -16,9 +16,10 @@ Group=calvin
 # /dev/dri/card*. The first client of a card becomes its master without root.
 SupplementaryGroups=video
 ExecStart=/usr/bin/python3 /usr/local/bin/calvin-drm-hold.py
-# Below the display agent's 10 s limit on the panel helper.
-TimeoutStartSec=5
-TimeoutStopSec=5
+# The display agent runs the panel helper with a 30 s timeout; a hung holder
+# start or stop must not eat most of it. Both fail fast instead.
+TimeoutStartSec=3
+TimeoutStopSec=3
 # A holder that dies while the screen is off would leave the panel to fbdev.
 Restart=on-failure
 RestartSec=2

@@ -1514,6 +1514,22 @@ def test_apply_on_cog_runs_the_root_helper(monkeypatch):
     assert calls == [["sudo", "-n", agent.COG_PANEL_HELPER, "on"]]
 
 
+def test_cog_panel_uses_a_timeout_that_covers_a_slow_pi(monkeypatch):
+    # Off can stop cog, wait for DRM master release, start the holder and retry
+    # it on a slow Pi 3B+. The 10 s _run default would kill only sudo and leave
+    # the helper running, so the agent's next poll would overlap it.
+    seen = {}
+
+    def fake_run(cmd, **kw):
+        seen.update(kw)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(agent.subprocess, "run", fake_run)
+    assert agent.apply_on_cog(False) == "cog"
+    assert seen["timeout"] == agent.COG_PANEL_TIMEOUT
+    assert agent.COG_PANEL_TIMEOUT > 10
+
+
 def test_apply_on_cog_reports_none_when_helper_fails(monkeypatch):
     monkeypatch.setattr(
         agent.subprocess, "run",
