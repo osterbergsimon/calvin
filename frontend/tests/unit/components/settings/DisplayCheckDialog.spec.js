@@ -598,6 +598,59 @@ describe("a non-finite brightness read is unusable on every step", () => {
     expect(primary(wrapper).text()).toBe("Read it again");
     expect(find(wrapper, "check-save").exists()).toBe(false);
   });
+
+  // calvin-xoly: a missing highest read survived the fallback, and leaving the
+  // fallback summary then let Save send brightnessLimit NaN and a NaN ddc pair.
+  it("does not keep a non-finite highest read through the fallback and Save", async () => {
+    await toStep2();
+    await readLevel(60, Number.NaN);
+    await clickPrimary(wrapper); // Read it again
+    await readLevel(60, Number.NaN);
+    await click(wrapper, "use-own-levels");
+    // Finish the two-level fallback, then answer the menu numbers it still needs.
+    await clickPrimary(wrapper);
+    agentStep("conversion", { value: 5, level: 4 });
+    await settle();
+    await find(wrapper, "reading-input").setValue("28");
+    await clickPrimary(wrapper);
+    agentStep("conversion", { value: 1, level: 1 });
+    await settle();
+    await find(wrapper, "reading-input").setValue("10");
+    await clickPrimary(wrapper);
+    await find(wrapper, "reading-input").setValue("28");
+    await clickPrimary(wrapper);
+    await find(wrapper, "reading-input").setValue("10");
+    await clickPrimary(wrapper);
+    expect(find(wrapper, "check-summary").exists()).toBe(true);
+    // Remove the everyday reading: the missing highest must be dropped too.
+    await find(wrapper, "remove-reading-1").trigger("click");
+    await flushPromises();
+    const pairs = { 2: [60, 30], 3: [40, 12], 4: [10, 2] };
+    while (find(wrapper, "reading-input").exists()) {
+      const shown = /Step (\d) of 4/.exec(status(wrapper));
+      expect(shown).toBeTruthy();
+      const [typed, ddc] = pairs[shown[1]];
+      await readLevel(typed, ddc);
+      await clickPrimary(wrapper);
+    }
+    await clickPrimary(wrapper); // Save
+    const patch = patches().at(-1)?.[0];
+    expect(patch).toBeTruthy();
+    expect(
+      [patch.brightnessLimit, patch.brightness, patch.brightnessFloor].every(Number.isFinite)
+    ).toBe(true);
+    expect(patch.brightnessConversion.every(pair => Number.isFinite(pair.ddc))).toBe(true);
+  });
+
+  it("disables Save and sends no patch when a summary reading is not finite", async () => {
+    await toSummary();
+    wrapper.vm.levels[0] = { typed: 60, ddc: Number.NaN, lastWrite: null };
+    await flushPromises();
+    expect(find(wrapper, "check-save").attributes("disabled")).toBeDefined();
+    await wrapper.vm.saveAll();
+    await flushPromises();
+    expect(patches()).toHaveLength(0);
+  });
 });
 
 describe("Remove and Back leave nothing stale behind", () => {

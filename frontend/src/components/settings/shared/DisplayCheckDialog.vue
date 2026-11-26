@@ -669,7 +669,9 @@ function resetFallback() {
   fbPhase.value = "explain";
   fbIndex.value = 0;
   behindTries.value = [0, 0, 0];
-  for (const i of [1, 2]) {
+  // Include the highest level: a non-finite read there has no neighbour to
+  // compare against, but it still must not survive into the summary (calvin-xoly).
+  for (const i of [0, 1, 2]) {
     const here = levels.value[i];
     const above = levels.value[i - 1];
     if (!here) continue;
@@ -823,9 +825,13 @@ const savedPairs = computed(() => {
   return [...byDdc.entries()].map(([ddc, menu]) => ({ ddc, menu })).sort((a, b) => a.ddc - b.ddc);
 });
 
+// A summary with a non-finite value is never saved: it would reach the server as
+// null (brightnessLimit) or a null ddc pair (calvin-xoly).
+const saveBlocked = computed(() => summaryRows.value.some(row => !Number.isFinite(row.ddc)));
+
 // One PATCH: nothing from an unfinished run is ever saved.
 async function saveAll() {
-  if (saving.value) return;
+  if (saving.value || saveBlocked.value) return;
   const [highest, everyday, lowest] = summaryRows.value;
   const patch = {
     brightnessConversion: savedPairs.value,
@@ -1330,7 +1336,7 @@ const ui = computed(() => {
           label: "Save",
           test: "check-save",
           run: saveAll,
-          disabled: saving.value,
+          disabled: saving.value || saveBlocked.value,
           loading: saving.value,
         },
         secondary: [{ label: "Try again", test: "check-retry", run: retry }],
