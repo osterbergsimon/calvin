@@ -2,7 +2,11 @@
 # Calvin cog panel helper — the root half of the display agent on the cog stack.
 #
 # cog owns DRM master, so nobody else can set DPMS while it runs: screen-off is
-# "stop cog, then blank the framebuffer"; screen-on is "unblank, then start cog".
+# "stop cog, then start calvin-drm-hold.service", which takes DRM master and
+# disables the CRTCs; screen-on is "stop the holder, unblank, start cog".
+# Without a master, a monitor that pulses hotplug in standby makes the kernel's
+# fbdev client relight the panel (calvin-e8ze). Where the holder is not
+# installed, or fails, screen-off blanks the framebuffer instead.
 # Rotation is a cog startup property (`--platform-params=renderer=gles,rotation=N`),
 # so a change is written to /etc/default/calvin-kiosk-cog and applied by
 # restarting the unit.
@@ -17,6 +21,7 @@
 set -euo pipefail
 
 UNIT="${CALVIN_COG_UNIT:-calvin-cog.service}"
+HOLD_UNIT="${CALVIN_DRM_HOLD_UNIT:-calvin-drm-hold.service}"
 ROTATION_FILE="${CALVIN_COG_ROTATION_FILE:-/etc/default/calvin-kiosk-cog}"
 FB_BLANK="${CALVIN_FB_BLANK:-/sys/class/graphics/fb0/blank}"
 DRM_DIR="${CALVIN_DRM_DIR:-/sys/class/drm}"
@@ -101,6 +106,36 @@ dpms_is_off() {
     [ "$failures" -eq 0 ]
 }
 
+holder_installed() { "$SYSTEMCTL" cat "$HOLD_UNIT" >/dev/null 2>&1; }
+
+# Also cancels a pending automatic restart. Dropping master makes the kernel
+# restore the console mode.
+stop_holder() {
+    log "stop ${HOLD_UNIT}"
+    "$SYSTEMCTL" stop "$HOLD_UNIT" || log "stop ${HOLD_UNIT} failed; continuing"
+}
+
+# Screen off with the holder: it returns from start only once the CRTCs are off.
+# fb blank writes are ignored while it holds master, so none are made here.
+off_with_holder() {
+    log "start ${HOLD_UNIT}"
+    "$SYSTEMCTL" start "$HOLD_UNIT" || return 1
+    if dpms_is_off; then
+        log "screen off: panel DPMS off, held by ${HOLD_UNIT}"
+        exit 0
+    fi
+    log "screen off: DPMS still on; retrying with a restart of ${HOLD_UNIT} in ${RETRY_DELAY}s"
+    sleep "$RETRY_DELAY"
+    log "restart ${HOLD_UNIT}"
+    "$SYSTEMCTL" restart "$HOLD_UNIT" || return 1
+    if dpms_is_off; then
+        log "screen off: panel DPMS off after retry, held by ${HOLD_UNIT}"
+        exit 0
+    fi
+    log "screen off: panel still reports DPMS on after the retry; it may stay lit"
+    exit 1
+}
+
 current_rotation() {
     [ -r "$ROTATION_FILE" ] || return 0
     sed -n 's/^CALVIN_COG_ROTATION=//p' "$ROTATION_FILE" | tail -n 1
@@ -132,17 +167,30 @@ case "${1:-}" in
             log "continuing without a confirmed stop; the panel may stay on"
         fi
         clear_console
+        # off_with_holder exits unless the holder itself fails. The blank below
+        # still darkens a monitor that sends no standby hotplug, but a failed
+        # holder exits 1 so the agent retries on its next poll.
+        fallback_status=0
+        if holder_installed; then
+            if ! off_with_holder; then
+                log "screen off: ${HOLD_UNIT} failed (journalctl -u ${HOLD_UNIT}); blanking, but the panel may relight"
+                stop_holder
+                fallback_status=1
+            fi
+        else
+            log "${HOLD_UNIT} is not installed; blanking only"
+        fi
         blank_cycle
         if dpms_is_off; then
             log "screen off: panel DPMS off"
-            exit 0
+            exit "$fallback_status"
         fi
         log "screen off: DPMS still on after blanking; retrying the 0/4 sequence in ${RETRY_DELAY}s"
         sleep "$RETRY_DELAY"
         blank_cycle
         if dpms_is_off; then
             log "screen off: panel DPMS off after retry"
-            exit 0
+            exit "$fallback_status"
         fi
         # Fail so the agent retries the panel command on its next poll instead
         # of leaving the panel lit until the next schedule change.
@@ -150,6 +198,9 @@ case "${1:-}" in
         exit 1
         ;;
     on)
+        # Release DRM master first: the kernel restores the console mode cog
+        # needs, and ignores unblank writes while a master exists.
+        stop_holder
         # Unblanking is best-effort: on a boot inside the off window fb0 can be
         # missing or unavailable. cog must be started regardless (start on an
         # already-running unit is a no-op), or the page never comes back.

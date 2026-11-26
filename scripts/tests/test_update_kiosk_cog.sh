@@ -19,6 +19,8 @@ EOF
 
 printf '[Unit]\nDescription=Calvin cog kiosk\n' > "$tmp/srv/calvin-cog.service"
 printf '#!/usr/bin/env bash\necho panel\n' > "$tmp/srv/calvin-cog-panel.sh"
+printf '#!/usr/bin/env python3\nprint("hold")\n' > "$tmp/srv/calvin-drm-hold.py"
+printf '[Unit]\nDescription=Calvin screen-off DRM holder\n' > "$tmp/srv/calvin-drm-hold.service"
 # Existing, modified units whose enable=1 would be re-enabled by reenable_units()
 # on a cog kiosk if unit_suppressed() did not know about cog.
 printf '[Unit]\nDescription=Calvin X Server (new bundle copy)\n' > "$tmp/systemd/calvin-x.service"
@@ -38,6 +40,8 @@ def entry(name, target, mode, enable=False, restart_unit=""):
 files = [
     entry("calvin-cog.service", os.path.join(systemd, "calvin-cog.service"), "0644"),
     entry("calvin-cog-panel.sh", os.path.join(local, "calvin-cog-panel.sh"), "0755"),
+    entry("calvin-drm-hold.py", os.path.join(local, "calvin-drm-hold.py"), "0755"),
+    entry("calvin-drm-hold.service", os.path.join(systemd, "calvin-drm-hold.service"), "0644"),
     entry("calvin-x.service", os.path.join(systemd, "calvin-x.service"), "0644",
           True, "calvin-x.service"),
     entry("calvin-kiosk-remote.service",
@@ -102,6 +106,14 @@ pass "an update keeps the agent's pairing files byte for byte"
 [ -f "$tmp/local/calvin-cog-panel.sh" ] || fail "calvin-cog-panel.sh not installed"
 assert_mode "$tmp/local/calvin-cog-panel.sh" 755
 pass "updater installs the cog unit and panel helper"
+
+[ -f "$tmp/local/calvin-drm-hold.py" ] || fail "calvin-drm-hold.py not installed"
+assert_mode "$tmp/local/calvin-drm-hold.py" 755
+[ -f "$tmp/systemd/calvin-drm-hold.service" ] || fail "calvin-drm-hold.service not installed"
+if grep -qE '^(enable|start|restart) calvin-drm-hold' "$SYSTEMCTL_LOG"; then
+    fail "the bundle must never enable or start the DRM holder"
+fi
+pass "updater installs the screen-off DRM holder without starting it"
 
 # The cog session env exists (the unit and agent both need the file) and carries
 # no X/Wayland variables.

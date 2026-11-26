@@ -79,6 +79,27 @@ assert_contains "$helper" 'rotate\)' "the helper has no rotate verb"
 assert_contains "$helper" 'rotation must be 0, 1, 2 or 3' "the helper does not validate rotation"
 pass "calvin-cog-panel.sh stops cog, blanks/holds the panel and validates rotation"
 
+# The screen-off DRM holder: never enabled at boot, unprivileged, ready only
+# once it holds the card, and unable to run next to any display owner. After=
+# orders the owner's stop before the holder's start (and the holder's stop
+# before the owner's start).
+hold="$REPO/deploy/systemd/calvin-drm-hold.service"
+[ -f "$hold" ] || fail "calvin-drm-hold.service is missing"
+[ -f "$REPO/deploy/kiosk-agent/calvin-drm-hold.py" ] || fail "calvin-drm-hold.py is missing"
+assert_contains "$hold" '^Type=notify$' "the panel helper cannot tell when the holder is ready"
+assert_contains "$hold" '^ExecStart=/usr/bin/python3 /usr/local/bin/calvin-drm-hold\.py$' \
+    "the holder unit does not run the installed helper"
+assert_contains "$hold" '^User=calvin$' "the holder does not run as calvin"
+assert_contains "$hold" '^SupplementaryGroups=video$' "the holder cannot open /dev/dri/card*"
+for owner in calvin-cog calvin-x calvin-wayland; do
+    assert_contains "$hold" "^Conflicts=.*$owner\\.service" "the holder can run next to $owner"
+    assert_contains "$hold" "^After=.*$owner\\.service" "the holder is not ordered after $owner"
+done
+assert_contains "$hold" '^TimeoutStartSec=5$' "a hung holder would outlast the agent's 10 s timeout"
+assert_contains "$hold" '^Restart=on-failure$' "a crashed holder would leave the panel to fbdev"
+assert_not_contains "$hold" '^WantedBy=' "the holder must never be enabled at boot"
+pass "calvin-drm-hold.service cannot outlive screen-off"
+
 # The kiosk/agent units must know about the third stack; the Chromium unit must
 # not be pulled in on cog at boot.
 assert_contains "$REPO/deploy/systemd/calvin-display-agent.service" \
