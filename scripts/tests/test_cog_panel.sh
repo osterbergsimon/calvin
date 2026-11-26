@@ -208,24 +208,38 @@ assert_eq "4" "$(cat "$CALVIN_FB_BLANK")" "the retry did not leave the framebuff
 pass "screen off retries the 0/4 sequence once and fails loudly when DPMS stays On"
 
 # --- 9. The retry succeeds: DPMS flips to Off after the second blank ---------
-# A FIFO hands the helper "On" for the first check and "Off" for the second,
-# i.e. the panel goes dark on the retry.
-rm -f "$HDMI_DIR/dpms"
-mkfifo "$HDMI_DIR/dpms"
-(
-    printf 'On\n' > "$HDMI_DIR/dpms"
-    printf 'Off\n' > "$HDMI_DIR/dpms"
-) &
-writer=$!
-if ! out="$(run off)"; then
-    kill "$writer" 2>/dev/null || true
+# Stub the dpms read with a per-call sequence (like MOCK_MAIN_PID_SEQ) rather
+# than a FIFO: a FIFO writer can reopen while the helper's first cat still
+# holds it open, so one read returns On and Off and the next read finds no
+# writer (calvin-owom flake). These two reads return "On" then "Off", i.e. the
+# panel goes dark on the retry.
+real_cat="$(command -v cat)"
+mkdir -p "$tmp/shimbin"
+cat > "$tmp/shimbin/cat" <<EOF
+#!/usr/bin/env bash
+if [ "\$#" -gt 0 ] && [ "\${!#}" = "$HDMI_DIR/dpms" ]; then
+    idx_file="$tmp/dpms.idx"
+    idx=0
+    [ -f "\$idx_file" ] && idx=\$(<"\$idx_file")
+    set -- \${MOCK_DPMS_SEQ:-Off}
+    values=("\$@")
+    last=\$(( \${#values[@]} - 1 ))
+    [ "\$idx" -gt "\$last" ] && idx=\$last
+    printf '%s\n' "\${values[\$idx]}"
+    echo \$(( idx + 1 )) > "\$idx_file"
+    exit 0
+fi
+exec "$real_cat" "\$@"
+EOF
+chmod +x "$tmp/shimbin/cat"
+rm -f "$tmp/dpms.idx"
+printf 'On\n' > "$HDMI_DIR/dpms"
+if ! out="$(PATH="$tmp/shimbin:$PATH" MOCK_DPMS_SEQ="On Off" run off)"; then
     fail "screen off failed although the panel went Off on the retry"
 fi
-kill "$writer" 2>/dev/null || true
 assert_eq "2" "$(grep -c 'blank 0' <<< "$out")" "screen off did not need exactly one retry"
 echo "$out" | grep -q 'screen off: panel DPMS off after retry' \
     || fail "screen off did not log the successful retry"
-rm -f "$HDMI_DIR/dpms"
 printf 'Off\n' > "$HDMI_DIR/dpms"
 pass "screen off recovers when the panel goes Off on the retry"
 
