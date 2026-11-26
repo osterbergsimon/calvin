@@ -4,8 +4,9 @@ Calvin is released from **`main`**, published as a version tag (`vX.Y.Z`), and
 installed by pinning that tag. `develop` is the integration branch where work
 lands first; testers can run it, but it is not a release.
 
-This page is the whole process. Nothing here is manual except merging two pull
-requests — the changelog, the tag and the container images are automated.
+This page is the whole process. Starting the promote workflow and merging the
+promote and release pull requests are manual; the changelog, the tag and the
+container images are automated.
 
 ## Branches at a glance
 
