@@ -255,7 +255,7 @@ describe("resolveClockBarDesign — stored design", () => {
     );
 
     expect(design.zones.center).not.toContain("date");
-    expect(design.hidden).toContain("date");
+    expect(design.hidden).toEqual(["date"]);
   });
 
   it("drops unknown ids, including a deleted instance", () => {
@@ -470,8 +470,12 @@ describe("clock bar design — review fixes", () => {
 
     expect(saved.horizontal.zones.left).toEqual(["tile:a"]);
     expect(saved.horizontal.zones.right).toEqual(["tiles", "status"]);
-    // The missing fixed parts join the shelf; the pinned hidden tile survives.
-    expect(saved.horizontal.hidden).toContain("tile:z");
+    expect(saved.horizontal.hidden).toEqual(["tile:z", "logo", "room", "pageDots", "date"]);
+
+    const again = resolveClockBarDesign(config({ clockBarDesign: saved }), [], {
+      servicesLoaded: false,
+    });
+    expect(buildClockBarDesign(again)).toEqual(saved);
   });
 
   it("drops a deleted instance once the services list is loaded (item 6)", () => {
@@ -480,7 +484,7 @@ describe("clock bar design — review fixes", () => {
     });
     const saved = buildClockBarDesign(resolved);
     expect(saved.horizontal.zones.left).toEqual([]);
-    expect(saved.horizontal.hidden).not.toContain("tile:z");
+    expect(saved.horizontal.hidden).toEqual(["logo", "room", "pageDots", "date"]);
   });
 
   it("falls back to the default font size for a legacy 0, as before (item 11)", () => {
