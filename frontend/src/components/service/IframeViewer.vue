@@ -4,7 +4,8 @@
       ref="iframe"
       :src="frameSrc"
       :title="title"
-      :sandbox="onKiosk ? kioskSandboxFor(frameSrc) : undefined"
+      :sandbox="frameSandboxFor(frameSrc, { kiosk: onKiosk })"
+      referrerpolicy="no-referrer"
       class="service-iframe"
       :class="{ 'iframe-error': iframeError }"
       frameborder="0"
@@ -52,7 +53,7 @@ import ExternalLink from "../ui/ExternalLink.vue";
 import HandoffOverlay from "../plugins/overlays/HandoffOverlay.vue";
 import { isKioskDisplay } from "../../utils/kioskId";
 import { isHttpUrl } from "../../utils/safeUrl";
-import { kioskSandboxFor } from "../../utils/kioskSandbox";
+import { frameSandboxFor } from "../../utils/kioskSandbox";
 import { FRAME_BLOCKED_TITLE, frameBlockedBody } from "../../utils/frameBlockedCopy";
 import { useFrameBlockDetection } from "../../composables/useFrameBlockDetection";
 
