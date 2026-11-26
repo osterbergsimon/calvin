@@ -519,12 +519,14 @@ const tooHigh = computed(() => {
 const behindNote = computed(() => {
   const now = thisLevel.value;
   if (!now) return "";
-  const before = previousLevel.value;
-  const after = nextLevelRead.value;
-  if (!before && !after) return "";
+  // A non-finite read (NaN, Infinity, or a missing level) is unusable on every
+  // step, including the highest one, which has no neighbour to compare against.
   if (!Number.isFinite(now.ddc)) {
     return "That reading doesn't look right: the panel gave no usable number.";
   }
+  const before = previousLevel.value;
+  const after = nextLevelRead.value;
+  if (!before && !after) return "";
   if (before && Number.isFinite(before.ddc)) {
     // Higher than the level before, or the same while the menu number went down.
     const behind = now.ddc > before.ddc || (now.ddc === before.ddc && now.typed < before.typed);

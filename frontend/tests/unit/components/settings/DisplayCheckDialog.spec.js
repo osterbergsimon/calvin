@@ -586,6 +586,20 @@ describe("retaking a reading checks both neighbours", () => {
   });
 });
 
+describe("a non-finite brightness read is unusable on every step", () => {
+  it.each([
+    ["NaN", Number.NaN],
+    ["Infinity", Number.POSITIVE_INFINITY],
+    ["missing", null],
+  ])("stops a %s read on the highest step (no previous level)", async (_label, level) => {
+    await toStep2();
+    await readLevel(60, level);
+    expect(find(wrapper, "level-behind").text()).toContain("doesn't look right");
+    expect(primary(wrapper).text()).toBe("Read it again");
+    expect(find(wrapper, "check-save").exists()).toBe(false);
+  });
+});
+
 describe("Remove and Back leave nothing stale behind", () => {
   it("Back forgets the 'behind' tries so the own-levels offer starts again", async () => {
     await toStep3();
