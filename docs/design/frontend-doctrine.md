@@ -224,8 +224,7 @@ Tests (vitest, `tests/unit/styles/`):
 5. Weights: only `--weight-*` (no numeric font-weight outside theme.css).
 
 Review: every UI PR attaches screenshots from the mocked e2e harness (`tests/e2e/phone/fixtures/api-mock.js`, no
-backend) at 1280 and 390, light and one dark theme. The design reviewer
-(.lane-control/design-reviewer.md) reviews against this doc.
+backend) at 1280 and 390, light and one dark theme. The design reviewer reviews against this doc.
 
 ## 8. Migration
 
