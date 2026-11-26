@@ -419,6 +419,12 @@ function resolveShape(shape, stored, config, services, hasDesign, servicesLoaded
     push(fallbackZone, token);
   }
 
+  // A fixed part the design lists in neither a zone nor hidden would vanish
+  // from the editor: keep it on the Not shown shelf so it can be shown again.
+  for (const token of CLOCK_BAR_FIXED_PARTS) {
+    if (token !== "status" && !seen.has(token) && !hiddenSet.has(token)) hiddenSet.add(token);
+  }
+
   const hidden = [...hiddenSet].filter(
     token => !seen.has(token) && (validFixed.has(token) || isKnownTile(token))
   );
