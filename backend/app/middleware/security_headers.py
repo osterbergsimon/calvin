@@ -1,8 +1,10 @@
 """Middleware that stamps every response with the kiosk CSP header."""
 
 from loguru import logger
+from starlette.datastructures import MutableHeaders
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.services.csp import (
     build_csp,
@@ -31,10 +33,47 @@ def _is_csp_exempt(path: str) -> bool:
     )
 
 
+HARDENING_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "same-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+}
+
+
+class HardeningHeadersMiddleware:
+    """Pure-ASGI wrapper that adds the non-CSP hardening headers.
+
+    Register it after ``install_security`` so it is outside the Host/Origin and
+    guest-gate middleware and decorates their short-circuit refusals too. A
+    response that already carries one of the headers keeps its own value (the
+    share page sends ``Referrer-Policy: no-referrer``). Starlette's
+    ServerErrorMiddleware sits outside every user middleware, so the 500 handler
+    in ``app.main`` adds ``HARDENING_HEADERS`` itself.
+    """
+
+    def __init__(self, app: ASGIApp):
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_headers(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                for name, value in HARDENING_HEADERS.items():
+                    if name not in headers:
+                        headers[name] = value
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
-        # Docs UI paths are exempt — they need CDN assets + inline scripts.
+        # Docs UI paths are exempt from CSP — they need CDN assets + inline scripts.
         if _is_csp_exempt(request.url.path):
             return response
         try:

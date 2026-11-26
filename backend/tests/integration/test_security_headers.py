@@ -14,7 +14,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.testclient import TestClient
 
-from app.middleware.security_headers import SecurityHeadersMiddleware
+from app.middleware.security_headers import (
+    HardeningHeadersMiddleware,
+    SecurityHeadersMiddleware,
+)
 from app.models.db_models import PluginDB
 from tests._support.db import (
     cleanup_db_file,
@@ -69,6 +72,10 @@ def security_test_client(temp_image_dir: Path) -> Generator[TestClient, None, No
         allow_headers=["*"],
     )
     test_app.add_middleware(SecurityHeadersMiddleware)
+    from app.security.host_origin import HostOriginMiddleware
+
+    test_app.add_middleware(HostOriginMiddleware)
+    test_app.add_middleware(HardeningHeadersMiddleware)
     test_app.include_router(health.router, prefix="/api", tags=["health"])
 
     # HTMLResponse stand-in for the SPA's index.html FileResponse.
@@ -78,6 +85,10 @@ def security_test_client(temp_image_dir: Path) -> Generator[TestClient, None, No
     @test_app.get("/spa")
     async def _spa_root():
         return HTMLResponse("<html><body>kiosk</body></html>")
+
+    @test_app.get("/share-like")
+    async def _share_like():
+        return HTMLResponse("<html></html>", headers={"Referrer-Policy": "no-referrer"})
 
     with TestClient(test_app) as client:
         yield client
@@ -326,6 +337,61 @@ class TestSecurityHeaders:
         csp = response.headers.get("content-security-policy", "")
         assert "default-src 'self'" in csp
         assert "frame-src 'self'" in csp
+
+
+_HARDENING = {
+    "x-content-type-options": "nosniff",
+    "referrer-policy": "same-origin",
+    "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=()",
+}
+
+
+@pytest.mark.integration
+class TestHardeningHeaders:
+    def test_normal_response_has_hardening_headers(self, security_test_client: TestClient):
+        headers = security_test_client.get("/api/health").headers
+        for name, value in _HARDENING.items():
+            assert headers.get(name) == value
+
+    def test_html_response_has_hardening_headers(self, security_test_client: TestClient):
+        headers = security_test_client.get("/spa").headers
+        for name, value in _HARDENING.items():
+            assert headers.get(name) == value
+
+    def test_csp_exempt_docs_still_get_nosniff_but_no_csp(self, security_test_client: TestClient):
+        for path in ("/docs", "/redoc", "/openapi.json"):
+            response = security_test_client.get(path)
+            for name, value in _HARDENING.items():
+                assert response.headers.get(name) == value, (path, name)
+            assert "content-security-policy" not in response.headers, path
+
+    def test_sealed_mode_keeps_hardening_headers(self, security_test_client: TestClient):
+        from app.models.db_models import ConfigDB
+
+        _run(ConfigDB.objects.create(key="sealed_mode", value="true", value_type="bool"))
+        headers = security_test_client.get("/api/health").headers
+        for name, value in _HARDENING.items():
+            assert headers.get(name) == value
+
+    def test_lookup_failure_still_serves_hardening_headers(self, security_test_client: TestClient):
+        with patch(
+            "app.middleware.security_headers.get_web_service_origins",
+            new=AsyncMock(side_effect=Exception("boom")),
+        ):
+            headers = security_test_client.get("/api/health").headers
+        for name, value in _HARDENING.items():
+            assert headers.get(name) == value
+
+    def test_host_origin_refusal_has_hardening_headers(self, security_test_client: TestClient):
+        response = security_test_client.get("/api/health", headers={"Host": "evil.example"})
+        assert response.status_code == 400
+        for name, value in _HARDENING.items():
+            assert response.headers.get(name) == value
+
+    def test_route_set_referrer_policy_is_not_overwritten(self, security_test_client: TestClient):
+        headers = security_test_client.get("/share-like").headers
+        assert headers.get("referrer-policy") == "no-referrer"
+        assert headers.get("x-content-type-options") == "nosniff"
 
 
 def _run(coro):

@@ -20,6 +20,7 @@ _BASELINE = [
     "script-src 'self'",
     # Vue/Vite inject inline styles; without 'unsafe-inline' the dashboard breaks.
     "style-src 'self' 'unsafe-inline'",
+    "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
     # Prevents other sites from iframing the kiosk; default-src does NOT cover frame-ancestors.

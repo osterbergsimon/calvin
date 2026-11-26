@@ -595,6 +595,14 @@ app.add_middleware(SecurityHeadersMiddleware)
 # router and Host/Origin middleware (CLV-9).
 install_security(app)
 
+# Outside the security middleware, so their refusals carry the headers too.
+from app.middleware.security_headers import (  # noqa: E402
+    HARDENING_HEADERS,
+    HardeningHeadersMiddleware,
+)
+
+app.add_middleware(HardeningHeadersMiddleware)
+
 
 # Dev-only HTTP request logging — enable with CALVIN_DEV_LOG_HTTP=1
 if os.environ.get("CALVIN_DEV_LOG_HTTP") == "1":
@@ -706,6 +714,8 @@ async def general_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error", "type": type(exc).__name__},
+        # ServerErrorMiddleware answers this outside every middleware.
+        headers=HARDENING_HEADERS,
     )
 
 

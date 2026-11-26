@@ -48,6 +48,7 @@ class TestBuildCsp:
         assert "font-src 'self' data:" in csp
         assert "frame-src 'self'" in csp
         assert "frame-ancestors 'self'" in csp
+        assert "object-src 'none'" in csp
 
     def test_frame_src_includes_given_origins(self):
         csp = build_csp(["https://grafana.lab", "http://192.0.2.50:3000"])
