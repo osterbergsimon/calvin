@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Highlight holidays</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<!--
+  Mock for highlight holidays (spec: ../../2026-11-22-holidays.md). Proposal awaiting the owner's approval.
+  Role tokens copied from frontend/src/styles/theme.css (light and Backlit). Dates: December 2026, Sweden,
+  holiday names in English. ?only=<section id> shows one section (used for the PNGs).
+-->
+<style>
+:root {
+  --bg-0:#eef1f4; --bg-1:#ffffff; --bg-2:#ffffff; --line:#dde3e8; --line-soft:#e8edf1;
+  --ink:#1b242b; --ink-2:#5d6b75; --ink-3:#636e77; --focus:#e08a1e; --focus-ink:#1b242b; --focus-text:#875c24;
+  --err-text:#76302b;
+  --holiday-ink:var(--err-text); /* the one new component token */
+  --font-ui:"IBM Plex Sans",system-ui,sans-serif; --font-data:"IBM Plex Mono",ui-monospace,monospace;
+  --text-dense:.6rem; --text-caption:.75rem; --text-meta:.8rem; --text-body:.9rem; --text-label:1rem; --text-title:1.15rem;
+  --weight-strong:500; --weight-title:600;
+  --gap-1:.25rem; --gap-2:.5rem; --gap-3:.75rem; --gap-4:1rem; --gap-5:1.25rem;
+  --radius-control:8px; --radius-card:12px; --radius-panel:16px; --radius-round:999px;
+}
+.dark {
+  --bg-0:#0e1316; --bg-1:#151c21; --bg-2:#1d262d; --line:#27313a; --line-soft:#1e272e;
+  --ink:#eaf0f3; --ink-2:#9aa7b0; --ink-3:#818d96; --focus:#f3b052; --focus-ink:#151c21; --focus-text:#efcd9a;
+  --err-text:#eda7a1;
+  --holiday-ink:var(--err-text); /* re-declared: a var() resolves where it is declared */
+}
+* { box-sizing:border-box; }
+body { margin:0; background:#d9dee3; font-family:var(--font-ui); color:#1b242b; }
+.board { padding:32px 16px; max-width:1260px; margin:0 auto; }
+h1 { font-size:1.4rem; font-weight:600; margin:0 0 8px; }
+h2 { font-size:1.1rem; font-weight:600; margin:40px 0 12px; }
+.board > p { max-width:76ch; margin:0 0 20px; line-height:1.5; }
+.row { display:flex; flex-wrap:wrap; gap:32px; align-items:flex-start; }
+figure { margin:0 0 24px; }
+figcaption { font-size:.85rem; color:#5d6b75; margin-top:8px; max-width:440px; line-height:1.4; }
+figcaption b { color:#1b242b; }
+body.only .board > h1, body.only .board > p { display:none; }
+section[hidden] { display:none; }
+
+/* settings */
+.settings { background:var(--bg-0); color:var(--ink); padding:var(--gap-4); border-radius:var(--radius-panel); width:390px; }
+.eyebrow { font-family:var(--font-data); font-size:var(--text-caption); text-transform:uppercase; letter-spacing:.14em; color:var(--ink-3); margin:0 0 var(--gap-2); }
+.panel { background:var(--bg-1); border:1px solid var(--line); border-radius:var(--radius-panel); }
+.panel > * { padding:var(--gap-3) var(--gap-5); }
+.panel > * + * { border-top:1px solid var(--line-soft); }
+.srow { display:flex; align-items:center; justify-content:space-between; gap:var(--gap-4); }
+.srow__label { font-size:var(--text-label); font-weight:var(--weight-strong); margin:0; }
+.srow__desc { font-size:var(--text-meta); color:var(--ink-2); margin:var(--gap-1) 0 0; line-height:1.4; }
+.pill { font-size:var(--text-body); border:1px solid var(--line); border-radius:var(--radius-round); padding:.55rem 1rem; background:var(--bg-2); white-space:nowrap; }
+.menu { margin-top:var(--gap-2); background:var(--bg-1); border:1px solid var(--line); border-radius:var(--radius-card); box-shadow:0 6px 18px -8px rgba(0,0,0,.3); overflow:hidden; }
+.menu input { width:100%; font:inherit; font-size:var(--text-body); border:0; border-bottom:1px solid var(--line-soft); padding:.7rem 1rem; background:var(--bg-1); color:var(--ink-2); }
+.menu div { padding:.65rem 1rem; font-size:var(--text-body); }
+.menu .sel { background:color-mix(in srgb,var(--focus) 16%,var(--bg-2)); }
+.stack { display:flex; flex-direction:column; align-items:stretch; }
+
+/* calendar */
+.cal { background:var(--bg-0); color:var(--ink); border:6px solid #11161a; border-radius:10px; display:flex; flex-direction:column; overflow:hidden; }
+.k800 { width:812px; height:492px; }
+.p390 { width:390px; height:520px; border-width:1px; border-color:var(--line); }
+.cal__head { display:flex; align-items:baseline; justify-content:space-between; padding:var(--gap-2) var(--gap-4); background:var(--bg-1); border-bottom:1px solid var(--line); }
+.cal__head b { font-size:var(--text-title); font-weight:var(--weight-title); }
+.cal__head span { font-size:var(--text-meta); color:var(--ink-2); }
+.grid { flex:1; display:grid; grid-template-columns:repeat(7,1fr); grid-auto-rows:1fr; gap:2px; padding:var(--gap-2); min-height:0; }
+.wd { font-size:var(--text-caption); color:var(--ink-3); text-align:left; padding:0 var(--gap-1); align-self:end; }
+.grid--month { grid-template-rows:auto repeat(5,1fr); }
+.day { background:var(--bg-1); border-radius:var(--radius-control); padding:3px 5px; min-width:0; overflow:hidden; display:flex; flex-direction:column; gap:2px; border:1px solid transparent; }
+.day.weekend, .day.holiday { background:color-mix(in srgb,var(--ink) 2%,var(--bg-1)); }
+.day.other { opacity:.45; }
+.day.today { border-color:var(--focus); background:color-mix(in srgb,var(--focus) 12%,var(--bg-1)); }
+.dh { display:flex; align-items:baseline; gap:5px; min-width:0; }
+.num { font-size:var(--text-meta); font-weight:var(--weight-strong); flex:none; }
+.holiday .num { color:var(--holiday-ink); font-weight:var(--weight-title); }
+.today .num { color:var(--focus-text); font-weight:var(--weight-title); }
+.hn { font-size:var(--text-dense); color:var(--holiday-ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.ev { font-size:var(--text-dense); background:color-mix(in srgb,var(--ink) 7%,var(--bg-1)); border-radius:4px; padding:1px 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.p390 .hn { display:none; }
+.p390 .ev { display:none; }
+.p390 .day { align-items:center; justify-content:center; }
+/* week strip */
+.grid--week { grid-template-rows:1fr; }
+.grid--week .day { padding:var(--gap-2); gap:var(--gap-2); }
+.grid--week .dh { flex-direction:column; align-items:flex-start; gap:2px; }
+.grid--week .num { font-size:var(--text-label); }
+.grid--week .hn { font-size:var(--text-caption); white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+.grid--week .ev { font-size:var(--text-caption); padding:3px 6px; }
+.wkd { font-size:var(--text-caption); color:var(--ink-3); }
+</style>
+</head>
+<body>
+<div class="board">
+  <h1>Highlight holidays (proposal)</h1>
+  <p>The household picks a country, and a region if it has one, in Content › Calendar basics. The calendar then
+  shows each public holiday's day number in red and its name on the day's header line. Off is the first choice in
+  the country list.</p>
+
+  <section id="settings"><h2>S. Settings: Content › Calendar basics</h2><div class="row" id="row-settings"></div></section>
+  <section id="calendar"><h2>D. The calendar on the wall panel (800×480)</h2><div class="row" id="row-cal"></div></section>
+  <section id="phone"><h2>P. Phone width</h2><div class="row" id="row-phone"></div></section>
+</div>
+<script>
+const HOL = { 24: "Christmas Eve", 25: "Christmas Day", 26: "Second Day of Christmas", 31: "New Year's Eve" };
+const EV = { 3: "Dentist 09:00", 8: "Swimming", 12: "Pizza night", 17: "Book club", 22: "School ends", 24: "Grandma visits", 28: "Ice skating", 30: "Bins out" };
+const WD = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+
+function settings(id, dark, state, caption) {
+  const country = state === "off" ? "Off" : "Sweden";
+  let rows = `<div class="srow"><div><p class="srow__label">Week starts on</p></div><span class="pill">Monday ▾</span></div>
+    <div class="srow"><div><p class="srow__label">Weekend days</p></div><span class="pill">Sat, Sun ▾</span></div>`;
+  rows += `<div class="${state === "off-open" ? "stack" : "srow"}"><div><p class="srow__label">Holidays</p>
+     <p class="srow__desc">Marks public holidays on the calendar, with their names.</p></div>
+     ${state === "off-open"
+       ? `<div class="menu" role="listbox" aria-label="Holidays"><input value="" placeholder="Search countries" aria-label="Search countries" /><div class="sel">Off</div><div>Sweden (your time zone)</div><div>Afghanistan</div><div>Albania</div><div>Algeria</div></div>`
+       : `<span class="pill">${state === "off" ? "Off" : country} ▾</span>`}</div>`;
+  if (state === "region")
+    rows += `<div class="srow"><div><p class="srow__label">Region</p><p class="srow__desc">Some holidays are only kept in part of the country.</p></div><span class="pill">Whole country ▾</span></div>`;
+  rows += `<div class="srow"><div><p class="srow__label">Time format</p></div><span class="pill">24-hour ▾</span></div>`;
+  return `<figure id="${id}"><div class="settings${dark ? " dark" : ""}"><p class="eyebrow">Calendar basics</p><div class="panel">${rows}</div></div>
+    <figcaption><b>${id}</b> ${caption}</figcaption></figure>`;
+}
+
+function dayCell(d, { other = false, today = 0, weekendCol = false, phone = false } = {}) {
+  const hol = !other && HOL[d];
+  const cls = ["day", weekendCol ? "weekend" : "", hol ? "holiday" : "", other ? "other" : "", !other && d === today ? "today" : ""].join(" ");
+  const name = hol ? `<span class="hn" aria-hidden="true" title="${hol}">${hol}</span>` : "";
+  const ev = !other && EV[d] ? `<div class="ev">${EV[d]}</div>` : "";
+  return `<div class="${cls}"><div class="dh"><span class="num">${d}</span>${name}</div>${ev}</div>`;
+}
+function month(id, dark, phone, caption) {
+  // December 2026 starts on a Tuesday; Monday first.
+  let cells = WD.map(w => `<div class="wd">${phone ? w[0] : w}</div>`).join("");
+  const days = [30, ...Array.from({ length: 31 }, (_, i) => i + 1), 1, 2, 3];
+  days.forEach((d, i) => {
+    const other = i === 0 || i > 31;
+    cells += dayCell(d, { other, today: 22, weekendCol: i % 7 >= 5, phone });
+  });
+  const cls = phone ? "cal p390" : "cal k800";
+  return `<figure id="${id}"><div class="${cls}${dark ? " dark" : ""}"><div class="cal__head"><b>December 2026</b><span>Month</span></div>
+    <div class="grid grid--month">${cells}</div></div><figcaption><b>${id}</b> ${caption}</figcaption></figure>`;
+}
+function week(id, dark, caption) {
+  const ds = [21, 22, 23, 24, 25, 26, 27];
+  const cells = ds.map((d, i) => {
+    const hol = HOL[d];
+    const cls = ["day", i >= 5 ? "weekend" : "", hol ? "holiday" : "", d === 25 ? "today" : ""].join(" ");
+    return `<div class="${cls}"><div class="dh"><span class="wkd">${WD[i]}</span><span class="num">${d}</span>${hol ? `<span class="hn" aria-hidden="true">${hol}</span>` : ""}</div>${EV[d] ? `<div class="ev">${EV[d]}</div>` : ""}</div>`;
+  }).join("");
+  return `<figure id="${id}"><div class="cal k800${dark ? " dark" : ""}"><div class="cal__head"><b>21–27 December</b><span>Week</span></div>
+    <div class="grid grid--week">${cells}</div></div><figcaption><b>${id}</b> ${caption}</figcaption></figure>`;
+}
+
+document.getElementById("row-settings").innerHTML =
+  settings("S1", false, "region", "Sweden chosen, light. Region appears because Sweden lists regions; Whole country is the default.") +
+  settings("S2", true, "off-open", "Off, Backlit, with the list open: Off first, then the suggestion from the household time zone, then every country.") +
+  settings("S3", false, "off", "Off, light: no Region row, and the calendar shows nothing.");
+document.getElementById("row-cal").innerHTML =
+  month("D1", false, false, "Month, light. Holiday numbers in red, names on the header line, ellipsis when long. Holidays get the weekend tint, not a red wash. Today (22) keeps its own look.") +
+  month("D2", true, false, "Month, Backlit.") +
+  week("D3", false, "Week strip, light. The name sits under the number, up to two lines. Today is Christmas Day: today's border and number win, and the name stays red.") +
+  week("D4", true, "Week strip, Backlit.");
+document.getElementById("row-phone").innerHTML =
+  month("P1", false, true, "Phone width, month: the red number only. The name is in the title and read by screen readers, and the week and day views show it.");
+
+const only = new URLSearchParams(location.search).get("only");
+if (only) { document.body.classList.add("only"); document.querySelectorAll("section").forEach(s => { s.hidden = s.id !== only; }); }
+</script>
+</body>
+</html>
